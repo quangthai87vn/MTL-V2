@@ -115,6 +115,43 @@ Docker image chỉ chứa mã chương trình, không chứa PostgreSQL local. M
 ./scripts/deploy-prod.sh sha-COMMIT_SHA
 ```
 
+## Khởi tạo máy chủ bằng toàn bộ dữ liệu local
+
+Quy trình này chỉ dùng khi khởi tạo hoặc chủ động reset máy chủ. Nó thay thế toàn bộ database trên server, bao gồm hóa đơn, khách hàng, sản phẩm, nhân viên, mật khẩu và cấu hình nghiệp vụ. Sau khi hệ thống production đã phát sinh dữ liệu thật, không dùng quy trình này để cập nhật code hằng ngày.
+
+Trên Windows, xuất PostgreSQL local thành file custom dump và checksum:
+
+```powershell
+cd "E:\PROJECT MTL\MTL.V2"
+.\scripts\export-local-postgres.ps1
+```
+
+Hai file được tạo trong `backups\transfer`. Thư mục này và file `*.dump` đã được Git bỏ qua; không commit dữ liệu hoặc mật khẩu lên GitHub.
+
+Chuyển cả dump và checksum lên máy chủ:
+
+```powershell
+ssh mtl@192.168.1.112 "mkdir -p /opt/mtl-v2/incoming"
+scp ".\backups\transfer\mtl-v2-local-YYYYMMDD-HHMMSS.dump*" `
+  "mtl@192.168.1.112:/opt/mtl-v2/incoming/"
+```
+
+Sau khi script đã được commit/push, trên Debian cập nhật source rồi chạy khởi tạo:
+
+```bash
+cd /opt/mtl-v2/source
+git pull --ff-only origin main
+cd MTL.V2
+chmod +x scripts/*.sh
+
+./scripts/initialize-prod-from-dump.sh \
+  /opt/mtl-v2/incoming/mtl-v2-local-YYYYMMDD-HHMMSS.dump \
+  main \
+  --confirm-overwrite
+```
+
+Script sẽ kiểm tra SHA-256 nếu có, pull image, khởi động PostgreSQL, kiểm tra định dạng dump, sao lưu database server hiện tại, dừng API/Web, khôi phục trong một transaction và chỉ khởi động ứng dụng khi restore thành công. Tài khoản đăng nhập sau khi restore là tài khoản nằm trong database local, không phải tài khoản seed mới trong `.env`.
+
 ## Sao lưu và khôi phục PostgreSQL
 
 Tạo backup thủ công:
