@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MTL.Domain.Common;
 
 namespace MTL.Domain.Catalog;
@@ -27,6 +28,46 @@ public enum ProductAvailability
     OnBackorder
 }
 
+public enum ProductCatalogVisibility
+{
+    Visible,
+    Catalog,
+    Search,
+    Hidden
+}
+
+public sealed record ProductTag(long? WooTagId, string Name);
+
+public static class ProductTagCollection
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static IReadOnlyList<ProductTag> Normalize(IEnumerable<ProductTag>? tags) =>
+        (tags ?? [])
+            .Where(tag => !string.IsNullOrWhiteSpace(tag.Name))
+            .Select(tag => new ProductTag(tag.WooTagId is > 0 ? tag.WooTagId : null, tag.Name.Trim()))
+            .GroupBy(tag => tag.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Take(50)
+            .ToList();
+
+    public static IReadOnlyList<ProductTag> Deserialize(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            return Normalize(JsonSerializer.Deserialize<List<ProductTag>>(json, JsonOptions));
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    public static string Serialize(IEnumerable<ProductTag>? tags) =>
+        JsonSerializer.Serialize(Normalize(tags), JsonOptions);
+}
+
 public sealed class Product : CompanyOwnedEntity
 {
     public string Sku { get; set; } = string.Empty;
@@ -44,7 +85,9 @@ public sealed class Product : CompanyOwnedEntity
     public string Unit { get; set; } = "Cái";
     public bool TrackInventory { get; set; } = true;
     public ProductAvailability Availability { get; set; } = ProductAvailability.OutOfStock;
+    public ProductCatalogVisibility CatalogVisibility { get; set; } = ProductCatalogVisibility.Visible;
     public ProductStatus Status { get; set; } = ProductStatus.Draft;
+    public string TagsJson { get; set; } = "[]";
     public string? PrimaryImageUrl { get; set; }
     public ProductSyncState SyncState { get; set; } = ProductSyncState.NotLinked;
     public DateTimeOffset? LastSyncedAtUtc { get; set; }

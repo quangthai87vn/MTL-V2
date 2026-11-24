@@ -25,6 +25,7 @@ export type Product = {
   stockQuantity: number
   trackInventory: boolean
   availability: 'InStock' | 'OutOfStock' | 'OnBackorder'
+  catalogVisibility?: 'Visible' | 'Catalog' | 'Search' | 'Hidden'
   status: 'Draft' | 'Active' | 'Inactive' | 'Discontinued'
   syncState: 'NotLinked' | 'Synced' | 'PendingPush' | 'PendingPull' | 'Conflict' | 'Failed'
   primaryImageUrl?: string
@@ -44,7 +45,14 @@ export type ProductDetails = Omit<Product, 'createdAtUtc' | 'updatedAtUtc'> & {
   unit: string
   wooCategoryIds: number[]
   images: ProductImage[]
+  tags: ProductTag[]
+  publishedAtUtc?: string
   syncWarning?: string
+}
+
+export type ProductTag = {
+  wooTagId?: number
+  name: string
 }
 
 export type ProductImage = {
@@ -87,6 +95,7 @@ export type ProductFilterOptions = {
     count: number
   }>
   brands: Array<{ name: string; count: number }>
+  tags: Array<{ name: string; count: number }>
 }
 
 export type BulkProductResult = {

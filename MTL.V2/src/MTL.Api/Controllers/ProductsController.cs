@@ -174,7 +174,20 @@ public sealed class ProductsController(
             .OrderBy(x => x.Name)
             .ToList();
 
-        return Ok(new ProductFilterOptions(categories, brands));
+        var tagRows = await db.Products.AsNoTracking()
+            .Where(x => x.TagsJson != "[]")
+            .Select(x => x.TagsJson)
+            .ToListAsync(cancellationToken);
+        var tags = tagRows
+            .SelectMany(ProductTagCollection.Deserialize)
+            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ProductTagOption(group.Key, group.Count()))
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.Name)
+            .Take(30)
+            .ToList();
+
+        return Ok(new ProductFilterOptions(categories, brands, tags));
     }
 
     [Authorize(Policy = Permissions.ProductsRead)]
@@ -242,7 +255,9 @@ public sealed class ProductsController(
             Unit = request.Unit,
             TrackInventory = request.TrackInventory,
             Availability = request.Availability,
+            CatalogVisibility = request.CatalogVisibility,
             Status = request.Status,
+            TagsJson = ProductTagCollection.Serialize(request.Tags),
             PrimaryImageUrl = request.PrimaryImageUrl,
             SyncState = ProductSyncState.PendingPush
         };
@@ -304,7 +319,9 @@ public sealed class ProductsController(
         product.Unit = request.Unit;
         product.TrackInventory = request.TrackInventory;
         product.Availability = request.Availability;
+        product.CatalogVisibility = request.CatalogVisibility;
         product.Status = request.Status;
+        product.TagsJson = ProductTagCollection.Serialize(request.Tags);
         product.PrimaryImageUrl = request.PrimaryImageUrl;
         product.SyncState = ProductSyncState.PendingPush;
         product.ConcurrencyToken = Guid.NewGuid();
@@ -673,7 +690,10 @@ public sealed class ProductsController(
         x.WooLink?.WooProductId,
         x.WooLink?.WooPermalink,
         x.ConcurrencyToken,
-        syncWarning);
+        syncWarning,
+        x.CatalogVisibility,
+        ProductTagCollection.Deserialize(x.TagsJson),
+        x.WooLink?.WooCreatedAtUtc);
 }
 
 public sealed record SaveProductRequest(
@@ -696,7 +716,9 @@ public sealed record SaveProductRequest(
     string? PrimaryImageUrl,
     IReadOnlyList<SaveProductImageRequest>? Images,
     Guid? ConcurrencyToken,
-    Guid? ClientRequestId);
+    Guid? ClientRequestId,
+    ProductCatalogVisibility CatalogVisibility = ProductCatalogVisibility.Visible,
+    IReadOnlyList<ProductTag>? Tags = null);
 
 public sealed record SaveProductImageRequest(
     long? WooMediaId,
@@ -752,7 +774,10 @@ public sealed record ProductDetails(
     long? WooProductId,
     string? WooPermalink,
     Guid ConcurrencyToken,
-    string? SyncWarning = null);
+    string? SyncWarning = null,
+    ProductCatalogVisibility CatalogVisibility = ProductCatalogVisibility.Visible,
+    IReadOnlyList<ProductTag>? Tags = null,
+    DateTimeOffset? PublishedAtUtc = null);
 
 public sealed record ProductImageDetails(
     long? WooMediaId,
@@ -770,9 +795,11 @@ public sealed record ProductCategoryOption(
     string Path,
     int Count);
 public sealed record ProductBrandOption(string Name, int Count);
+public sealed record ProductTagOption(string Name, int Count);
 public sealed record ProductFilterOptions(
     IReadOnlyList<ProductCategoryOption> Categories,
-    IReadOnlyList<ProductBrandOption> Brands);
+    IReadOnlyList<ProductBrandOption> Brands,
+    IReadOnlyList<ProductTagOption> Tags);
 public sealed record BulkProductRequest(IReadOnlyList<Guid> ProductIds, string Action);
 public sealed record BulkProductResult(int Processed, int Failed, IReadOnlyList<string> Errors);
 public sealed record CategoryHierarchyRow(long Id, long? ParentId);

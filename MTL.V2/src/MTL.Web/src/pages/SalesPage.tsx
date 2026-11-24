@@ -122,22 +122,22 @@ export function SalesPage() {
 
       <div className="data-table-wrap sales-table-wrap">
         <table className="data-table sales-table">
-          <thead><tr><th>Hóa đơn</th><th>Khách hàng</th><th>Nội dung / ghi chú</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th>Tổng tiền</th><th>Đã ghi nhận</th><th>Còn lại</th><th>Nguồn tiền</th><th>Người lập phiếu</th><th>Ngày lập phiếu</th><th>Thao tác</th></tr></thead>
+          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Hóa đơn</th><th>Khách hàng</th><th>Nội dung / ghi chú</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th>Tổng tiền</th><th>Đã ghi nhận</th><th>Còn lại</th><th>Nguồn tiền</th><th>Người lập phiếu</th><th>Ngày lập phiếu</th></tr></thead>
           <tbody>
             {invoicesQuery.isLoading && <tr><td colSpan={12} className="empty-cell">Đang tải hóa đơn…</td></tr>}
             {invoicesQuery.data?.items.map((invoice) => <tr key={invoice.id} className={`sales-invoice-row ${invoice.repairStatus === 'Returned' ? 'repair-is-returned' : invoice.repairStatus === 'ReadyForReturn' ? 'repair-is-ready' : 'repair-is-pending'}`} onClick={() => setSelectedInvoiceId(invoice.id)}>
+              <td className="sales-actions-column"><div className="invoice-row-actions">{hasPermission('sales.manage') && <button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setEditInvoiceId(invoice.id) }} aria-label={`Sửa ${invoice.number}`} title="Sửa hóa đơn"><Pencil size={16} /></button>}<button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setPrintInvoiceId(invoice.id) }} aria-label={`In ${invoice.number}`} title="In hóa đơn"><Printer size={16} /></button>{hasPermission('sales.manage') && <button type="button" className="icon-button danger" onClick={(event) => { event.stopPropagation(); deleteInvoice(invoice) }} aria-label={`Xóa ${invoice.number}`} title="Xóa hóa đơn" disabled={deleteMutation.isPending}><Trash2 size={16} /></button>}</div></td>
               <td><button type="button" className="invoice-number" onClick={() => setSelectedInvoiceId(invoice.id)}><FileText size={16} /><span><strong>{invoice.number}</strong><small>{invoice.type === 'Repair' && invoice.repairDeviceModel ? `${invoice.repairDeviceModel}${invoice.repairDeviceCount > 1 ? ` + ${invoice.repairDeviceCount - 1} máy` : ''}` : invoice.isInstallment ? 'Bán trả góp' : 'Bán trực tiếp'}</small></span></button></td>
               <td><div className="sales-customer-cell"><strong>{invoice.customerName}</strong><span>{invoice.customerPhone || 'Chưa có số điện thoại'}</span><small>{invoice.customerInvoiceCount || 0} đơn · Tổng mua {currency.format(invoice.customerTotalSpent || 0)}</small></div></td>
               <td className="invoice-purpose-cell"><strong>{invoice.notes || (invoice.type === 'Repair' ? `Sửa chữa ${invoice.repairDeviceModel || 'máy khách'}` : 'Bán sản phẩm')}</strong><small>{invoice.type === 'Repair' ? 'Nội dung tiếp nhận / sửa chữa' : 'Nội dung đơn hàng'}</small></td>
               <td><div className="invoice-service-cell">{invoice.type === 'Sale' ? <span className={`invoice-type sale ${invoice.isInstallment ? 'installment' : ''}`}><PackageCheck size={14} /> {invoice.isInstallment ? 'Bán trả góp' : 'Bán trực tiếp'}</span> : <span className="invoice-type repair"><Wrench size={14} /> Sửa chữa</span>}<div className="invoice-service-tags">{invoice.serviceTypes?.map((item) => <span key={item.id}>{item.name}</span>)}</div></div></td>
-              <td><div className="repair-progress-cell"><StatusBadge tone={processingTone(invoice.repairStatus)}>{processingLabel(invoice.repairStatus, invoice.type)}</StatusBadge>{invoice.type === 'Repair' && <small>{invoice.repairDeviceCount} máy trong phiếu</small>}</div></td>
+              <td><div className="repair-progress-cell"><StatusBadge tone={processingTone(invoice.repairStatus)}>{processingLabel(invoice.repairStatus)}</StatusBadge>{invoice.type === 'Repair' && <small>{invoice.repairDeviceCount} máy trong phiếu</small>}</div></td>
               <td className="money">{currency.format(invoice.totalAmount)}</td>
               <td className="collected-money">{invoice.isInstallment ? <span className="installment-money-breakdown"><strong>{currency.format(invoice.paidAmount)}</strong><small>{currency.format(invoice.receivedAmount)} tiền mặt + {currency.format(invoice.scheduledAmount)} banking</small></span> : currency.format(invoice.paidAmount)}</td>
               <td className={invoice.outstandingAmount > 0 ? 'outstanding-money' : 'muted-money'}>{currency.format(invoice.outstandingAmount)}</td>
               <td><StatusBadge tone={processingTone(invoice.repairStatus)}>{invoice.repairStatus === 'Returned' ? 'Đã ghi nhận' : invoice.repairStatus === 'Cancelled' ? 'Đã hủy' : 'Chờ xử lý'}</StatusBadge>{invoice.paymentDueDateUtc && invoice.isInstallment ? <small className="due-date"><CalendarClock size={12} /> Banking {new Date(invoice.paymentDueDateUtc).toLocaleDateString('vi-VN')}</small> : null}</td>
               <td><span className="invoice-creator">{invoice.createdByName || 'Dữ liệu cũ'}</span></td>
               <td><span className="date-cell">{dateTime.format(new Date(invoice.invoiceDateUtc))}</span></td>
-              <td><div className="invoice-row-actions">{hasPermission('sales.manage') && <button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setEditInvoiceId(invoice.id) }} aria-label={`Sửa ${invoice.number}`} title="Sửa hóa đơn"><Pencil size={16} /></button>}<button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setPrintInvoiceId(invoice.id) }} aria-label={`In ${invoice.number}`} title="In hóa đơn"><Printer size={16} /></button>{hasPermission('sales.manage') && <button type="button" className="icon-button danger" onClick={(event) => { event.stopPropagation(); deleteInvoice(invoice) }} aria-label={`Xóa ${invoice.number}`} title="Xóa hóa đơn" disabled={deleteMutation.isPending}><Trash2 size={16} /></button>}</div></td>
             </tr>)}
             {!invoicesQuery.isLoading && invoicesQuery.data?.items.length === 0 && <tr><td colSpan={12} className="empty-cell"><CreditCard size={22} /> Chưa có hóa đơn phù hợp.</td></tr>}
           </tbody>
@@ -167,7 +167,7 @@ export function SalesPage() {
   </>
 }
 
-function processingLabel(status: RepairStatus | undefined, _type: SalesInvoice['type']) {
+function processingLabel(status: RepairStatus | undefined) {
   if (status === 'Returned') return 'Đã xử lý'
   if (status === 'Cancelled') return 'Đã hủy'
   return 'Đang xử lý'

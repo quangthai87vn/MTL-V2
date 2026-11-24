@@ -117,6 +117,8 @@ public sealed class WooProductCreationTests
         product.TrackInventory = false;
         product.StockQuantity = 0;
         product.Availability = ProductAvailability.InStock;
+        product.CatalogVisibility = ProductCatalogVisibility.Search;
+        product.TagsJson = ProductTagCollection.Serialize([new ProductTag(42, "Laptop văn phòng")]);
         product.WooLink = new WooProductLink
         {
             CompanyId = product.CompanyId,
@@ -141,6 +143,8 @@ public sealed class WooProductCreationTests
         Assert.False(payload.RootElement.GetProperty("manage_stock").GetBoolean());
         Assert.Equal("instock", payload.RootElement.GetProperty("stock_status").GetString());
         Assert.False(payload.RootElement.TryGetProperty("stock_quantity", out _));
+        Assert.Equal("search", payload.RootElement.GetProperty("catalog_visibility").GetString());
+        Assert.Equal("Laptop văn phòng", payload.RootElement.GetProperty("tags")[0].GetProperty("name").GetString());
     }
 
     [Fact]
@@ -179,12 +183,25 @@ public sealed class WooProductCreationTests
         id = RemoteProductId,
         name = product.Name,
         status = "draft",
+        catalog_visibility = product.CatalogVisibility switch
+        {
+            ProductCatalogVisibility.Catalog => "catalog",
+            ProductCatalogVisibility.Search => "search",
+            ProductCatalogVisibility.Hidden => "hidden",
+            _ => "visible"
+        },
         date_created_gmt = DateTimeOffset.UtcNow,
         permalink = $"https://example.test/product/{RemoteProductId}",
         manage_stock = false,
         stock_status = "instock",
         categories = Array.Empty<object>(),
         images = Array.Empty<object>(),
+        tags = ProductTagCollection.Deserialize(product.TagsJson).Select(tag => new
+        {
+            id = tag.WooTagId ?? 0,
+            name = tag.Name,
+            slug = tag.Name.ToLowerInvariant().Replace(' ', '-')
+        }),
         meta_data = new[]
         {
             new { key = "_mtl_v2_product_id", value = product.Id.ToString("D") }

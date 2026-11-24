@@ -80,6 +80,13 @@ namespace MTL.Infrastructure.Persistence.Migrations
                     b.Property<string>("Brand")
                         .HasColumnType("text");
 
+                    b.Property<string>("CatalogVisibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Visible");
+
                     b.Property<string>("CategoryName")
                         .HasColumnType("text");
 
@@ -152,6 +159,12 @@ namespace MTL.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("TagsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValue("[]");
 
                     b.Property<bool>("TrackInventory")
                         .HasColumnType("boolean");

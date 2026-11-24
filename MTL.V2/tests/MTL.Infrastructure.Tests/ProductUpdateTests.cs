@@ -44,7 +44,9 @@ public sealed class ProductUpdateTests
             Unit = "Cái",
             TrackInventory = true,
             Availability = ProductAvailability.OutOfStock,
+            CatalogVisibility = ProductCatalogVisibility.Hidden,
             Status = ProductStatus.Draft,
+            TagsJson = ProductTagCollection.Serialize([new ProductTag(10, "Thẻ cũ")]),
             PrimaryImageUrl = "https://example.test/old.jpg",
             SyncState = ProductSyncState.Synced,
             ConcurrencyToken = originalToken
@@ -102,7 +104,9 @@ public sealed class ProductUpdateTests
                 new SaveProductImageRequest(102, "https://example.test/new-gallery.jpg", null, "Ảnh phụ", null, 1)
             ],
             ConcurrencyToken: originalToken,
-            ClientRequestId: null);
+            ClientRequestId: null,
+            CatalogVisibility: ProductCatalogVisibility.Search,
+            Tags: [new ProductTag(21, "Laptop văn phòng"), new ProductTag(null, "Mỏng nhẹ")]);
 
         var result = await controller.Update(product.Id, request);
 
@@ -134,7 +138,11 @@ public sealed class ProductUpdateTests
         Assert.Equal("Bộ", saved.Unit);
         Assert.False(saved.TrackInventory);
         Assert.Equal(ProductAvailability.InStock, saved.Availability);
+        Assert.Equal(ProductCatalogVisibility.Search, saved.CatalogVisibility);
         Assert.Equal(ProductStatus.Active, saved.Status);
+        Assert.Equal(
+            ["Laptop văn phòng", "Mỏng nhẹ"],
+            ProductTagCollection.Deserialize(saved.TagsJson).Select(item => item.Name));
         Assert.Equal(ProductSyncState.Failed, saved.SyncState);
         Assert.Equal("https://example.test/new-primary.jpg", saved.PrimaryImageUrl);
         Assert.Equal(

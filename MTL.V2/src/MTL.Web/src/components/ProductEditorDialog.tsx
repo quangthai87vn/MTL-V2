@@ -1,10 +1,14 @@
 import {
   Bold,
+  CalendarDays,
   Code2,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Eye,
   ExternalLink,
+  Globe2,
   Images,
   ImageOff,
   Italic,
@@ -12,16 +16,18 @@ import {
   List,
   ListOrdered,
   PackagePlus,
+  PackageCheck,
   Save,
   Star,
+  Tag,
   Trash2,
   Upload,
   X,
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import { api, apiFetch } from '../lib/api'
-import type { MediaItem, MediaPage, ProductDetails, ProductFilterOptions, ProductImage } from '../types'
+import type { MediaItem, MediaPage, ProductDetails, ProductFilterOptions, ProductImage, ProductTag } from '../types'
 
 type ProductEditorDialogProps = {
   productId?: string
@@ -46,6 +52,8 @@ const emptyProduct: ProductDetails = {
   concurrencyToken: '',
   wooCategoryIds: [],
   images: [],
+  tags: [],
+  catalogVisibility: 'Visible',
 }
 
 export function ProductEditorDialog({ productId, filterOptions, onClose, onSaved, onDeleted }: ProductEditorDialogProps) {
@@ -80,6 +88,9 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
   const [description, setDescription] = useState(product.description ?? '')
   const [shortDescription, setShortDescription] = useState(product.shortDescription ?? '')
   const [trackInventory, setTrackInventory] = useState(product.trackInventory)
+  const [tags, setTags] = useState<ProductTag[]>(product.tags ?? [])
+  const [tagInput, setTagInput] = useState('')
+  const [showPopularTags, setShowPopularTags] = useState(false)
   const [dataTab, setDataTab] = useState<'general' | 'inventory'>('general')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -106,13 +117,15 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
       salePrice: Number(form.get('salePrice')) || 0,
       costPrice: Number(form.get('costPrice')) || 0,
       stockQuantity: Number(form.get('stockQuantity')) || 0,
-      unit: product.unit || 'Cái',
+      unit: String(form.get('unit') ?? '').trim() || 'Cái',
       trackInventory,
       availability: String(form.get('availability')),
+      catalogVisibility: String(form.get('catalogVisibility')),
       status: String(form.get('status')),
+      tags,
       primaryImageUrl: images[0]?.url ?? null,
       images: images.map((image, position) => ({ ...image, position })),
-      sku: null,
+      sku: String(form.get('sku') ?? '').trim() || null,
       concurrencyToken: isEditing ? product.concurrencyToken : null,
       clientRequestId: isEditing ? null : clientRequestId,
     }
@@ -150,6 +163,24 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
       else next.add(categoryId)
       return next
     })
+  }
+
+  function addTags(values: string[]) {
+    const normalized = values.map((value) => value.trim()).filter(Boolean)
+    if (normalized.length === 0) return
+    setTags((current) => {
+      const byName = new Map(current.map((tag) => [tag.name.toLocaleLowerCase('vi'), tag]))
+      normalized.forEach((name) => {
+        const key = name.toLocaleLowerCase('vi')
+        if (!byName.has(key)) byName.set(key, { name })
+      })
+      return [...byName.values()].slice(0, 50)
+    })
+    setTagInput('')
+  }
+
+  function removeTag(name: string) {
+    setTags((current) => current.filter((tag) => tag.name.toLocaleLowerCase('vi') !== name.toLocaleLowerCase('vi')))
   }
 
   function chooseMedia(selected: MediaItem[]) {
@@ -226,6 +257,8 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
                   <label className="editor-field"><span>Giá vốn nội bộ (₫)</span><input name="costPrice" type="number" min="0" defaultValue={product.costPrice} /></label>
                 </div></div>
                 <div className={`product-data-pane${dataTab === 'inventory' ? '' : ' is-hidden'}`} aria-hidden={dataTab !== 'inventory'}><div className="editor-form-grid">
+                  <label className="editor-field"><span>Mã sản phẩm (SKU)</span><input name="sku" defaultValue={product.sku} placeholder="Tự động tạo nếu để trống" /></label>
+                  <label className="editor-field"><span>Đơn vị tính</span><input name="unit" defaultValue={product.unit || 'Cái'} placeholder="Cái, Bộ, Chiếc…" /></label>
                   <label className="editor-field"><span>Trạng thái kho</span><select name="availability" defaultValue={product.availability}><option value="InStock">Còn hàng</option><option value="OutOfStock">Hết hàng</option><option value="OnBackorder">Cho phép đặt trước</option></select></label>
                   <label className="editor-check full"><input type="checkbox" checked={trackInventory} onChange={(event) => setTrackInventory(event.target.checked)} /><span><strong>Quản lý số lượng tồn</strong><small>Đồng bộ số lượng cụ thể lên WooCommerce.</small></span></label>
                   {trackInventory && <label className="editor-field"><span>Số lượng tồn</span><input name="stockQuantity" type="number" min="0" step="1" defaultValue={product.stockQuantity} /></label>}
@@ -239,33 +272,70 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
         </main>
 
         <aside className="product-editor-side wordpress-editor-side">
-          <section className="editor-side-card category-card">
-            <h3>Danh mục sản phẩm</h3>
+          <EditorSideCard title="Danh mục sản phẩm" className="category-card">
             <CategoryTree categories={filterOptions?.categories ?? []} selectedIds={selectedCategoryIds} onToggle={toggleCategory} />
             <small className="editor-help">Có thể chọn nhiều danh mục. Danh mục đầu tiên được dùng làm danh mục chính trong danh sách.</small>
-          </section>
+          </EditorSideCard>
 
-          <section className="editor-side-card publish-card">
-            <h3>Xuất bản</h3>
-            <label className="editor-field"><span>Trạng thái</span><select name="status" defaultValue={product.status}><option value="Active">Đang bán / Publish</option><option value="Draft">Bản nháp</option><option value="Inactive">Tạm ẩn</option><option value="Discontinued">Ngừng kinh doanh</option></select></label>
+          <EditorSideCard title="Xuất bản" className="publish-card">
+            {product.wooPermalink && <a className="secondary-button editor-open-link publish-preview" href={product.wooPermalink} target="_blank" rel="noreferrer"><Eye size={16} /> Xem trước</a>}
+            <div className="publish-settings">
+              <label className="publish-setting-row">
+                <PackageCheck size={16} />
+                <span>Trạng thái</span>
+                <select name="status" defaultValue={product.status}><option value="Active">Đã xuất bản</option><option value="Draft">Bản nháp</option><option value="Inactive">Tạm ẩn</option><option value="Discontinued">Ngừng kinh doanh</option></select>
+              </label>
+              <label className="publish-setting-row">
+                <Globe2 size={16} />
+                <span>Hiển thị</span>
+                <select name="catalogVisibility" defaultValue={product.catalogVisibility ?? 'Visible'}><option value="Visible">Cửa hàng và tìm kiếm</option><option value="Catalog">Chỉ trong cửa hàng</option><option value="Search">Chỉ trong tìm kiếm</option><option value="Hidden">Ẩn khỏi cửa hàng</option></select>
+              </label>
+              <div className="publish-setting-row is-static">
+                <CalendarDays size={16} />
+                <span>{product.publishedAtUtc ? 'Đã xuất bản lúc' : 'Ngày xuất bản'}</span>
+                <strong>{product.publishedAtUtc ? formatPublishedAt(product.publishedAtUtc) : 'Khi cập nhật'}</strong>
+              </div>
+            </div>
             <div className="woo-editor-state"><span className={product.wooProductId ? 'connected' : ''} /><div><strong>{product.wooProductId ? `Woo #${product.wooProductId}` : 'Chưa có trên Woo'}</strong><small>{product.syncState === 'Synced' ? 'Dữ liệu đã đồng bộ' : 'Sẽ đồng bộ khi lưu'}</small></div></div>
-            {product.wooPermalink && <a className="secondary-button editor-open-link" href={product.wooPermalink} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Xem trước</a>}
-            <button className="primary-button editor-save" disabled={saving || deleting}><Save size={17} /> {saving ? 'Đang lưu & đồng bộ…' : isEditing ? 'Cập nhật sản phẩm' : 'Đăng sản phẩm'}</button>
-            {isEditing && <button type="button" className="danger-button" onClick={() => void remove()} disabled={saving || deleting}><Trash2 size={16} /> {deleting ? 'Đang chuyển vào thùng rác…' : 'Bỏ vào thùng rác'}</button>}
-          </section>
+            <div className="publish-actions">
+              {isEditing && <button type="button" className="publish-trash" onClick={() => void remove()} disabled={saving || deleting}><Trash2 size={15} /> {deleting ? 'Đang xóa…' : 'Bỏ vào thùng rác'}</button>}
+              <button className="primary-button editor-save" disabled={saving || deleting}><Save size={17} /> {saving ? 'Đang lưu…' : isEditing ? 'Cập nhật' : 'Đăng sản phẩm'}</button>
+            </div>
+          </EditorSideCard>
 
-          <section className="editor-side-card">
-            <h3>Ảnh sản phẩm</h3>
+          <EditorSideCard title="Thẻ sản phẩm" className="product-tags-card">
+            <div className="tag-entry-row">
+              <input
+                value={tagInput}
+                onChange={(event) => setTagInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  addTags(tagInput.split(','))
+                }}
+                placeholder="Ví dụ: Laptop văn phòng"
+                aria-label="Nhập thẻ sản phẩm"
+              />
+              <button type="button" className="secondary-button" onClick={() => addTags(tagInput.split(','))}>Thêm</button>
+            </div>
+            <small className="editor-help">Phân tách nhiều thẻ bằng dấu phẩy.</small>
+            {tags.length > 0 && <div className="product-tag-list">{tags.map((tag) => <span key={tag.name}>{tag.name}<button type="button" onClick={() => removeTag(tag.name)} aria-label={`Xóa thẻ ${tag.name}`}><X size={13} /></button></span>)}</div>}
+            {(filterOptions?.tags?.length ?? 0) > 0 && <>
+              <button type="button" className="popular-tags-toggle" onClick={() => setShowPopularTags((current) => !current)}><Tag size={14} /> {showPopularTags ? 'Ẩn các thẻ phổ biến' : 'Chọn từ các thẻ được dùng nhiều nhất'}</button>
+              {showPopularTags && <div className="popular-tag-list">{filterOptions?.tags?.map((tag) => <button type="button" key={tag.name} onClick={() => addTags([tag.name])}>{tag.name}<small>{tag.count}</small></button>)}</div>}
+            </>}
+          </EditorSideCard>
+
+          <EditorSideCard title="Ảnh sản phẩm">
             <button type="button" className="editor-image-preview media-trigger" onClick={() => setMediaPicker('featured')}>
               {images[0] ? <img src={images[0].thumbnailUrl ?? images[0].url} alt={images[0].altText ?? product.name} /> : <span><ImageOff size={30} /> Chọn ảnh sản phẩm</span>}
             </button>
             <button type="button" className="secondary-button media-select-button" onClick={() => setMediaPicker('featured')}><Images size={16} /> {images[0] ? 'Thay ảnh sản phẩm' : 'Chọn ảnh sản phẩm'}</button>
             {images[0] && <button type="button" className="text-danger-button" onClick={() => removeImage(0)}>Xóa ảnh sản phẩm</button>}
             <small className="editor-help">Ảnh đầu tiên là ảnh đại diện và được đồng bộ lên WooCommerce.</small>
-          </section>
+          </EditorSideCard>
 
-          <section className="editor-side-card product-gallery-card">
-            <h3>Album hình ảnh sản phẩm</h3>
+          <EditorSideCard title="Album hình ảnh sản phẩm" className="product-gallery-card">
             {images.length > 1 ? <div className="product-gallery-editor">
               {images.slice(1).map((image, offset) => {
                 const index = offset + 1
@@ -281,13 +351,12 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
             </div> : <div className="gallery-empty"><Images size={26} /><span>Chưa có ảnh album</span></div>}
             <button type="button" className="secondary-button media-select-button" onClick={() => setMediaPicker('gallery')}><Images size={16} /> Thêm ảnh vào album</button>
             <small className="editor-help">Có thể chọn và upload nhiều ảnh cùng lúc, tối đa 30 ảnh cho một sản phẩm.</small>
-          </section>
+          </EditorSideCard>
 
-          <section className="editor-side-card">
-            <h3>Thương hiệu sản phẩm</h3>
+          <EditorSideCard title="Thương hiệu sản phẩm">
             <label className="editor-field"><span>Thương hiệu</span><input name="brand" defaultValue={product.brand ?? ''} list="product-brands" placeholder="Ví dụ: Dell" /></label>
             <datalist id="product-brands">{filterOptions?.brands.map((item) => <option key={item.name} value={item.name} />)}</datalist>
-          </section>
+          </EditorSideCard>
 
           {!isEditing && <div className="editor-new-note"><PackagePlus size={19} /><span>Sản phẩm sẽ được tạo đồng thời trong MTL.V2 và WooCommerce.</span></div>}
         </aside>
@@ -300,6 +369,22 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
       onConfirm={chooseMedia}
     />}
   </div>
+}
+
+function EditorSideCard({ title, className = '', children }: { title: string; className?: string; children: ReactNode }) {
+  return <details className={`editor-side-card wp-side-card ${className}`.trim()} open>
+    <summary><strong>{title}</strong><ChevronDown size={18} /></summary>
+    <div className="wp-side-card-body">{children}</div>
+  </details>
+}
+
+function formatPublishedAt(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Không xác định'
+  return new Intl.DateTimeFormat('vi-VN', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 function CategoryTree({ categories, selectedIds, onToggle }: { categories: ProductFilterOptions['categories']; selectedIds: Set<number>; onToggle: (id: number) => void }) {

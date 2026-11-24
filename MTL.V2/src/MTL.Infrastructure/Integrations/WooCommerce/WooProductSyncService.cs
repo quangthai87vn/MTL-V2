@@ -212,6 +212,13 @@ public sealed class WooProductSyncService(
             name = product.Name,
             sku = IsGeneratedSku(product.Sku) ? null : product.Sku,
             status = product.Status == ProductStatus.Active ? "publish" : "draft",
+            catalog_visibility = product.CatalogVisibility switch
+            {
+                ProductCatalogVisibility.Catalog => "catalog",
+                ProductCatalogVisibility.Search => "search",
+                ProductCatalogVisibility.Hidden => "hidden",
+                _ => "visible"
+            },
             regular_price = product.RegularPrice?.ToString("0.##", CultureInfo.InvariantCulture),
             sale_price = product.SalePrice.ToString("0.##", CultureInfo.InvariantCulture),
             manage_stock = product.TrackInventory,
@@ -227,6 +234,9 @@ public sealed class WooProductSyncService(
             categories = product.CategoryAssignments.Count > 0
                 ? product.CategoryAssignments.Select(category => new { id = category.WooCategoryId }).ToArray()
                 : product.WooCategoryId.HasValue ? new[] { new { id = product.WooCategoryId.Value } } : null,
+            tags = ProductTagCollection.Deserialize(product.TagsJson)
+                .Select(tag => new { id = tag.WooTagId, name = tag.Name })
+                .ToArray(),
             images = BuildWooImagePayload(product),
             meta_data = new[]
             {
@@ -273,6 +283,8 @@ public sealed class WooProductSyncService(
         product.WooLink.LastPushedAtUtc = DateTimeOffset.UtcNow;
         SyncProductCategories(product, woo.Categories);
         SyncProductImages(product, woo.Images);
+        product.TagsJson = ProductTagCollection.Serialize(
+            woo.Tags.Select(tag => new ProductTag(tag.Id is > 0 ? tag.Id : null, tag.Name ?? string.Empty)));
         product.SyncState = ProductSyncState.Synced;
         product.LastSyncedAtUtc = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
@@ -448,6 +460,15 @@ public sealed class WooProductSyncService(
             "onbackorder" => ProductAvailability.OnBackorder,
             _ => ProductAvailability.OutOfStock
         };
+        product.CatalogVisibility = woo.CatalogVisibility switch
+        {
+            "catalog" => ProductCatalogVisibility.Catalog,
+            "search" => ProductCatalogVisibility.Search,
+            "hidden" => ProductCatalogVisibility.Hidden,
+            _ => ProductCatalogVisibility.Visible
+        };
+        product.TagsJson = ProductTagCollection.Serialize(
+            woo.Tags.Select(tag => new ProductTag(tag.Id is > 0 ? tag.Id : null, tag.Name ?? string.Empty)));
         SyncProductImages(product, woo.Images);
         product.CategoryName = woo.Categories.FirstOrDefault()?.Name;
         product.WooCategoryId = woo.Categories.FirstOrDefault()?.Id;
@@ -664,6 +685,8 @@ internal sealed class WooProductDto
     public string? Slug { get; set; }
     [JsonPropertyName("status")]
     public string? Status { get; set; }
+    [JsonPropertyName("catalog_visibility")]
+    public string? CatalogVisibility { get; set; }
     [JsonPropertyName("permalink")]
     public string? Permalink { get; set; }
     [JsonPropertyName("price")]
@@ -692,6 +715,8 @@ internal sealed class WooProductDto
     public List<WooImageDto> Images { get; set; } = [];
     [JsonPropertyName("categories")]
     public List<WooCategoryDto> Categories { get; set; } = [];
+    [JsonPropertyName("tags")]
+    public List<WooTagDto> Tags { get; set; } = [];
     [JsonPropertyName("attributes")]
     public List<WooAttributeDto> Attributes { get; set; } = [];
     [JsonPropertyName("brands")]
@@ -742,6 +767,16 @@ internal sealed class WooCategoryDto
     public long Parent { get; set; }
     [JsonPropertyName("count")]
     public int Count { get; set; }
+}
+
+internal sealed class WooTagDto
+{
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+    [JsonPropertyName("slug")]
+    public string? Slug { get; set; }
 }
 
 internal sealed class WooAttributeDto

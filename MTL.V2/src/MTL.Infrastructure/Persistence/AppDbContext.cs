@@ -80,6 +80,8 @@ public sealed class AppDbContext(
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
             entity.Property(x => x.SyncState).HasConversion<string>().HasMaxLength(30);
             entity.Property(x => x.Availability).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.CatalogVisibility).HasConversion<string>().HasMaxLength(30).HasDefaultValue(ProductCatalogVisibility.Visible);
+            entity.Property(x => x.TagsJson).HasColumnType("jsonb").HasDefaultValue("[]");
             entity.Property(x => x.SalePrice).HasPrecision(18, 2);
             entity.Property(x => x.RegularPrice).HasPrecision(18, 2);
             entity.Property(x => x.CostPrice).HasPrecision(18, 2);
