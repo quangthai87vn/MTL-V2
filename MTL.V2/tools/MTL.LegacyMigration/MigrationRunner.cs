@@ -790,7 +790,7 @@ internal sealed class MigrationRunner(MigrationOptions options, LegacyDataset so
         var first = Clean(visible);
         var second = Clean(internalNotes);
         if (second is null) return first;
-        return first is null ? $"Ghi chú nội bộ hệ thống cũ: {second}" : $"{first}\nGhi chú nội bộ hệ thống cũ: {second}";
+        return first is null ? second : $"{first}\n{second}";
     }
 
     private static string MapLegacyTagName(string value) => NormalizeText(value) switch
