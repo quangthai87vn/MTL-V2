@@ -74,6 +74,23 @@ docker pull ghcr.io/quangthai87vn/mtl-v2-web:main
 
 Nếu vẫn báo `unauthorized`, kiểm tra token là loại classic, có quyền `read:packages`, chưa hết hạn và thuộc tài khoản có quyền truy cập repository/package.
 
+### Sửa lỗi API `unhealthy`
+
+Xem lỗi khởi động API:
+
+```bash
+docker compose --env-file .env -f compose.prod.yml ps
+docker compose --env-file .env -f compose.prod.yml logs --tail=200 api
+```
+
+Lần chạy đầu tiên, nguyên nhân thường gặp là `.env` còn giá trị `CHANGE_ME_` hoặc mật khẩu quản trị không đạt chính sách. `MTL_ADMIN_PASSWORD` phải dài ít nhất 12 ký tự và có chữ hoa, chữ thường, chữ số, ký tự đặc biệt. Sau khi sửa `.env`, chạy lại:
+
+```bash
+./scripts/deploy-prod.sh main
+```
+
+Không xóa volume PostgreSQL chỉ vì API `unhealthy`. Việc khởi động lại sau khi sửa cấu hình sẽ tiếp tục migration và seed còn thiếu.
+
 Để triển khai đúng một commit đã được build:
 
 ```bash
