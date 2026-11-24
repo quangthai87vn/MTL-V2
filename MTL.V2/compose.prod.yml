@@ -1,0 +1,59 @@
+name: mtl-v2
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/quangthai87vn/mtl-v2-api:${IMAGE_TAG:-main}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Database: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      DataProtection__KeysPath: /keys
+      Seed__CompanyName: ${MTL_COMPANY_NAME:-MỸ THO LAPTOP}
+      Seed__CompanyCode: MTL
+      Seed__AdminEmail: ${MTL_ADMIN_EMAIL:?Set MTL_ADMIN_EMAIL in .env}
+      Seed__AdminPassword: ${MTL_ADMIN_PASSWORD:?Set MTL_ADMIN_PASSWORD in .env}
+    volumes:
+      - data-protection-keys:/keys
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/quangthai87vn/mtl-v2-web:${IMAGE_TAG:-main}
+    ports:
+      - "127.0.0.1:${MTL_HTTP_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  data-protection-keys:
