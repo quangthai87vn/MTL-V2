@@ -8,6 +8,16 @@ Không mở cổng PostgreSQL ra Internet. Chỉ dịch vụ API trong cùng Doc
 
 ## Chuẩn bị máy chủ
 
+Cho phép user triển khai chạy Docker mà không cần `sudo`:
+
+```bash
+sudo usermod -aG docker "$USER"
+newgrp docker
+docker info >/dev/null && echo "Docker OK"
+```
+
+Nhóm `docker` có quyền quản trị máy chủ. Chỉ thêm tài khoản dùng để triển khai, không thêm tài khoản người dùng thông thường.
+
 ```bash
 sudo mkdir -p /opt/mtl-v2
 sudo chown -R "$USER":"$USER" /opt/mtl-v2
@@ -17,10 +27,21 @@ cp deploy/production.env.example .env
 chmod 600 .env
 ```
 
-Điền mật khẩu thật vào `.env`, sau đó đăng nhập GitHub Container Registry bằng token chỉ có quyền `read:packages`:
+Điền mật khẩu thật vào `.env`. Sau đó tạo **Personal access token (classic)** có quyền `read:packages` và đăng nhập GitHub Container Registry. Không dùng mật khẩu tài khoản GitHub:
 
 ```bash
-docker login ghcr.io -u quangthai87vn
+read -rsp "GitHub package token: " GHCR_TOKEN; echo
+printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u quangthai87vn --password-stdin
+unset GHCR_TOKEN
+```
+
+Thông tin đăng nhập Docker được lưu riêng theo từng user. Vì vậy không đăng nhập bằng `docker login` rồi chạy `sudo ./scripts/deploy-prod.sh`; khi đó lệnh chạy dưới user `root` và không đọc được thông tin đăng nhập của user hiện tại.
+
+Kiểm tra quyền truy cập image trước khi triển khai:
+
+```bash
+docker pull ghcr.io/quangthai87vn/mtl-v2-api:main
+docker pull ghcr.io/quangthai87vn/mtl-v2-web:main
 ```
 
 ## Triển khai
@@ -32,6 +53,26 @@ cd MTL.V2
 chmod +x scripts/*.sh
 ./scripts/deploy-prod.sh main
 ```
+
+### Sửa lỗi `unauthorized` khi pull image
+
+Nếu trước đó đã chạy script bằng `sudo`, thực hiện lại bằng đúng user triển khai:
+
+```bash
+sudo usermod -aG docker "$USER"
+newgrp docker
+
+docker logout ghcr.io || true
+read -rsp "GitHub package token: " GHCR_TOKEN; echo
+printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u quangthai87vn --password-stdin
+unset GHCR_TOKEN
+
+docker pull ghcr.io/quangthai87vn/mtl-v2-api:main
+docker pull ghcr.io/quangthai87vn/mtl-v2-web:main
+./scripts/deploy-prod.sh main
+```
+
+Nếu vẫn báo `unauthorized`, kiểm tra token là loại classic, có quyền `read:packages`, chưa hết hạn và thuộc tài khoản có quyền truy cập repository/package.
 
 Để triển khai đúng một commit đã được build:
 
