@@ -196,6 +196,11 @@ public sealed class ProductsController(
         SaveProductRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (ValidateRequest(request) is { } validationMessage)
+        {
+            return BadRequest(new { message = validationMessage });
+        }
+
         var companyId = currentUser.CompanyId ?? throw new UnauthorizedAccessException();
         var productId = request.ClientRequestId is { } requestedId && requestedId != Guid.Empty
             ? requestedId
@@ -218,8 +223,6 @@ public sealed class ProductsController(
         {
             return Conflict(new { message = "SKU đã tồn tại." });
         }
-
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var product = new Product
         {
@@ -247,16 +250,10 @@ public sealed class ProductsController(
         db.Products.Add(product);
         await ApplyProductCategoriesAsync(product, request.WooCategoryIds, request.WooCategoryId, cancellationToken);
         ApplyProductImages(product, request.Images, request.PrimaryImageUrl);
-        try
-        {
-            await wooSync.PushAsync(product, cancellationToken);
-        }
-        catch (WooProductRecoveryRequiredException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
-        await transaction.CommitAsync(cancellationToken);
-        return CreatedAtAction(nameof(GetById), new { id = product.Id }, ToDetails(product));
+        await db.SaveChangesAsync(cancellationToken);
+
+        var syncResult = await PushOrMarkFailedAsync(product, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = product.Id }, ToDetails(syncResult.Product, syncResult.Warning));
     }
 
     [Authorize(Policy = Permissions.ProductsManage)]
@@ -266,6 +263,11 @@ public sealed class ProductsController(
         SaveProductRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (ValidateRequest(request) is { } validationMessage)
+        {
+            return BadRequest(new { message = validationMessage });
+        }
+
         var product = await db.Products
             .Include(x => x.WooLink)
             .Include(x => x.CategoryAssignments)
@@ -288,8 +290,6 @@ public sealed class ProductsController(
             return Conflict(new { message = "SKU đã tồn tại." });
         }
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-
         product.Sku = normalizedSku;
         product.Name = request.Name.Trim();
         product.ShortDescription = request.ShortDescription;
@@ -311,27 +311,49 @@ public sealed class ProductsController(
         await ApplyProductCategoriesAsync(product, request.WooCategoryIds, request.WooCategoryId, cancellationToken);
         ApplyProductImages(product, request.Images, request.PrimaryImageUrl);
 
-        await wooSync.PushAsync(product, cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return Ok(ToDetails(product));
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict(new { message = "Sản phẩm đã được người khác cập nhật. Hãy tải lại dữ liệu." });
+        }
+
+        var syncResult = await PushOrMarkFailedAsync(product, cancellationToken);
+        return Ok(ToDetails(syncResult.Product, syncResult.Warning));
     }
 
     [Authorize(Policy = Permissions.ProductsManage)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        await wooSync.DeleteAsync(id, force: false, cancellationToken: cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return NoContent();
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await wooSync.DeleteAsync(id, force: false, cancellationToken: cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return NoContent();
+        }
+        catch (WooCommerceRequestException exception)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = exception.Message });
+        }
     }
 
     [Authorize(Policy = Permissions.WooCommerceManage)]
     [HttpPost("{id:guid}/push-to-woocommerce")]
     public async Task<IActionResult> PushToWoo(Guid id, CancellationToken cancellationToken)
     {
-        await wooSync.PushAsync(id, cancellationToken);
-        return Accepted(new { message = "Đã cập nhật sản phẩm lên WooCommerce." });
+        try
+        {
+            await wooSync.PushAsync(id, cancellationToken);
+            return Accepted(new { message = "Đã cập nhật sản phẩm lên WooCommerce." });
+        }
+        catch (WooCommerceRequestException exception)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = exception.Message });
+        }
     }
 
     [Authorize(Policy = Permissions.ProductsManage)]
@@ -571,7 +593,57 @@ public sealed class ProductsController(
         return result;
     }
 
-    private static ProductDetails ToDetails(Product x) => new(
+    private async Task<(Product Product, string? Warning)> PushOrMarkFailedAsync(
+        Product product,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await wooSync.PushAsync(product, cancellationToken);
+            return (product, null);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var reason = exception.Message;
+            db.ChangeTracker.Clear();
+
+            var persistedProduct = await db.Products
+                .Include(x => x.WooLink)
+                .Include(x => x.CategoryAssignments)
+                .Include(x => x.Images)
+                .SingleAsync(x => x.Id == product.Id, cancellationToken);
+            persistedProduct.SyncState = ProductSyncState.Failed;
+
+            var connection = await db.WooCommerceConnections.SingleOrDefaultAsync(cancellationToken);
+            if (connection is not null)
+            {
+                connection.LastError = reason;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            return (
+                persistedProduct,
+                $"Chưa đồng bộ WooCommerce: {reason}");
+        }
+    }
+
+    private static string? ValidateRequest(SaveProductRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name)) return "Tên sản phẩm không được để trống.";
+        if (string.IsNullOrWhiteSpace(request.Unit)) return "Đơn vị tính không được để trống.";
+        if (request.SalePrice < 0 || request.CostPrice < 0 || request.RegularPrice < 0)
+            return "Giá sản phẩm không được nhỏ hơn 0.";
+        if (request.RegularPrice.HasValue && request.SalePrice > request.RegularPrice.Value)
+            return "Giá khuyến mãi không được lớn hơn giá thông thường.";
+        if (request.StockQuantity < 0) return "Số lượng tồn không được nhỏ hơn 0.";
+        return null;
+    }
+
+    private static ProductDetails ToDetails(Product x, string? syncWarning = null) => new(
         x.Id,
         x.Sku,
         x.Name,
@@ -600,7 +672,8 @@ public sealed class ProductsController(
             image.Position)).ToList(),
         x.WooLink?.WooProductId,
         x.WooLink?.WooPermalink,
-        x.ConcurrencyToken);
+        x.ConcurrencyToken,
+        syncWarning);
 }
 
 public sealed record SaveProductRequest(
@@ -678,7 +751,8 @@ public sealed record ProductDetails(
     IReadOnlyList<ProductImageDetails> Images,
     long? WooProductId,
     string? WooPermalink,
-    Guid ConcurrencyToken);
+    Guid ConcurrencyToken,
+    string? SyncWarning = null);
 
 public sealed record ProductImageDetails(
     long? WooMediaId,

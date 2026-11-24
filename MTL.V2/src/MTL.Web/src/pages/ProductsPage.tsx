@@ -56,6 +56,7 @@ export function ProductsPage() {
   const selectedProductsRef = useRef<Map<string, Product>>(new Map())
   const [labelProducts, setLabelProducts] = useState<Product[] | null>(null)
   const [saveNotice, setSaveNotice] = useState('')
+  const [saveWarning, setSaveWarning] = useState('')
   const { hasPermission } = useAuth()
   const queryClient = useQueryClient()
 
@@ -190,6 +191,7 @@ export function ProductsPage() {
 
       {(syncMutation.isError || pushMutation.isError || bulkMutation.isError || query.isError || filterOptionsQuery.isError) && <div className="form-alert">{(syncMutation.error ?? pushMutation.error ?? bulkMutation.error ?? query.error ?? filterOptionsQuery.error)?.message}</div>}
       {saveNotice && <div className="form-success product-save-notice">{saveNotice}</div>}
+      {saveWarning && <div className="form-warning product-save-notice">{saveWarning}</div>}
       {bulkMutation.data && <div className={bulkMutation.data.failed ? 'form-alert' : 'form-success'}>Đã xử lý {bulkMutation.data.processed} sản phẩm{bulkMutation.data.failed ? `, ${bulkMutation.data.failed} sản phẩm lỗi.` : ' thành công.'}</div>}
 
       <section className="panel product-browser">
@@ -263,7 +265,13 @@ export function ProductsPage() {
         onSaved={(savedProduct: ProductDetails, wasEditing: boolean) => {
           setEditorProductId(null)
           setPage(1)
-          setSaveNotice(wasEditing ? `Đã cập nhật “${savedProduct.name}” thành công.` : `Đã thêm “${savedProduct.name}” thành công.`)
+          if (savedProduct.syncWarning) {
+            setSaveNotice('')
+            setSaveWarning(`${wasEditing ? 'Đã cập nhật' : 'Đã thêm'} “${savedProduct.name}” trong MTL.V2. ${savedProduct.syncWarning}`)
+          } else {
+            setSaveWarning('')
+            setSaveNotice(wasEditing ? `Đã cập nhật “${savedProduct.name}” thành công.` : `Đã thêm “${savedProduct.name}” thành công.`)
+          }
           void queryClient.invalidateQueries({ queryKey: ['products'] })
           void queryClient.invalidateQueries({ queryKey: ['product-filter-options'] })
         }}

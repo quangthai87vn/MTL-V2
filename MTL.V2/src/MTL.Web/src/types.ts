@@ -44,6 +44,7 @@ export type ProductDetails = Omit<Product, 'createdAtUtc' | 'updatedAtUtc'> & {
   unit: string
   wooCategoryIds: number[]
   images: ProductImage[]
+  syncWarning?: string
 }
 
 export type ProductImage = {

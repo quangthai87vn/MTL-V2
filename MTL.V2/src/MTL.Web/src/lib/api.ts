@@ -52,16 +52,34 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     : await response.text()
 
   if (!response.ok) {
-    const message =
-      typeof data === 'object' && data !== null && 'message' in data
-        ? String((data as { message: unknown }).message)
-        : typeof data === 'object' && data !== null && 'detail' in data
-          ? String((data as { detail: unknown }).detail)
-          : 'Yêu cầu không thành công.'
+    const message = getApiErrorMessage(data, response.status)
     throw new ApiError(message, response.status, data)
   }
 
   return data as T
+}
+
+function getApiErrorMessage(data: unknown, status: number) {
+  if (typeof data === 'object' && data !== null) {
+    if ('message' in data && String((data as { message: unknown }).message).trim()) {
+      return String((data as { message: unknown }).message)
+    }
+    if ('detail' in data && String((data as { detail: unknown }).detail).trim()) {
+      return String((data as { detail: unknown }).detail)
+    }
+    if ('errors' in data) {
+      const errors = (data as { errors: unknown }).errors
+      if (typeof errors === 'object' && errors !== null) {
+        const messages = Object.values(errors).flatMap((value) => Array.isArray(value) ? value.map(String) : [String(value)])
+        if (messages.length > 0) return messages.join(' ')
+      }
+    }
+    if ('title' in data && String((data as { title: unknown }).title).trim()) {
+      return String((data as { title: unknown }).title)
+    }
+  }
+  if (typeof data === 'string' && data.trim()) return data.trim()
+  return `Yêu cầu không thành công (HTTP ${status}).`
 }
 
 export const api = {

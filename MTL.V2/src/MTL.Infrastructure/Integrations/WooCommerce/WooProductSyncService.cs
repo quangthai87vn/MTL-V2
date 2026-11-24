@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -16,6 +17,16 @@ namespace MTL.Infrastructure.Integrations.WooCommerce;
 public sealed record WooSyncResult(int Processed, int Created, int Updated, IReadOnlyList<string> Errors);
 
 public sealed class WooProductRecoveryRequiredException(string message) : InvalidOperationException(message);
+
+public sealed class WooCommerceRequestException(
+    string message,
+    HttpStatusCode statusCode,
+    string? errorCode = null)
+    : InvalidOperationException(message)
+{
+    public HttpStatusCode StatusCode { get; } = statusCode;
+    public string? ErrorCode { get; } = errorCode;
+}
 
 public interface IWooProductSyncService
 {
@@ -69,7 +80,7 @@ public sealed class WooProductSyncService(
                 var response = await httpClient.GetAsync(
                     $"wp-json/wc/v3/products?per_page={pageSize}&page={page}&orderby=id&order=asc",
                     cancellationToken);
-                response.EnsureSuccessStatusCode();
+                await EnsureWooSuccessAsync(response, "Lấy danh sách sản phẩm", cancellationToken);
 
                 var products = await response.Content.ReadFromJsonAsync<List<WooProductDto>>(JsonOptions, cancellationToken)
                     ?? [];
@@ -204,7 +215,7 @@ public sealed class WooProductSyncService(
             regular_price = product.RegularPrice?.ToString("0.##", CultureInfo.InvariantCulture),
             sale_price = product.SalePrice.ToString("0.##", CultureInfo.InvariantCulture),
             manage_stock = product.TrackInventory,
-            stock_quantity = (int)product.StockQuantity,
+            stock_quantity = product.TrackInventory ? (int?)product.StockQuantity : null,
             stock_status = product.Availability switch
             {
                 ProductAvailability.InStock => "instock",
@@ -240,7 +251,10 @@ public sealed class WooProductSyncService(
                 JsonOptions,
                 cancellationToken);
 
-        response.EnsureSuccessStatusCode();
+        var operation = wooProductId.HasValue
+            ? $"Cập nhật sản phẩm Woo #{wooProductId.Value}"
+            : "Tạo sản phẩm trên WooCommerce";
+        await EnsureWooSuccessAsync(response, operation, cancellationToken);
         var woo = await response.Content.ReadFromJsonAsync<WooProductDto>(JsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("WooCommerce trả về dữ liệu không hợp lệ.");
 
@@ -274,7 +288,7 @@ public sealed class WooProductSyncService(
         using var response = await httpClient.GetAsync(
             $"wp-json/wc/v3/products?per_page=100&status=any&orderby=id&order=desc&search={search}",
             cancellationToken);
-        response.EnsureSuccessStatusCode();
+        await EnsureWooSuccessAsync(response, "Tìm sản phẩm trên WooCommerce", cancellationToken);
 
         var candidates = await response.Content.ReadFromJsonAsync<List<WooProductDto>>(JsonOptions, cancellationToken)
             ?? [];
@@ -329,7 +343,7 @@ public sealed class WooProductSyncService(
             var response = await httpClient.DeleteAsync(
                 $"wp-json/wc/v3/products/{product.WooLink.WooProductId}?force={force.ToString().ToLowerInvariant()}",
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            await EnsureWooSuccessAsync(response, $"Xóa sản phẩm Woo #{product.WooLink.WooProductId}", cancellationToken);
         }
 
         db.ProductImages.RemoveRange(product.Images);
@@ -385,7 +399,7 @@ public sealed class WooProductSyncService(
             var response = await httpClient.GetAsync(
                 $"wp-json/wc/v3/products/categories?per_page={pageSize}&page={page}&orderby=id&order=asc",
                 cancellationToken);
-            response.EnsureSuccessStatusCode();
+            await EnsureWooSuccessAsync(response, "Lấy danh mục WooCommerce", cancellationToken);
             var categories = await response.Content.ReadFromJsonAsync<List<WooCategoryDto>>(JsonOptions, cancellationToken)
                 ?? [];
 
@@ -595,6 +609,47 @@ public sealed class WooProductSyncService(
         decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result)
             ? result
             : null;
+
+    private static async Task EnsureWooSuccessAsync(
+        HttpResponseMessage response,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode) return;
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        string? errorCode = null;
+        string? remoteMessage = null;
+        if (!string.IsNullOrWhiteSpace(responseBody))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(responseBody);
+                var root = document.RootElement;
+                if (root.TryGetProperty("code", out var codeElement) && codeElement.ValueKind == JsonValueKind.String)
+                {
+                    errorCode = codeElement.GetString();
+                }
+                if (root.TryGetProperty("message", out var messageElement) && messageElement.ValueKind == JsonValueKind.String)
+                {
+                    remoteMessage = messageElement.GetString();
+                }
+            }
+            catch (JsonException)
+            {
+                // WooCommerce or a reverse proxy can return HTML. Use the HTTP status instead of
+                // exposing an arbitrary response body to users or logs.
+            }
+        }
+
+        var status = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}".Trim();
+        var code = string.IsNullOrWhiteSpace(errorCode) ? null : $" [{errorCode}]";
+        var detail = string.IsNullOrWhiteSpace(remoteMessage) ? status : remoteMessage.Trim();
+        throw new WooCommerceRequestException(
+            $"{operation} không thành công{code}: {detail}",
+            response.StatusCode,
+            errorCode);
+    }
 }
 
 internal sealed class WooProductDto

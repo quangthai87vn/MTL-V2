@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\MTL.Api\MTL.Api.csproj" />
     <ProjectReference Include="..\..\src\MTL.Infrastructure\MTL.Infrastructure.csproj" />
   </ItemGroup>
 

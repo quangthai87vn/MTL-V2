@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MTL.Domain.Catalog;
 using MTL.Infrastructure.Identity;
@@ -105,6 +106,74 @@ public sealed class WooProductCreationTests
         Assert.Contains(RemoteProductId.ToString(), error.Message);
     }
 
+    [Fact]
+    public async Task PushLinkedUntrackedProduct_ChangesStockStatusWithoutSendingStockQuantity()
+    {
+        var fixture = await TestFixture.CreateAsync();
+        if (fixture is null) return;
+
+        await using var scope = fixture;
+        var product = scope.NewProduct("MTL regression stock status");
+        product.TrackInventory = false;
+        product.StockQuantity = 0;
+        product.Availability = ProductAvailability.InStock;
+        product.WooLink = new WooProductLink
+        {
+            CompanyId = product.CompanyId,
+            ProductId = product.Id,
+            Product = product,
+            WooProductId = RemoteProductId
+        };
+        scope.Db.Products.Add(product);
+
+        string? requestBody = null;
+        var handler = new AsyncStubHandler(async (request, cancellationToken) =>
+        {
+            Assert.Equal(HttpMethod.Put, request.Method);
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return Json(HttpStatusCode.OK, WooProduct(product));
+        });
+
+        await scope.CreateService(handler).PushAsync(product);
+
+        Assert.NotNull(requestBody);
+        using var payload = JsonDocument.Parse(requestBody);
+        Assert.False(payload.RootElement.GetProperty("manage_stock").GetBoolean());
+        Assert.Equal("instock", payload.RootElement.GetProperty("stock_status").GetString());
+        Assert.False(payload.RootElement.TryGetProperty("stock_quantity", out _));
+    }
+
+    [Fact]
+    public async Task PushLinkedProduct_WooErrorIncludesRemoteCodeAndMessage()
+    {
+        var fixture = await TestFixture.CreateAsync();
+        if (fixture is null) return;
+
+        await using var scope = fixture;
+        var product = scope.NewProduct("MTL regression Woo error");
+        product.WooLink = new WooProductLink
+        {
+            CompanyId = product.CompanyId,
+            ProductId = product.Id,
+            Product = product,
+            WooProductId = RemoteProductId
+        };
+        scope.Db.Products.Add(product);
+        var handler = new StubHandler(_ => Json(HttpStatusCode.BadRequest, new
+        {
+            code = "woocommerce_rest_invalid_product",
+            message = "Trạng thái kho không hợp lệ."
+        }));
+
+        var error = await Assert.ThrowsAsync<WooCommerceRequestException>(
+            () => scope.CreateService(handler).PushAsync(product));
+
+        Assert.Equal(HttpStatusCode.BadRequest, error.StatusCode);
+        Assert.Equal("woocommerce_rest_invalid_product", error.ErrorCode);
+        Assert.Contains("woocommerce_rest_invalid_product", error.Message);
+        Assert.Contains("Trạng thái kho không hợp lệ.", error.Message);
+    }
+
     private static object WooProduct(Product product) => new
     {
         id = RemoteProductId,
@@ -134,6 +203,16 @@ public sealed class WooProductCreationTests
             HttpRequestMessage request,
             CancellationToken cancellationToken) =>
             Task.FromResult(responseFactory(request));
+    }
+
+    private sealed class AsyncStubHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responseFactory)
+        : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            responseFactory(request, cancellationToken);
     }
 
     private sealed class PlaintextProtector : ISecretProtector
