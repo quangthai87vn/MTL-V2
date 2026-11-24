@@ -44,7 +44,7 @@ services:
   web:
     image: ghcr.io/quangthai87vn/mtl-v2-web:${IMAGE_TAG:-main}
     ports:
-      - "127.0.0.1:${MTL_HTTP_PORT:-8080}:80"
+      - "${MTL_BIND_ADDRESS:-127.0.0.1}:${MTL_HTTP_PORT:-8080}:80"
     depends_on:
       api:
         condition: service_healthy

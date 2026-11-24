@@ -99,7 +99,7 @@ Khi chưa cấu hình domain HTTPS, đặt trong `.env`:
 MTL_REQUIRE_HTTPS=false
 ```
 
-Web production chỉ bind vào `127.0.0.1`, nên chế độ này chỉ cho phép bootstrap qua trình duyệt ngay trên máy chủ. Sau khi pull image mới, chạy:
+Mặc định web production chỉ bind vào `127.0.0.1`, nên chế độ này chỉ cho phép bootstrap qua trình duyệt ngay trên máy chủ. Sau khi pull image mới, chạy:
 
 ```bash
 ./scripts/deploy-prod.sh main
@@ -135,7 +135,20 @@ cat backups/postgres/mtl-v2-YYYYMMDD-HHMMSS.dump | \
 
 ## Reverse proxy
 
-Web chỉ lắng nghe tại `127.0.0.1:8080`. Dùng Caddy hoặc Nginx trên máy chủ để cung cấp HTTPS và reverse proxy tới địa chỉ này.
+Mặc định web chỉ lắng nghe tại `127.0.0.1:8080`. Nếu Nginx Proxy Manager nằm trên máy khác trong LAN, không sửa trực tiếp file Compose. Đặt địa chỉ LAN cố định của máy chủ trong `.env`, ví dụ:
+
+```dotenv
+MTL_BIND_ADDRESS=192.168.1.112
+MTL_HTTP_PORT=8080
+```
+
+Chạy lại `./scripts/deploy-prod.sh main`, sau đó cấu hình Proxy Host trong Nginx Proxy Manager:
+
+- Scheme: `http`
+- Forward Hostname/IP: `192.168.1.112`
+- Forward Port: `8080`
+
+Nên đặt DHCP reservation cho `192.168.1.112` và chỉ cho IP của Nginx Proxy Manager truy cập cổng 8080. Không dùng `0.0.0.0` nếu chỉ cần truy cập qua một card mạng LAN.
 
 Sau khi HTTPS hoạt động và reverse proxy gửi `X-Forwarded-Proto: https`, đổi `.env` thành:
 
