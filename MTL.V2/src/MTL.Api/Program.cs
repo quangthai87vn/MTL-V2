@@ -11,6 +11,11 @@ using MTL.Infrastructure;
 using MTL.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+var requireHttps = builder.Configuration.GetValue<bool?>("Security:RequireHttps")
+    ?? !builder.Environment.IsDevelopment();
+var cookieSecurePolicy = requireHttps
+    ? CookieSecurePolicy.Always
+    : CookieSecurePolicy.SameAsRequest;
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
@@ -27,9 +32,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.Name = "mtl.v2.auth";
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Strict;
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
     options.SlidingExpiration = true;
     options.Events = new CookieAuthenticationEvents
@@ -53,9 +56,7 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.Name = "mtl.v2.csrf";
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Strict;
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
 });
 
 builder.Services.AddControllersWithViews(options =>
@@ -100,7 +101,10 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
-    app.UseHttpsRedirection();
+    if (requireHttps)
+    {
+        app.UseHttpsRedirection();
+    }
 }
 
 app.UseExceptionHandler();

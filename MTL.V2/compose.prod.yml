@@ -21,6 +21,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      Security__RequireHttps: ${MTL_REQUIRE_HTTPS:-false}
       ConnectionStrings__Database: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       DataProtection__KeysPath: /keys
       Seed__CompanyName: ${MTL_COMPANY_NAME:-MỸ THO LAPTOP}

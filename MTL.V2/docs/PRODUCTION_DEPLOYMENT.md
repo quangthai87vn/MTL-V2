@@ -91,6 +91,24 @@ Lần chạy đầu tiên, nguyên nhân thường gặp là `.env` còn giá tr
 
 Không xóa volume PostgreSQL chỉ vì API `unhealthy`. Việc khởi động lại sau khi sửa cấu hình sẽ tiếp tục migration và seed còn thiếu.
 
+## Đăng nhập lần đầu trên localhost
+
+Khi chưa cấu hình domain HTTPS, đặt trong `.env`:
+
+```dotenv
+MTL_REQUIRE_HTTPS=false
+```
+
+Web production chỉ bind vào `127.0.0.1`, nên chế độ này chỉ cho phép bootstrap qua trình duyệt ngay trên máy chủ. Sau khi pull image mới, chạy:
+
+```bash
+./scripts/deploy-prod.sh main
+```
+
+Truy cập `http://localhost:8080`. Tài khoản ban đầu là `MTL_ADMIN_EMAIL` và `MTL_ADMIN_PASSWORD` đã được dùng ở lần API khởi tạo database thành công đầu tiên.
+
+Docker image chỉ chứa mã chương trình, không chứa PostgreSQL local. Muốn giữ dữ liệu máy phát triển phải tạo `pg_dump` ở máy local và khôi phục vào PostgreSQL máy chủ theo quy trình backup/restore riêng.
+
 Để triển khai đúng một commit đã được build:
 
 ```bash
@@ -118,6 +136,14 @@ cat backups/postgres/mtl-v2-YYYYMMDD-HHMMSS.dump | \
 ## Reverse proxy
 
 Web chỉ lắng nghe tại `127.0.0.1:8080`. Dùng Caddy hoặc Nginx trên máy chủ để cung cấp HTTPS và reverse proxy tới địa chỉ này.
+
+Sau khi HTTPS hoạt động và reverse proxy gửi `X-Forwarded-Proto: https`, đổi `.env` thành:
+
+```dotenv
+MTL_REQUIRE_HTTPS=true
+```
+
+Sau đó chạy lại `./scripts/deploy-prod.sh main` để bắt buộc cookie bảo mật và chuyển hướng HTTPS.
 
 ## Lưu ý migration
 
