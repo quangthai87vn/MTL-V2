@@ -1,0 +1,88 @@
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		<SpinLoader IsLoading=@IsLoading Spinner="SpinnerType.Chase">
+				<LoadingTemplate>
+					<Loading />
+				</LoadingTemplate>
+				<ContentTemplate>
+		<MudGrid Spacing=1>
+			<MudItem xs="12" sm="12" md="12">
+				<img class="mx-auto d-block" src="/images/icons/recyclebin.png" width="50" />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudText Typo="Typo.h5" Class="mtl-dialog-confirm-title">XÁC NHẬN XÓA ?</MudText>
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudText Typo="Typo.h6" Class="mtl-dialog-confirm-subtitle">@NoiDung</MudText>
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<img class="mx-auto d-block" src=@LinkAnh width="150" />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudText Typo="Typo.body2" Class="mtl-dialog-confirm-hint">Hãy cẩn thận vì dữ liệu sẽ không thể khôi phục !!!</MudText>
+			</MudItem>
+		</MudGrid>
+			</ContentTemplate>
+		</SpinLoader>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Delete"
+					   OnClick="SaveAsync" Color="Color.Error">ĐỒNG Ý</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="OnCancelDeleteClick" Color="Color.Primary">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public string NoiDung { get; set; }
+	[Parameter]
+	public string LinkAnh { get; set; }
+	[Parameter]
+	public EventCallback<string> OnDeleteCallback { get; set; }
+	[Parameter]
+	public bool Visible { get; set; }
+	bool IsLoading = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			IsLoading = false;
+		}
+		catch (Exception)
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task SaveAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			await OnDeleteCallback.InvokeAsync();
+			MudDialog.Close(DialogResult.Ok(true));
+			IsLoading = false;
+		}
+		catch (Exception)
+		{
+			IsLoading = false;
+		}
+	}
+
+	void OnCancelDeleteClick()
+	{
+		MudDialog.Cancel();
+	}
+}

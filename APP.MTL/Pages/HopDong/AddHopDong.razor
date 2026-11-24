@@ -1,0 +1,209 @@
+@page "/AddHopDong/Add"
+@page "/AddHopDong/{id:int}"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+@using MudExRichTextEditor
+@using MudBlazor.Extensions.Options
+@inject IJSRuntime JSRuntime
+@inject HopDongService hopDongService
+@inject UserService userService
+@inject IToastService toastService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@inject WordPressRESTAPI wordPressRESTAPI
+
+@attribute [Authorize]
+
+<style>
+	.my-style {
+		font-weight: bold !important;
+		color: #0d6efd;
+	}
+</style>
+
+<AuthorizeView>
+	<Authorized>
+		<div class="card-body">
+
+			<MudGrid Spacing=1>
+				<MudItem xs="6" sm="6" md="3">
+					<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.List"
+							   FullWidth="true" Disabled=IsLoading
+							   OnClick="OpenLinkDSHopDong" Color="Color.Primary">DS HỢP ĐỒNG</MudButton>
+				</MudItem>
+				<MudItem xs="6" sm="6" md="3">
+					<MudButton FullWidth=true Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save" Disabled=IsLoading
+							   OnClick="LuuHopDong" Color="Color.Success">LƯU HỢP ĐỒNG</MudButton>
+				</MudItem>
+				<SpinLoader IsLoading="IsLoading" Spinner="SpinnerType.Chase">
+					<LoadingTemplate>
+						<Loading />
+					</LoadingTemplate>
+					<ContentTemplate>
+						<MudItem xs="12" sm="12" md="12">
+							<MudPaper Class="pa-4" Elevation="4">
+								<MudStack Row="true" Spacing="2">
+									<MudAvatar Image=@userSession.company.Logourl Size="Size.Medium" />
+									<MudStack Justify="Justify.Center" Spacing="0">
+										<MudExGradientText Typo="Typo.h5" style="font-weight: bold; text-align:center">1. THÔNG TIN</MudExGradientText>
+									</MudStack>
+								</MudStack>
+								<MudGrid Spacing=1>
+									<MudItem xs="5" sm="5" md="4">
+										<MudTextField T="string" Label="Số HĐ:" 
+													  HelperTextOnFocus="true" @bind-Text=model.Sohd />
+									</MudItem>
+									<MudItem xs="7" sm="7" md="8">
+										<MudTextField T="string" Label="Nội dung HĐ:" Required="true"
+													  HelperTextOnFocus="true" @bind-Text=model.Noidunghd />
+									</MudItem>
+									<MudItem xs="12" sm="12" md="12">
+										<MudTextField T="string" Label="Tên khách hàng:" Required="true"
+													  HelperTextOnFocus="true" @bind-Text=model.Tenkhachhang />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="6">
+										<MudTextField T="string" Label="Địa chỉ:" 
+													  HelperTextOnFocus="true" @bind-Text=model.Diachikhachhang />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="6">
+										<MudTextField T="string" Label="Điện thoại:" 
+													  HelperTextOnFocus="true" @bind-Text=model.Sdtkhachhang />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="3">
+										<MudDatePicker Label="Ngày ký lần đầu:"  DateFormat="dd/MM/yyyy"
+													   @bind-Date=model.Ngayky />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="3">
+										<MudDatePicker Label="Ngày tái ký:" DateFormat="dd/MM/yyyy"
+													   @bind-Date=model.Ngaytaiky />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="3">
+										<MudNumericField HideSpinButtons="true"
+														 Label="Giá trị HĐ:"
+														 @bind-Value=model.Giatrihd
+														 Format="N0"
+														 Class="curency"
+														 Disabled=IsLoading />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="3">
+										<MudNumericField HideSpinButtons="true"
+														 Label="Tổng thanh toán:"
+														 @bind-Value=model.Tongthanhtoan
+														 Format="N0"
+														 Class="curency"
+														 Disabled=IsLoading />
+									</MudItem>
+									<MudItem xs="12" sm="12" md="12">
+										<CKEditorBlazor Id="GhiChuEditor" style="height:700px"
+														@bind-Value=@GhiChuEditor.InitialText>
+										</CKEditorBlazor>
+									</MudItem>
+
+
+								</MudGrid>
+							</MudPaper>
+						</MudItem>
+					</ContentTemplate>
+				</SpinLoader>
+			</MudGrid>
+		</div>
+	</Authorized>
+</AuthorizeView>
+@code
+{
+	[Parameter]
+	public int id { get; set; }
+
+	UserSession userSession { get; set; }
+	bool IsLoading = true;
+	DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.Medium,
+			MaximizeButton = true,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+			 
+		};
+
+	IEnumerable<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+	public bool isNew { get; set; }
+	HopDong model = new HopDong();
+	public HopDong hopdong { get; set; }	
+	MudExRichTextEdit NoidungControl = new MudExRichTextEdit();	
+	EditorOptions GhiChuEditor;	
+	protected override async Task OnInitializedAsync()
+	{		
+		GhiChuEditor = new EditorOptions();
+		GhiChuEditor.InitialText = "";
+	}
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			userSession = await configs.LoadAllConfig();
+			if (id == null || id == 0)
+			{
+				//add
+				isNew = true;
+				model = new HopDong();				
+				model.Id = 0;
+			}
+			else
+			{
+				//edit
+				isNew = false;
+				hopdong = await hopDongService.GetHopDongAsync(id);
+				model = hopdong;
+				GhiChuEditor.InitialText = model.Ghichu;
+			}
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task<HopDong> LuuHopDong()
+	{
+		try
+		{
+			IsLoading = true;
+			model.Ghichu = GhiChuEditor.InitialText;
+			if (isNew) //Mới
+			{				
+				model = await hopDongService.CreateHopDongAsync(model);
+				string mess = $"Tạo thành công hợp đồng [{model.Noidunghd}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			else //update
+			{		
+				model = await hopDongService.UpdateHopDongAsync(model);
+				string mess = $"Lưu thành công hợp đồng [{model.Noidunghd}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			IsLoading = false;
+			return model;
+		}
+		catch (Exception)
+		{
+			return null;
+		}
+	}
+
+	private async Task OpenLinkDSHopDong()
+	{
+		string Link = "/DSHopDong";
+		await JSRuntime.InvokeVoidAsync("open", Link, "_self");
+	}
+
+}

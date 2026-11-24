@@ -1,0 +1,245 @@
+@page "/PhanQuyen"
+@using Blazored.LocalStorage;
+@using MTL.API.Models;
+@using MTL.DEV.Handlers;
+@using MTL.DEV.Services;
+@using MTL.DEV.Data
+@inject IJSRuntime JSRuntime
+@inject IProductService productService
+@inject IUserService userService
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@inject ProtectedLocalStorage BrowserStorage
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IKhachHangService khachHangService
+@inject IToastService toastService
+@inject Microsoft.Extensions.Configuration.IConfiguration config
+@inject LoginState loginState
+@inject IMTLService<MTL.API.Models.Role> mtlService_Role
+@inject IRolesService RolesService
+
+<AuthorizeView>
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.Security" Title="PHÂN QUYỀN"></PageStandardHeader>
+
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="false" HideText="true" />
+		}
+		else
+		{
+			@if (MenuList != null)
+			{
+				<MudTabs @bind-ActivePanelIndex="@ActiveTabIndex" Elevation="0" Rounded="true" Centered="true" Color="@Color.Primary" Class="mt-3">
+					<MudTabPanel Icon="@Icons.Material.Filled.Home" Text="QUYỀN SỬ DỤNG">
+						<MudGrid Spacing="2" Class="mt-3">
+							<MudItem xs="12" sm="12" md="4">
+								<MudSelect T="int" Label="Vai trò" Value="@idvaitro" ValueChanged="VaiTro_ValueChangedHandler"
+										   AnchorOrigin="Origin.BottomCenter">
+									@if (RoleList != null)
+									{
+										@foreach (var item in RoleList)
+										{
+											<MudSelectItem T="int" Value="@item.RoleId">@item.RoleDesc</MudSelectItem>
+										}
+									}
+								</MudSelect>
+							</MudItem>
+							<MudItem xs="12" sm="12" md="12">
+								<MudTextField @bind-Value="_searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+											 Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+											 AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search mb-2" />
+								<MudDataGrid T="MTL_GetMenuByRolesResult"
+											 Items="@MenuList"
+											 Filterable="true"
+											 FilterMode="@DataGridFilterMode.Simple"
+											 QuickFilterFilter="@_quickFilter"
+											 Sortable="true"
+											 Hover="true"
+											 Striped="true"
+											 Bordered="true"
+											 Dense="true"
+											 RowsPerPage="50"
+											 ShowMenuIcon="false"
+											 Hideable="true"
+											 ShowColumnOptions="true"
+											 HorizontalScrollbar="true"
+											 ColumnResizeMode="ResizeMode.Column"
+											 Class="MTLGrid mtl-standard-grid">
+									<NoRecordsContent><MudText Typo="Typo.body1">Không có dữ liệu.</MudText></NoRecordsContent>
+									<LoadingContent><MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText></LoadingContent>
+									<ToolBarContent>
+										<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+											<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+											<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+											<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+											<MudSpacer />
+										</MudStack>
+									</ToolBarContent>
+									<Columns>
+										<TemplateColumn T="MTL_GetMenuByRolesResult" Title="THAO TÁC" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+											<CellTemplate>
+												<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+													<MudIconButton Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+																  Color="Color.Primary" Size="Size.Small" Title="Chỉnh sửa" />
+												</MudButtonGroup>
+											</CellTemplate>
+										</TemplateColumn>
+										<PropertyColumn Property="x => x.name" Title="TÊN MENU" HeaderStyle="min-width:200px;" Filterable="true" ReadOnly="true" />
+										<PropertyColumn Property="x => x.order" Title="THỨ TỰ" HeaderStyle="width:80px;" Filterable="false" ReadOnly="true" />
+										<PropertyColumn Property="x => x.link" Title="LINK" HeaderStyle="min-width:150px;" Filterable="true" ReadOnly="true" />
+										<TemplateColumn T="MTL_GetMenuByRolesResult" Title="HIỂN THỊ" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+											<CellTemplate>
+												<MudSwitch Value="context.active" ReadOnly="true" T="bool" Color="Color.Primary" />
+											</CellTemplate>
+										</TemplateColumn>
+									</Columns>
+									<PagerContent>
+										<MudDataGridPager T="MTL_GetMenuByRolesResult" PageSizeOptions="new int[] { 25, 50, 100 }" />
+									</PagerContent>
+									<FooterContent>
+										<MudText Typo="Typo.body2" Class="pa-2">
+											Tổng số: <strong>@(MenuList?.Count() ?? 0)</strong> menu
+										</MudText>
+									</FooterContent>
+								</MudDataGrid>
+							</MudItem>
+						</MudGrid>
+					</MudTabPanel>
+					<MudTabPanel Icon="@Icons.Material.Filled.AccountTree" Text="DANH SÁCH VAI TRÒ">
+						<MudGrid Spacing="2" Class="mt-3">
+							<MudItem xs="12" sm="12" md="12">
+								<MudTextField @bind-Value="_searchString2" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+											 Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+											 AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search mb-2" />
+								<MudDataGrid T="MTL.API.Models.Role"
+											 Items="@RoleList"
+											 Filterable="true"
+											 FilterMode="@DataGridFilterMode.Simple"
+											 QuickFilterFilter="@_quickFilter2"
+											 Sortable="true"
+											 Hover="true"
+											 Striped="true"
+											 Bordered="true"
+											 Dense="true"
+											 RowsPerPage="50"
+											 ShowMenuIcon="false"
+											 Hideable="true"
+											 ShowColumnOptions="true"
+											 HorizontalScrollbar="true"
+											 ColumnResizeMode="ResizeMode.Column"
+											 Class="MTLGrid mtl-standard-grid">
+									<NoRecordsContent><MudText Typo="Typo.body1">Không có dữ liệu vai trò.</MudText></NoRecordsContent>
+									<LoadingContent><MudText Typo="Typo.body2">Đang tải...</MudText></LoadingContent>
+									<ToolBarContent>
+										<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+											<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+											<MudText Typo="Typo.subtitle2" Style="font-weight:600">DANH SÁCH VAI TRÒ</MudText>
+											<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+											<MudSpacer />
+										</MudStack>
+									</ToolBarContent>
+									<Columns>
+										<PropertyColumn Property="x => x.RoleDesc" Title="TÊN VAI TRÒ" HeaderStyle="width:200px;" Filterable="true" ReadOnly="true" />
+										<PropertyColumn Property="x => x.Ghichu" Title="GHI CHÚ" HeaderStyle="min-width:200px;" Filterable="true" ReadOnly="true" />
+									</Columns>
+									<PagerContent>
+										<MudDataGridPager T="MTL.API.Models.Role" PageSizeOptions="new int[] { 25, 50, 100 }" />
+									</PagerContent>
+									<FooterContent>
+										<MudText Typo="Typo.body2" Class="pa-2">
+											Tổng số: <strong>@(RoleList?.Count() ?? 0)</strong> vai trò
+										</MudText>
+									</FooterContent>
+								</MudDataGrid>
+							</MudItem>
+						</MudGrid>
+					</MudTabPanel>
+				</MudTabs>
+			}
+		}
+	</Authorized>
+	<NotAuthorized>
+		@{
+			NavigationManager.NavigateTo("/login");
+		}
+	</NotAuthorized>
+</AuthorizeView>
+
+@code
+{
+	KhachHangPopupInfo khachhanginfo = new KhachHangPopupInfo();
+	public class KhachHangPopupInfo
+	{
+		public bool isNew = true;
+		public string HeaderText = "";
+		public bool PopupVisible { get; set; }
+		public MTL.API.Models.User UserInfo { get; set; } = new MTL.API.Models.User();
+	}
+
+	int ActiveTabIndex { get; set; } = 0;
+	bool IsLoading = true;
+
+	string _searchString = "";
+	string _searchString2 = "";
+
+	private Func<MTL_GetMenuByRolesResult, bool> _quickFilter => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchString))
+			return true;
+		if (x.name?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.link?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		return false;
+	};
+
+	private Func<MTL.API.Models.Role, bool> _quickFilter2 => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchString2))
+			return true;
+		if (x.RoleDesc?.Contains(_searchString2, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Ghichu?.Contains(_searchString2, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		return false;
+	};
+
+	int idcompany = 0;
+	Utils _Utils = new Utils();
+	IEnumerable<MTL.API.Models.Role>? RoleList { get; set; }
+	IEnumerable<MTL.API.Models.MTL_GetMenuByRolesResult>? MenuList { get; set; }
+	private ToastParameters _toastParameters;
+	public MTL.API.Models.User UserInfo { get; set; } = new MTL.API.Models.User();
+
+	int idvaitro = 1; // quản trị phần mềm
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		try
+		{
+			if (firstRender)
+			{
+				var _idcompany = await BrowserStorage.GetAsync<int>("idcompany");
+				idcompany = _idcompany.Success ? _idcompany.Value : 0;
+				RoleList = await userService.GetAllRoleAsync();
+				MenuList = await RolesService.GetMenuByRolesResultAsync(idcompany, idvaitro);
+				IsLoading = false;
+				StateHasChanged();
+			}
+			await base.OnAfterRenderAsync(firstRender);
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	}
+
+	async Task VaiTro_ValueChangedHandler(int newValue)
+	{
+		idvaitro = newValue;
+		MenuList = await RolesService.GetMenuByRolesResultAsync(idcompany, idvaitro);
+	}
+
+}

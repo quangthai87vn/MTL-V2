@@ -1,0 +1,315 @@
+@page "/"
+@page "/danh-muc/{idDanhMuc:int}"
+@layout HomeLayout
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MTL.APP.Authentication
+@using System.Linq
+
+@inject Configs configs
+@inject CVJPService cVJPService
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@inject HangHoaService hangHoaService
+@inject IMenuService menuService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager navigationManager
+
+
+<style>
+	.img_wrapper {
+		position: relative;
+		overflow: hidden;
+		transition: transform .2s;
+	}
+
+		.img_wrapper img {
+			width: 100%;
+		}
+
+	.item_zoom {
+		transition: transform .2s;
+		width: 100%;
+	}
+
+		.item_zoom:hover {
+			transform: scale(1.1); /* (110% zoom - Note: if the zoom is too large, it will go outside of the viewport) */
+		}
+
+	.sold_out {
+		top: 2em;
+		left: -4em;
+		color: white;
+		display: block;
+		position: absolute;
+		text-align: center;
+		text-decoration: none;
+		letter-spacing: .06em;
+		background-color: #A00;
+		padding: 0.5em 5em 0.4em 5em;
+		text-shadow: 0 0 0.75em #444;
+		box-shadow: 0 0 0.5em rgba(0,0,0,0.5);
+		font: bold 16px/1.2em Arial, Sans-Serif;
+		-webkit-text-shadow: 0 0 0.75em #444;
+		-webkit-box-shadow: 0 0 0.5em rgba(0,0,0,0.5);
+		-webkit-transform: rotate(-45deg) scale(0.75,1);
+		z-index: 10;
+	}
+
+		.sold_out:before {
+			content: '';
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			position: absolute;
+			margin: -0.3em -5em;
+			transform: scale(0.7);
+			-webkit-transform: scale(0.7);
+			border: 2px rgba(255,255,255,0.7) dashed;
+		}
+</style>
+<SpinLoader IsLoading="IsLoading" Spinner="SpinnerType.Chase">
+	<LoadingTemplate>
+		<Loading />
+	</LoadingTemplate>
+	<ContentTemplate>
+		<MudTextField @bind-Value="_searchChonHang" Clearable="true"
+					  Placeholder="Gõ tên hàng hóa cần tìm ...."
+					  Immediate="true"
+					  Margin="Margin.Dense" Variant="Variant.Outlined"
+					  Adornment="Adornment.Start"
+					  AdornmentIcon="@Icons.Material.Filled.Search"
+					  IconSize="Size.Medium" Class="search-bar">
+
+		</MudTextField>
+		<br />
+		<br />
+		<br />
+		@* Chỉ catalog theo danh mục: /danh-muc/{id}. Trang chủ / → redirect OverviewReport (không render vòng lặp). *@
+		@if (idDanhMuc != null && ListNhomHang != null)
+		{
+			var dsnhomhang = ListNhomHang ?? new List<MTL_GetAllNhomHangResult>();
+			dsnhomhang = dsnhomhang.Where(p => p.id == idDanhMuc).ToList();
+			@foreach (MTL_GetAllNhomHangResult nhomhang in dsnhomhang)
+			{
+				<MudGrid Spacing=0>
+					<MudItem xs="12" sm="12" md="12">
+						<MudExGradientText Typo="Typo.h5" style="font-weight: bold; text-align:center">@nhomhang.v_nhomhang</MudExGradientText>
+						</MudItem>
+						<br />
+						@foreach (MTL_GetAllProductsInCompanyResult pd in (ListProduct ?? Enumerable.Empty<MTL_GetAllProductsInCompanyResult>()).Where(p => p.idnhomhang == nhomhang.id).ToList())
+					{
+						string linksp = "/san-pham/" + pd.id;
+						if (!SearchSPCanDatChanged(pd))
+							continue;
+						<MudItem xs="6" sm="6" md="4" lg="2">
+							<div class="product-card">
+								<div class="img_wrapper">
+									<div class="product-image">
+										<img Style=@GetCssImageStatus(@pd) src=@GetImageProductFileName(pd) alt="@pd.tensp" @onerror="() => HandleImageError(pd)">
+										@if (!(bool)@pd.active)
+										{
+											<a class="sold_out" target="_blank" href=@pd.link>HẾT HÀNG</a>
+										}
+									</div>
+								</div>
+								<div class="product-details">
+									<h2 class="product-title">@pd.tensp</h2>
+									<MudText Typo="Typo.h6" Style="text-align:center;color:red; font-weight: bold !important;">
+										@string.Format("{0:n0}", @pd.giaban)
+									</MudText>
+									<MudButton Href=@linksp
+											   Variant="Variant.Filled"
+											   FullWidth=true
+											   
+											   Color="Color.Primary">CHI TIẾT SẢN PHẨM</MudButton>
+								</div>
+							</div>
+						</MudItem>
+					}
+				</MudGrid>
+			}
+		}
+	</ContentTemplate>
+</SpinLoader>
+
+@code {
+	[CascadingParameter]
+	public HomeLayout Layout { get; set; }
+
+	[Parameter]
+	public int? idDanhMuc { get; set; }
+
+	[Parameter]
+	public string tenDanhMuc { get; set; }
+
+	UserSession userSession { get; set; }
+
+	bool IsLoading = false;
+	/// <summary>Đã gọi API danh sách sản phẩm thành công (tránh gọi lặp).</summary>
+	bool _productsDataLoaded;
+
+	protected override async Task OnInitializedAsync()
+	{
+		// Chưa đăng nhập → redirect sang /login
+		var authState = await ((CustomAuthenticationStateProvider)AuthStateProvider).GetAuthenticationStateAsync();
+		if (authState?.User?.Identity?.IsAuthenticated != true)
+		{
+			navigationManager.NavigateTo("/login", true);
+			return;
+		}
+
+		// Trang chủ "/" → báo cáo tổng quan (tránh lỗi render danh sách + đúng luồng nghiệp vụ)
+		// Chỉ giữ trang Home catalog cho "/danh-muc/{id}"
+		if (idDanhMuc == null)
+		{
+			navigationManager.NavigateTo("/OverviewReport", true);
+			return;
+		}
+
+		// userSession đầy đủ có thể chỉ có sau khi HomeLayout.OnAfterRenderAsync gọi LoadAllConfig
+		await TryLoadProductsIfReadyAsync();
+	}
+
+	/// <summary>Load sản phẩm khi đã có company id (từ Layout hoặc userSession).</summary>
+	async Task<bool> TryLoadProductsIfReadyAsync()
+	{
+		if (_productsDataLoaded)
+			return false;
+
+		var us = Layout?.userSession ?? userSession;
+		if (us?.company == null || us.company.Id <= 0)
+			return false;
+
+		try
+		{
+			IsLoading = true;
+			userSession = us;
+			idcompany = us.company.Id;
+			var rows = await hangHoaService.GetAllProductCompanyAsync(
+				idcompany,
+				MTLEnum.TonKho.ConHang,
+				filter_idnhomhang,
+				MTLEnum.SapXepTheoNgay.NgayTao);
+			ListProduct = rows ?? new List<MTL_GetAllProductsInCompanyResult>();
+			_productsDataLoaded = true;
+			return true;
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		// Layout gán ListNhomHang + userSession sau first render — đồng bộ và load SP nếu chưa load được
+		if (Layout?.layoutRendered == true)
+		{
+			var needState = false;
+			if (Layout.ListNhomHang != null && !ReferenceEquals(ListNhomHang, Layout.ListNhomHang))
+			{
+				ListNhomHang = Layout.ListNhomHang;
+				needState = true;
+			}
+			if (Layout.userSession != null)
+				userSession = Layout.userSession;
+
+			if (await TryLoadProductsIfReadyAsync())
+				needState = true;
+
+			if (needState)
+				await InvokeAsync(StateHasChanged);
+		}
+
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	public List<MTL_GetAllProductsInCompanyResult>? ListProduct { get; set; }
+
+	public string v_tonkho { get; set; } = "Tất cả";
+	public string v_theongay { get; set; } = "Ngày tạo";
+	public int v_loaihh { get; set; } = 1; // Là : Hàng Hóa
+
+	private string timsp = "";
+	private CVJP_GetAllProductsResult sanpahmselected = null;
+
+	public List<MTL_GetAllNhomHangResult>? ListNhomHang { get; set; }
+
+	int idcompany = 1;
+	int idLoaiHinhKinhDoanh = MTLEnum.LoaiHinhKinhDoanh.HangHoa;
+
+	string _searchChonHang = "";
+	int filter_idnhomhang = 0;
+	protected override void OnInitialized()
+	{
+		if (Layout?.layoutRendered == true && Layout.ListNhomHang != null)
+		{
+			ListNhomHang = Layout.ListNhomHang.ToList();
+			userSession = Layout.userSession;
+		}
+	}
+
+	private bool TimSanPhamFunc(CVJP_GetAllProductsResult element) => FilterFunc(element, timsp);
+
+	private bool FilterFunc(CVJP_GetAllProductsResult element, string searchString)
+	{
+		if (string.IsNullOrWhiteSpace(searchString))
+			return true;
+		if (element.tensp.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			return true;
+
+		return false;
+	}
+
+	void HandleImageError(MTL_GetAllProductsInCompanyResult pd)
+	{
+		var logo = userSession?.company?.Logourl ?? Layout?.userSession?.company?.Logourl;
+		if (!string.IsNullOrEmpty(logo))
+			pd.pic00 = logo;
+	}
+	string GetImageProductFileName(MTL_GetAllProductsInCompanyResult pd)
+	{
+		string url_anhdaidien = "";// company.Logourl;
+		if (pd.pic00 != null)
+		{
+			url_anhdaidien = pd.pic00;
+		}
+		// else
+		// {
+
+		// 	url_anhdaidien = pd.pic00;
+
+		// }
+		return url_anhdaidien;
+
+	}
+	public bool SearchSPCanDatChanged(MTL_GetAllProductsInCompanyResult product)
+	{
+		if (string.IsNullOrEmpty(_searchChonHang))
+			return true;
+		if (product.tensp.Contains(_searchChonHang, StringComparison.OrdinalIgnoreCase))
+			return true;
+		return false;
+	}
+
+	string GetCssImageStatus(MTL_GetAllProductsInCompanyResult product)
+	{
+		string css_image = "";
+		if ((bool)product.active)
+			css_image = "width:100%;filter: grayscale(0%);";
+		else css_image = "width:100%;filter: grayscale(100%);";
+		return css_image;
+	}
+
+	void AddToCart(MTL_GetAllProductsInCompanyResult pd)
+	{
+
+	}
+	async Task EditProduct(MTL_GetAllProductsInCompanyResult pd)
+	{
+
+	}
+}

@@ -1,0 +1,250 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using System.ComponentModel.DataAnnotations
+@using FluentValidation;
+@using static MTL.APP.Pages.BanHang.ThemHoaDon
+@inject KhachHangService khachHangService
+@inject HangHoaService hangHoaService
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		<SpinLoader IsLoading="IsLoading" Spinner="SpinnerType.Chase">
+			<LoadingTemplate>
+				<Loading />
+			</LoadingTemplate>
+			<ContentTemplate>
+				<MudForm @ref="form">
+					<MudGrid Spacing=2>
+						<MudItem xs="12" sm="12" md="3">
+							<MudPaper Class="pa-4" Elevation="4">
+								@{
+									string url_anhdaidien = company.Logourl;
+									if (thanhphan.hinhanh1 != null)
+									{
+										url_anhdaidien = thanhphan.hinhanh1;
+									}
+									<a target="_blank" href="@thanhphan.linksanpham">
+										<MudImage Fluid="true" Src=@url_anhdaidien Alt="@thanhphan.tensp"></MudImage>
+									</a>
+								}
+							</MudPaper>
+						</MudItem>
+						<MudItem xs="12" sm="12" md="9">
+							<MudGrid Spacing=2>								
+								<MudItem xs="6" sm="6" md="2">
+									@if (company.IsActiveSpao != null)
+									{										
+										if ((bool)company.IsActiveSpao)
+										{
+											<MudSwitch Label="Sản phẩm ảo"
+													   Value="spAo_enable"
+													   ValueChanged="isSPAo_CheckedChanged"
+													   T="bool" Color="Color.Primary" />
+										}
+									}
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									@if (!spAo_enable)
+									{
+										<MudAutocomplete T="MTL_GetAllProductsInCompanyResult"
+														 Label="Chọn hàng hóa thành phần cần thêm"
+														 Disabled=spAo_enable
+														 Clearable="true"
+														 SearchFunc=@SearchHangHoaAsync
+														 Value=@product_mtl
+														 @ref="_HangHoaAutoComplete"
+														 ValueChanged="HangHoaValueChanged"
+														 MaxItems="100"
+														 ResetValueOnEmptyText=true
+														 ToStringFunc="@(e=> e==null?null : $"{e.tensp} ({e.giaban})")">
+											<ItemTemplate Context="pd">
+												<div class="combobox-item-template">
+													<img src=@GetImageFileName(pd) width="120px" height="120px" />
+													<div class="combobox-item-template-text">
+														<span class="combobox-item-tensp">@pd.tensp</span>
+														<span>Nhóm hàng: @pd.nhomhang</span>
+														<span>Bảo hành: @pd.baohanh</span>
+														<span class="combobox-item-price">Giá bán: @String.Format("{0:n0}", @pd.giaban) </span>
+														<span class="combobox-item-price" style=" text-decoration: line-through;">Giá thường: @String.Format("{0:n0}", @pd.giathuong) </span>
+													</div>
+												</div>
+											</ItemTemplate>
+										</MudAutocomplete>
+									}
+									else
+									{
+										<MudTextField T="string"
+													  Label="Nhập sản phẩm ảo cần bán"
+													  Disabled=!spAo_enable
+													  @bind-Text=thanhphan.tensp />
+									}
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudNumericField HideSpinButtons="true"
+													 Label="Số lượng" @bind-Value=thanhphan.sl
+													 style="font-weight: bold;"
+													 Format="N0" />
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudNumericField HideSpinButtons="true"
+													 Label="Đơn giá" @bind-Value=thanhphan.giaban
+													 Class="mud-input-emphasis"
+													 Format="N0" />
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudSelect Label="Bảo hành" T="int?"
+											   Class="mud-input-emphasis"
+											   @bind-Value="thanhphan.idbaohanh"
+											  
+											   AnchorOrigin="Origin.BottomCenter" Required="true">
+										@foreach (var item in BaoHanhList)
+										{
+											<MudSelectItem T="int?" Value="@item.Id">@item.Baohanh</MudSelectItem>
+										}
+									</MudSelect>
+								</MudItem>
+							</MudGrid>
+						</MudItem>
+					</MudGrid>
+				</MudForm>
+			</ContentTemplate>
+		</SpinLoader>
+	</DialogContent>
+	<DialogActions>
+		@{
+			string btupdate = "CẬP NHẬT THÀNH PHẦN";
+			if (isNew) btupdate = "THÊM THÀNH PHẦN";
+		}
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="SaveAsync" Color="Color.Success">@btupdate</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public bool isNew { get; set; }
+	[Parameter]
+	public int idsanpham { get; set; }
+	[Parameter]
+	public MTL_GetSanPhamThanhPhanResult thanhphan { get; set; }	
+	[Parameter]
+	public List<TblLoaihanghoadichvu>? LoaiHHDVList { get; set; }
+	[Parameter]
+	public List<TblBaoHanh>? BaoHanhList { get; set; }
+	[Parameter]										
+	public bool spAo_enable { get; set; } = false;
+	[Parameter]
+	public MTL.APP.Models.Company company { get; set; }		
+	[Parameter]
+	public EventCallback<MTL_GetSanPhamThanhPhanResult> OnDialogCallback { get; set; }
+	[Parameter]
+	public List<MTL_GetAllProductsInCompanyResult> ListProductInCompany { get; set; }
+
+	[Parameter]
+	public MTL_GetAllProductsInCompanyResult product_mtl { get; set; }
+	[Parameter]
+	public List<MTL_GetSanPhamThanhPhanResult>? ListHangHoaThanhPhan { get; set; }
+
+
+	MudForm form;
+	public MudAutocomplete<MTL_GetAllProductsInCompanyResult> _HangHoaAutoComplete { get; set; }
+	string v_tonkho = "Còn hàng";
+	string v_theongay = "Ngày cập nhật";
+	public int id_baohanh = 1;
+	bool IsLoading = true;
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			if(isNew)
+			{
+				spAo_enable = false;
+			}
+			else
+			{
+				spAo_enable = (bool)thanhphan.issanphamao;
+			}
+			
+			
+			product_mtl = ListProductInCompany.Where(p => p.id == thanhphan.idhanghoathanhphan).FirstOrDefault();
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+	async Task SaveAsync()
+	{
+		await OnDialogCallback.InvokeAsync(thanhphan);
+		MudDialog.Close(DialogResult.Ok(true));
+	}
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}	
+
+	string GetImageFileName(MTL_GetAllProductsInCompanyResult product)
+	{
+		string url_anhdaidien = company.Logourl;
+		if (product.pic00 != null)
+		{
+			url_anhdaidien = product.pic00;
+		}
+		return url_anhdaidien;
+	}
+	async Task<IEnumerable<MTL_GetAllProductsInCompanyResult>> SearchHangHoaAsync(string searchTerm,CancellationToken token)
+	{
+		// In real life use an asynchronous function for fetching data from an api.
+		await Task.Delay(5, token);
+		if (string.IsNullOrEmpty(searchTerm))
+		{
+			return ListProductInCompany;
+		}
+		var products = ListProductInCompany?
+			.Where(product => product.tensp.Contains(searchTerm, StringComparison.InvariantCultureIgnoreCase))
+			?? Enumerable.Empty<MTL_GetAllProductsInCompanyResult>();
+		return products;
+	}
+	async Task HangHoaValueChanged(MTL_GetAllProductsInCompanyResult hanghoa)
+	{
+		product_mtl = hanghoa;
+		if (hanghoa != null)
+		{
+			thanhphan.idsanpham = idsanpham;
+			thanhphan.tensp = hanghoa.tensp;
+			
+			thanhphan.linksanpham = hanghoa.link;
+			thanhphan.hinhanh1 = hanghoa.hinhanh1;
+			thanhphan.sl = 1; //ép về 1
+			thanhphan.giaban = (int?)hanghoa.giaban;
+			thanhphan.idbaohanh = (int?)hanghoa.idBaoHanh;
+			thanhphan.idhanghoathanhphan = hanghoa.id;
+		}
+		StateHasChanged();
+	}
+
+
+	void isSPAo_CheckedChanged(bool value)
+	{			
+		spAo_enable = value;
+		thanhphan.issanphamao = value;
+		if ((bool)thanhphan.issanphamao)// là sp ao
+		{
+			thanhphan.idhanghoathanhphan = 0;
+		}
+	}
+}

@@ -1,0 +1,40 @@
+﻿@inject NavigationManager navigationManager
+<CascadingAuthenticationState>
+	<Router AppAssembly="@typeof(App).Assembly">
+		<Found Context="routeData">
+			@if (@routeData.PageType.Name == "Home")
+			{
+				@*navigationManager.NavigateTo("/Hom");*@
+				@* <MTL.APP.Pages.WebApp.Home></MTL.APP.Pages.WebApp.Home> *@
+				<AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(HomeLayout)">
+					<Authorizing>
+						Đang xác thực dữ liệu...
+					</Authorizing>
+					<NotAuthorized>
+						@{
+							<MTL.APP.Pages.WebApp.Home></MTL.APP.Pages.WebApp.Home>
+						}
+					</NotAuthorized>
+				</AuthorizeRouteView>
+			}
+			else
+			{
+				<AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+					<Authorizing>
+						Authorizing...
+					</Authorizing>
+					<NotAuthorized>
+						<RedirectToLogin />
+					</NotAuthorized>
+				</AuthorizeRouteView>
+			}
+		</Found>
+		<NotFound>
+			<LayoutView Layout="@typeof(HomeLayout)">
+				@{
+					navigationManager.NavigateTo("/Page404");
+				}
+			</LayoutView>
+		</NotFound>
+	</Router>
+</CascadingAuthenticationState>

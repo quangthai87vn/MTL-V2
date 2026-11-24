@@ -1,0 +1,40 @@
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager NavigationManager
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-0"
+		   ActionsClass="dialog-background-surface mtl-themdon-dialog-actions">
+	<DialogContent>
+		<div class="mtl-a4-preview-frame">
+			<iframe src="@_iframeSrc"
+					class="mtl-a4-preview-iframe"
+					title="In hóa đơn A4"
+					referrerpolicy="no-referrer-when-downgrade"></iframe>
+		</div>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="Close">ĐÓNG</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+	[Parameter] public string MaHD { get; set; } = "";
+
+	string _iframeSrc = "";
+
+	protected override void OnParametersSet()
+	{
+		var m = MaHD?.Trim() ?? "";
+		if (string.IsNullOrEmpty(m))
+			_iframeSrc = "about:blank";
+		else
+			_iframeSrc = NavigationManager.ToAbsoluteUri($"/HoaDon/A4/{Uri.EscapeDataString(m)}").AbsoluteUri;
+	}
+
+	void Close() => MudDialog.Cancel();
+}

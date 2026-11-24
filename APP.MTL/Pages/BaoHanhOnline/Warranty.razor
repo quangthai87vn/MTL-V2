@@ -1,0 +1,143 @@
+@page "/Warranty/{idcompany}/{serial}/{phonenumber}"
+@page "/Warranty/{idcompany}/{serial}"
+@layout NoMenuLayout
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using System.Collections;
+@using MTL.APP.Pages.HangHoa
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+@using MudBlazor.Services
+@inject InvoiceService invoiceService
+@inject ISnackbar SnackbarService
+<style>
+
+
+</style>
+<center>
+	<div class="card-body">
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="true" />
+		}
+		else
+		{
+			<MudGrid Spacing=2>
+				<MudItem xs="12" sm="12" md="3">
+					<MudCard Elevation="4" Style="height: 100% ; width:100%">
+						<MudCardMedia Image="https://mytholaptop.vn/wp-content/uploads/2024/07/logo-mytholaptop.webp" Height="250" />
+						<MudCardContent>
+							<MudText Typo="Typo.body2" Style="text-align:center;color:red; font-weight: bold !important;">MÃ HĐ: @serial</MudText>
+
+							<MudTextField T="string" Label="NHẬP SỐ ĐIỆN THOẠI MUA HÀNG"
+								HelperTextOnFocus="true"
+								Style="text-align:center;color:red; font-weight: bold !important;"
+								@bind-Text=@phonenumber />
+						</MudCardContent>
+						<MudCardActions Class="center-content">
+							<MudButton Size="Size.Large" Variant="Variant.Filled" FullWidth=true StartIcon="@Icons.Material.Filled.Search"
+								onclick="TraCuuBH" Color="Color.Primary">TRA CỨU THÔNG TIN</MudButton>
+						</MudCardActions>
+					</MudCard>
+				</MudItem>
+				@if (isHoaDon)
+				{
+					<MudItem xs="12" sm="12" md="9">
+						<MudPaper Class="pa-4" Elevation="4">
+							<MudGrid Spacing=1>
+								<MudItem xs="12" sm="12" md="12">
+									<h3 Style="text-align:center;color:red; font-weight: bold !important;">ĐƠN HÀNG CHI TIẾT</h3>
+								</MudItem>
+								<MudItem xs="12" sm="12" md="4">
+									<MudExGradientText Style="text-align:center;" Typo="Typo.h6">Khách hàng: @Invoice.tenkh </MudExGradientText>
+								</MudItem>
+								<MudItem xs="12" sm="12" md="4">
+									<MudExGradientText Style="text-align:center;" Typo="Typo.h6">Ngày mua: @(((DateTime)@Invoice.ngaytraphieu).ToString("dd/MM/yyyy HH:mm:ss")) </MudExGradientText>
+								</MudItem>
+								<MudItem xs="12" sm="12" md="4">
+									<MudExGradientText Style="text-align:center;" Typo="Typo.h6">Tổng đơn hàng: $@String.Format("{0:#,##0}", @Invoice.thanhtoan)</MudExGradientText>
+								</MudItem>
+							</MudGrid>
+							@foreach (var hdct in HoaDonChiTiet)
+							{
+								<MudPaper Class="pa-4">
+									<MudGrid Spacing=1>
+										<MudItem xs="6" sm="6" md="4">
+											<MudExGradientText Typo="Typo.body2">@hdct.tensp</MudExGradientText>
+										</MudItem>
+										<MudItem xs="6" sm="6" md="4">
+											<MudExGradientText Typo="Typo.body2">@hdct.sl x $@String.Format("{0:#,##0}", @hdct.dongia) = $@String.Format("{0:#,##0}", @hdct.thanhtien) </MudExGradientText>
+										</MudItem>
+										<MudItem xs="12" sm="12" md="4">
+											<MudExGradientText Typo="Typo.body2">Bảo hành: @hdct.baohanh</MudExGradientText>
+										</MudItem>
+									</MudGrid>
+								</MudPaper>
+							}
+						</MudPaper>
+					</MudItem>
+				}
+				else
+				{
+					<MudItem xs="12" sm="12" md="9">
+						<MudPaper Class="pa-4" Elevation="4">
+							<MudGrid Spacing=1>
+								<MudItem xs="12" sm="12" md="12">
+									<MudText Typo="Typo.body2" Style="text-align:center;color:red; font-weight: bold !important;">@mess_error</MudText>
+								</MudItem>
+							</MudGrid>
+						</MudPaper>
+					</MudItem>
+				}
+			</MudGrid>
+		}
+	</div>
+</center>
+
+@code {
+	[Parameter]
+	public string idcompany { get; set; } = "";
+	[Parameter]
+	public string serial { get; set; } = "";
+	[Parameter]
+	public string phonenumber { get; set; } = "";
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+	public string mahd { get; set; } = "";
+	public bool isHoaDon { get; set; } = false;
+	bool IsLoading = true;
+
+	string mess_error = "";
+	List<MTL_GetHoaDonBySDT_SerialResult> ListInvoice = new List<MTL_GetHoaDonBySDT_SerialResult>();
+	MTL_GetHoaDonBySDT_SerialResult Invoice = new MTL_GetHoaDonBySDT_SerialResult();
+	List<MTL_GetHoaDonChiTietResult> HoaDonChiTiet = new List<MTL_GetHoaDonChiTietResult>();
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+	async Task TraCuuBH()
+	{
+		ListInvoice = await invoiceService.GetHoaDon(1, phonenumber, serial);
+		if (ListInvoice.Count > 0)
+		{
+			isHoaDon = true;
+			Invoice = ListInvoice[0];
+			mahd = Invoice.mahd;
+			HoaDonChiTiet = await invoiceService.GetHoaDonChiTiet_MaHDAsync(mahd);
+		}
+		else
+		{
+			isHoaDon = false;
+			mess_error = $"Hóa đơn không tồn tại, vui lòng xem lại";
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, mess_error);
+		}
+	}
+}

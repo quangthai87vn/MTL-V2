@@ -1,0 +1,36 @@
+@* Khối bảng chuẩn: toolbar gradient + nội dung (MudSimpleTable / lưới) + footer tùy chọn *@
+
+<MudPaper Elevation="4" Class="@RootClass">
+	<MudToolBar Dense="true" Class="mtl-section-toolbar px-3 py-2">
+		<MudIcon Icon="@ToolbarIcon" Size="Size.Small" />
+		<MudText Typo="Typo.subtitle1" Style="font-weight:700" Class="ml-2">@Title</MudText>
+		<MudSpacer />
+		@if (ToolbarTrailing != null)
+		{
+			@ToolbarTrailing
+		}
+	</MudToolBar>
+
+	@if (ChildContent != null)
+	{
+		@ChildContent
+	}
+
+	@if (Footer != null)
+	{
+		@Footer
+	}
+</MudPaper>
+
+@code {
+	[Parameter] public string Title { get; set; } = "";
+	[Parameter] public string ToolbarIcon { get; set; } = Icons.Material.Filled.TableChart;
+	[Parameter] public string? CssClass { get; set; }
+
+	string RootClass => string.IsNullOrWhiteSpace(CssClass)
+		? "rounded-lg overflow-hidden"
+		: $"rounded-lg overflow-hidden {CssClass}";
+	[Parameter] public RenderFragment? ToolbarTrailing { get; set; }
+	[Parameter] public RenderFragment? ChildContent { get; set; }
+	[Parameter] public RenderFragment? Footer { get; set; }
+}

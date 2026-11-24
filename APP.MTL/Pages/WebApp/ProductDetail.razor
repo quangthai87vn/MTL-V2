@@ -1,0 +1,126 @@
+@page "/san-pham/{idsanpham:int}"
+@layout HomeLayout
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudExRichTextEditor
+@inject Configs configs
+@inject CVJPService cVJPService
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@inject HangHoaService hangHoaService
+@inject IMenuService menuService
+@inject APIWooService wooAPIService
+
+<style>
+	.mudex-richtext-image img {
+		max-width: 100%;
+		height: auto;
+	}
+</style>
+<SpinLoader IsLoading="IsLoading" Spinner="SpinnerType.Chase">
+	<LoadingTemplate>
+		<Loading />
+	</LoadingTemplate>
+	<ContentTemplate>
+		<MudGrid Spacing=0>
+			<MudItem xs="12" sm="12" md="4">
+				<MudPaper Class="pa-4" Elevation="4">
+					<MudGrid Spacing=1>
+						<MudItem xs="12" sm="12" md="12">
+							<MudImage Fluid="true" Src="@sanpham.Pic00" Alt="@sanpham.Tensp" />
+						</MudItem>
+					</MudGrid>
+				</MudPaper>
+			</MudItem>
+			<MudItem xs="12" sm="12" md="8">
+				<MudPaper Class="pa-4" Elevation="1">
+					<MudGrid Spacing=0>
+						<MudItem xs="12" sm="12" md="12">
+							<MudExGradientText Typo="Typo.h6" style="color:var(--mud-palette-primary); font-weight: bold;">@sanpham.Tensp</MudExGradientText>
+							</MudItem>
+							<MudText Typo="Typo.h6" Style="text-align:center;color:red; font-weight: bold !important;">
+								Giá bán: @string.Format("{0:n0}", sanpham.Giaban)
+						</MudText>
+						<MudItem xs="12" sm="12" md="12">
+							<p class="m-2 mudex-richtext-image">
+								@htmlMotaNgan
+							</p>
+						</MudItem>
+					</MudGrid>
+				</MudPaper>
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<p class="m-2 mudex-richtext-image">
+					@htmlMotaChiTiet
+				</p>
+			</MudItem>
+		</MudGrid>
+	</ContentTemplate>
+</SpinLoader>
+@code {
+	[CascadingParameter]
+	public HomeLayout Layout { get; set; }
+
+	[Parameter]
+	public int? idsanpham { get; set; }
+
+	[Parameter]
+	public string tensanpham { get; set; }
+
+	bool IsLoading = false;
+	TblSanpham sanpham { get; set; }
+
+
+	MarkupString htmlMotaNgan;
+	MarkupString htmlMotaChiTiet;
+	MTL.APP.WooRestAPI.Product WooProduct { get; set; }
+	UserSession userSession { get; set; }
+
+	protected override void OnInitialized()
+	{
+		if (Layout.layoutRendered)
+		{
+			userSession = Layout.userSession;
+		}
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			sanpham = await hangHoaService.GetProductAsync((int)idsanpham);
+			await this.LoadWooProduct(sanpham.WooId.ToString());
+			IsLoading = false;
+		}
+		catch (Exception)
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task LoadWooProduct(string woo_id)
+	{
+		try
+		{
+			if (woo_id != null && woo_id != "0" && woo_id != "")
+			{
+				WooProduct = await wooAPIService.RetrieveProductAsync(woo_id, userSession.company.Wookey, userSession.company.Woosecret, userSession.company.Woourl);
+				if (WooProduct != null)
+				{
+					htmlMotaNgan = (MarkupString)WooProduct.short_description;
+					htmlMotaChiTiet = (MarkupString)WooProduct.description;
+				}
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+
+
+
+}

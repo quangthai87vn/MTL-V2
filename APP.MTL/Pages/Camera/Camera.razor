@@ -1,0 +1,510 @@
+@page "/camera"
+@attribute [Authorize]
+@implements IAsyncDisposable
+@inject ICameraService CameraService
+@inject ISnackbar SnackbarService
+@inject IJSRuntime JSRuntime
+@using MTL.APP.Models
+@using MTL.APP.Services
+
+<style>
+	.mtl-cam-page {
+		height: calc(100vh - 140px);
+		display: flex;
+		flex-direction: column;
+	}
+
+	.mtl-cam-toolbar {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 8px 12px;
+		background: #1a1a2e;
+		border-bottom: 2px solid #e94560;
+		flex-shrink: 0;
+	}
+
+	.mtl-cam-toolbar-title {
+		color: #fff;
+		font-weight: 700;
+		font-size: 0.95rem;
+		letter-spacing: 0.05em;
+	}
+
+	.mtl-cam-rec-indicator {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		color: #ff4444;
+		font-size: 0.75rem;
+		font-weight: 600;
+	}
+
+	.mtl-cam-rec-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: #ff4444;
+		animation: blink-rec 1s infinite;
+	}
+
+	@@keyframes blink-rec {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.3; }
+	}
+
+	.mtl-cam-grid {
+		flex: 1;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		grid-template-rows: 1fr 1fr;
+		gap: 3px;
+		background: #111;
+		overflow: hidden;
+	}
+
+	.mtl-cam-card {
+		position: relative;
+		background: #000;
+		overflow: hidden;
+		cursor: pointer;
+	}
+
+	.mtl-cam-card:hover .mtl-cam-overlay-tools {
+		opacity: 1;
+	}
+
+	.mtl-cam-frame {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		display: block;
+		background: #0a0a0a;
+	}
+
+	.mtl-cam-placeholder {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		background: #0a0a0a;
+		gap: 10px;
+	}
+
+	.mtl-cam-placeholder-text {
+		color: #555;
+		font-size: 0.8rem;
+	}
+
+	.mtl-cam-err-detail {
+		color: #ffca28;
+		max-width: 95%;
+		text-align: center;
+		white-space: normal;
+		word-break: break-word;
+		font-size: 0.72rem;
+		line-height: 1.35;
+		padding: 0 6px;
+	}
+
+	/* ── Hikvision-style overlay ── */
+	.mtl-cam-overlay {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		background: linear-gradient(transparent, rgba(0,0,0,0.85));
+		padding: 24px 8px 6px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		pointer-events: none;
+	}
+
+	.mtl-cam-cam-name {
+		color: #fff;
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-shadow: 1px 1px 2px #000;
+		letter-spacing: 0.04em;
+	}
+
+	.mtl-cam-timestamp {
+		color: #ddd;
+		font-size: 0.65rem;
+		font-family: 'Courier New', monospace;
+		text-shadow: 1px 1px 2px #000;
+	}
+
+	/* Top-right status badge */
+	.mtl-cam-status-badge {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 8px;
+		border-radius: 3px;
+		font-size: 0.65rem;
+		font-weight: 700;
+		pointer-events: none;
+	}
+
+	.mtl-cam-status-badge.live {
+		background: rgba(0,0,0,0.6);
+		color: #00e676;
+		border: 1px solid #00e676;
+	}
+
+	.mtl-cam-status-badge.offline {
+		background: rgba(0,0,0,0.6);
+		color: #ff5252;
+		border: 1px solid #ff5252;
+	}
+
+	.mtl-cam-status-badge.connecting {
+		background: rgba(0,0,0,0.6);
+		color: #ffca28;
+		border: 1px solid #ffca28;
+	}
+
+	.mtl-cam-status-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: currentColor;
+	}
+
+	.mtl-cam-status-badge.live .mtl-cam-status-dot {
+		animation: blink-rec 0.8s infinite;
+	}
+
+	/* Floating toolbar per camera */
+	.mtl-cam-overlay-tools {
+		position: absolute;
+		top: 6px;
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		gap: 4px;
+		opacity: 0;
+		transition: opacity 0.2s;
+		z-index: 10;
+	}
+
+	.mtl-cam-btn {
+		background: rgba(0,0,0,0.7);
+		border: 1px solid rgba(255,255,255,0.3);
+		color: #fff;
+		border-radius: 3px;
+		padding: 3px 8px;
+		font-size: 0.65rem;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		gap: 3px;
+		transition: background 0.15s;
+	}
+
+	.mtl-cam-btn:hover {
+		background: rgba(233,69,96,0.8);
+		border-color: #e94560;
+	}
+
+	/* Fullscreen mode */
+	.mtl-cam-grid.fullscreen-single {
+		grid-template-columns: 1fr;
+		grid-template-rows: 1fr;
+	}
+
+	.mtl-cam-grid.fullscreen-single .mtl-cam-card {
+		display: none;
+	}
+
+	.mtl-cam-grid.fullscreen-single .mtl-cam-card.selected {
+		display: block;
+	}
+
+	/* Channel label */
+	.mtl-cam-channel {
+		position: absolute;
+		top: 6px;
+		left: 6px;
+		background: rgba(233,69,96,0.8);
+		color: #fff;
+		font-size: 0.65rem;
+		font-weight: 700;
+		padding: 1px 6px;
+		border-radius: 2px;
+		pointer-events: none;
+	}
+
+	/* Responsive */
+	@@media (max-width: 768px) {
+		.mtl-cam-grid {
+			grid-template-columns: 1fr;
+			grid-template-rows: repeat(4, 1fr);
+		}
+	}
+</style>
+
+<div class="mtl-cam-page">
+	@* ── FFmpeg Warning Banner ── *@
+	@if (!_ffmpegAvailable)
+	{
+		<MudAlert Severity="Severity.Error" Variant="Variant.Filled" Dense="true" Class="mb-0">
+			<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+				<MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Small" />
+				<MudText Typo="Typo.subtitle2" Style="font-weight:700;">THIẾU FFmpeg - Camera không hoạt động!</MudText>
+				<MudSpacer />
+				<MudChip T="string" Size="Size.Small" Color="Color.Warning" OnClick="ShowFfmpegSetup">
+					Xem hướng dẫn cài đặt
+				</MudChip>
+			</MudStack>
+		</MudAlert>
+	}
+
+	@* ── Toolbar ── *@
+	<div class="mtl-cam-toolbar">
+		<MudIcon Icon="@Icons.Material.Filled.Videocam" Size="Size.Medium" Style="color:#e94560" />
+		<MudText Typo="Typo.subtitle1" Class="mtl-cam-toolbar-title">HÌNH ẢNH TRỰC TUYẾN</MudText>
+
+		<div class="mtl-cam-rec-indicator">
+			<div class="mtl-cam-rec-dot"></div>
+			REC
+		</div>
+
+		<MudSpacer />
+
+		<MudChip T="string" Size="Size.Small" Color="Color.Error" OnClick="RefreshAll">
+			<MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Class="mr-1" />
+			Làm mới
+		</MudChip>
+
+		<MudChip T="string" Size="Size.Small" Color="@(_isFullscreen ? Color.Warning : Color.Default)"
+				 OnClick="ToggleFullscreen">
+			<MudIcon Icon="@(_isFullscreen ? Icons.Material.Filled.FullscreenExit : Icons.Material.Filled.Fullscreen)"
+					  Size="Size.Small" Class="mr-1" />
+			@(_isFullscreen ? "Thoát" : "Toàn màn hình")
+		</MudChip>
+
+		<MudChip T="string" Size="Size.Small" Color="Color.Success" OnClick="SnapshotAll">
+			<MudIcon Icon="@Icons.Material.Filled.CameraAlt" Size="Size.Small" Class="mr-1" />
+			Chụp ảnh
+		</MudChip>
+	</div>
+
+	@* ── Camera Grid ── *@
+	<div class="mtl-cam-grid @(_isFullscreen ? "fullscreen-single" : "")" id="camGrid">
+		@foreach (var cam in Cameras)
+		{
+			var isSelected = _selectedCamId == cam.Id;
+			var frame = CameraService.GetFrameBase64(cam.Id);
+			var isLive = CameraService.IsCameraActive(cam.Id);
+			var isConnecting = CameraService.IsCameraConnecting(cam.Id);
+			var lastErr = CameraService.GetLastError(cam.Id);
+
+			<div class="mtl-cam-card @(isSelected ? "selected" : "")"
+				 @ondblclick="() => ToggleFullscreenCam(cam.Id)">
+
+				@* Channel label *@
+				<div class="mtl-cam-channel">CAM @cam.Id</div>
+
+				@* Floating toolbar *@
+				<div class="mtl-cam-overlay-tools">
+					<button class="mtl-cam-btn" title="Toàn màn hình"
+							@onclick="() => ToggleFullscreenCam(cam.Id)"
+							@onclick:stopPropagation="true">
+						<i class="fas fa-expand"></i>
+					</button>
+					<button class="mtl-cam-btn" title="Chụp ảnh"
+							@onclick="() => SnapshotCam(cam.Id, frame)"
+							@onclick:stopPropagation="true">
+						<i class="fas fa-camera"></i>
+					</button>
+					<button class="mtl-cam-btn" title="Tải lại"
+							@onclick="() => RefreshCam(cam.Id)"
+							@onclick:stopPropagation="true">
+						<i class="fas fa-sync"></i>
+					</button>
+				</div>
+
+				@* Status badge *@
+				<div class="mtl-cam-status-badge @(isLive ? "live" : isConnecting ? "connecting" : "offline")">
+					<div class="mtl-cam-status-dot"></div>
+					@(isLive ? "LIVE" : isConnecting ? "ĐANG KẾT NỐI" : "OFFLINE")
+				</div>
+
+				@* Video frame *@
+				@if (!string.IsNullOrEmpty(frame))
+				{
+					<img src="@frame" alt="@cam.Name" class="mtl-cam-frame"
+						 loading="lazy" />
+				}
+				else
+				{
+					<div class="mtl-cam-placeholder">
+						@if (!_ffmpegAvailable)
+						{
+							<MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" />
+							<span class="mtl-cam-placeholder-text" style="color:#ff5252; max-width:400px; text-align:center;">
+								FFmpeg chưa được cài đặt trên máy chủ!
+								<br />
+								<small>Xem hướng dẫn: nhấn nút "Xem hướng dẫn cài đặt" bên trên</small>
+							</span>
+						}
+						else if (isConnecting && string.IsNullOrEmpty(lastErr))
+						{
+							<MudProgressCircular Size="Size.Medium" Color="Color.Default" Indeterminate="true" />
+						}
+						else if (string.IsNullOrEmpty(cam.RtspUrl))
+						{
+							<span class="mtl-cam-placeholder-text">Chưa cấu hình RTSP</span>
+						}
+						else if (!string.IsNullOrEmpty(lastErr))
+						{
+							<span class="mtl-cam-placeholder-text mtl-cam-err-detail">@lastErr</span>
+						}
+						else if (isConnecting)
+						{
+							<span class="mtl-cam-placeholder-text">Đang kết nối (server → RTSP)…</span>
+						}
+						else
+						{
+							<span class="mtl-cam-placeholder-text">Không có hình — kiểm tra kết nối mạng và URL RTSP</span>
+						}
+					</div>
+				}
+
+				@* Hikvision-style overlay (name + timestamp) *@
+				<div class="mtl-cam-overlay">
+					<span class="mtl-cam-cam-name">@cam.Name</span>
+					<span class="mtl-cam-timestamp">@_currentTime.ToString("yyyy-MM-dd HH:mm:ss")</span>
+				</div>
+			</div>
+		}
+	</div>
+</div>
+
+@code {
+	List<CameraStreamInfo> Cameras = new();
+	private int? _selectedCamId = null;
+	private bool _isFullscreen = false;
+	private DateTime _currentTime = DateTime.Now;
+	private System.Threading.Timer? _timer;
+	private bool _ffmpegAvailable = false;
+	private string _ffmpegMessage = "";
+
+	protected override async Task OnInitializedAsync()
+	{
+		_ffmpegAvailable = CameraService.IsFfmpegAvailable();
+		_ffmpegMessage = CameraService.GetFfmpegSetupMessage();
+		
+		await CameraService.StartAllAsync();
+		Cameras = CameraService.GetCameras().ToList();
+
+		// Timer: cập nhật timestamp mỗi giây + trigger re-render để refresh frame ảnh
+		_timer = new System.Threading.Timer(_ =>
+		{
+			_currentTime = DateTime.Now;
+			InvokeAsync(StateHasChanged);
+		}, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		_timer?.Dispose();
+		await CameraService.StopAllAsync();
+	}
+
+	void ToggleFullscreenCam(int camId)
+	{
+		if (_isFullscreen && _selectedCamId == camId)
+		{
+			_isFullscreen = false;
+			_selectedCamId = null;
+		}
+		else
+		{
+			_selectedCamId = camId;
+			_isFullscreen = true;
+		}
+	}
+
+	void ToggleFullscreen()
+	{
+		if (_isFullscreen)
+		{
+			_isFullscreen = false;
+			_selectedCamId = null;
+		}
+		else if (Cameras.Any())
+		{
+			_selectedCamId = Cameras.First().Id;
+			_isFullscreen = true;
+		}
+	}
+
+	async Task RefreshAll()
+	{
+		await CameraService.StopAllAsync();
+		await CameraService.StartAllAsync();
+		SnackbarService.Add("Đã làm mới tất cả camera", Severity.Info);
+	}
+
+	void RefreshCam(int camId)
+	{
+		// Force refresh — stop/start individual camera
+		StateHasChanged();
+		SnackbarService.Add($"Đã làm mới camera {camId}", Severity.Info);
+	}
+
+	void SnapshotAll()
+	{
+		foreach (var cam in Cameras)
+		{
+			var frame = CameraService.GetFrameBase64(cam.Id);
+			SnapshotCam(cam.Id, frame);
+		}
+	}
+
+	void SnapshotCam(int camId, string? frameBase64)
+	{
+		if (string.IsNullOrEmpty(frameBase64))
+		{
+			SnackbarService.Add($"Camera {camId}: Không có hình ảnh để chụp", Severity.Warning);
+			return;
+		}
+
+		var js = (IJSRuntime)JSRuntime;
+		try
+		{
+			// Strip "data:image/jpeg;base64," prefix before save
+			var base64Data = frameBase64.Contains(',')
+				? frameBase64.Split(',')[1]
+				: frameBase64;
+			var camName = Cameras.FirstOrDefault(c => c.Id == camId)?.Name ?? $"Cam{camId}";
+			var fileName = $"{camName}_{DateTime.Now:yyyyMMdd_HHmmss}.jpg";
+			JSRuntime.InvokeVoidAsync("downloadBase64Image", base64Data, fileName);
+			SnackbarService.Add($"Đã lưu: {fileName}", Severity.Success);
+		}
+		catch (Exception ex)
+		{
+			SnackbarService.Add($"Lỗi chụp ảnh: {ex.Message}", Severity.Error);
+		}
+	}
+
+	void ShowFfmpegSetup()
+	{
+		var msg = CameraService.GetFfmpegSetupMessage();
+		SnackbarService.Add(msg, Severity.Error, config =>
+		{
+			config.RequireInteraction = true;
+			config.ShowCloseIcon = true;
+			config.VisibleStateDuration = 15000;
+		});
+	}
+}

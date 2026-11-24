@@ -1,0 +1,145 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models
+@using MTL.APP.Services
+@inject HangHoaService hangHoaService
+@inject IToastService toastService
+@inject ISnackbar SnackbarService
+
+
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface mtl-themdon-dialog-actions">
+	<DialogContent>
+
+		<MudForm @ref="form" Model="@model" Validation=@(Validator.ValidateValue)>
+			<MudGrid Spacing=1>
+				<MudItem xs="6" sm="6" md="6">
+					<MudTextField Immediate=true
+								  For="@(() => model.Thuonghieu)"
+								  T="string" Label="Nhập tên thương hiệu"
+								  Margin="Margin.Dense" Variant="Variant.Outlined"
+								  HelperTextOnFocus="true"
+								  Class="mud-input-emphasis"
+								  @bind-Text=@model.Thuonghieu />
+				</MudItem>
+				<MudItem xs="6" sm="6" md="6">
+					<MudTextField Immediate="true"
+								  For="@(() => model.Viettat)"
+								  T="string" Label="Nhập tên viết tắt"
+								  Margin="Margin.Dense" Variant="Variant.Outlined"
+								  HelperTextOnFocus="true"								  
+								  @bind-Text=@model.Viettat />
+				</MudItem>
+				<MudItem xs="6" sm="6" md="6">
+					<MudNumericField HideSpinButtons="true"
+									 Margin="Margin.Dense" Variant="Variant.Outlined"
+									 Label="Vui lòng nhập thứ tự" @bind-Value="model.Order"
+									 Format="N0"									
+									  />
+				</MudItem>
+				<MudItem xs="6" sm="6" md="6">
+					<MudSwitch @bind-Checked="model.Active" Label="Kích hoạt"
+							   T="bool?" Color="Color.Primary" />
+				</MudItem>
+			</MudGrid>
+		</MudForm>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="SaveDataAsync" Color="Color.Success">LƯU THÔNG TIN</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public bool isNew { get; set; }
+	[Parameter]
+	public UserSession userSession { get; set; }
+	[Parameter]
+	public TblThuonghieu thuonghieu { get; set; }
+	[Parameter]
+	public EventCallback<TblThuonghieu> OnDialogCallback { get; set; }
+	
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	MudForm form;
+	TblThuonghieu model = new TblThuonghieu();
+	ThuongHieuValidator Validator = new ThuongHieuValidator();
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{					
+			if (isNew)
+			{
+				model = new TblThuonghieu();
+				model.Id = 0;
+				model.Active = true;
+				model.Order = 1;				
+				model.Idcompany = userSession.company.Id;
+				model.Thuonghieu = "";
+				model.Iduserlastcreate = model.Iduserlastupdate = userSession.user.UserId;
+			}
+			else
+			{
+				model = thuonghieu;				
+			}			
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task<TblThuonghieu> SaveData()
+	{		
+		try
+		{
+			if (isNew)
+			{
+				model = await hangHoaService.CreateThuongHieuAsync(model);
+				string mess = $"Tạo thành công thương hiệu [{model.Thuonghieu}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			else
+			{
+				model = await hangHoaService.UpdateThuongHieuAsync(model);
+				string mess = $"Lưu thành công thương hiệu [{model.Thuonghieu}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			return model;
+		}
+		catch (Exception)
+		{
+			return null;
+		}
+		
+		
+	}
+
+	async Task SaveDataAsync()
+	{
+		await form.Validate();
+		if (form.IsValid)
+		{
+			TblThuonghieu th= await SaveData();			
+			await OnDialogCallback.InvokeAsync(th);
+			MudDialog.Close(DialogResult.Ok(true));
+		}
+		else
+		{
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Có lỗi xảy ra, vui lòng xem lại !");
+		}
+	}
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+
+}

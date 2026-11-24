@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE & Editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.cursor/
+.csharpier/
+
+# Build output
+bin/
+obj/
+out/
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+# docker-entrypoint.sh được giữ lại vì cần cho entrypoint
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Test
+[Tt]est/
+[Ww]wwroot/[Tt]est/
+
+# Documentation
+*.md
+*.txt
+LICENSE
+
+# Temp / history
+.history/
+.temp/
+tmp/
+*.tmp
+
+# Publish output
+publish/
+publish-fast/
+
+# Config override (appsettings.Development bị loại, appsettings.json giữ lại)
+appsettings.Development.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Optional: giữ lại wwwroot nhưng loại bỏ folder upload lớn
+# wwwroot/Uploads/

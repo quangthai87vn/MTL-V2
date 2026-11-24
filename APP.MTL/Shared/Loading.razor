@@ -1,0 +1,61 @@
+@* Không gọi DbContext/LoadAllConfig ở đây — tránh chạy song song với OnAfterRenderAsync của trang cha (lỗi "second operation on this context"). *@
+
+@if (IsFullPage)
+{
+    <MudOverlay Visible="true" DarkBackground="true" ZIndex="9999">
+        <div style="text-align:center">
+            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="3">
+                @if (!string.IsNullOrWhiteSpace(CompanyLogoUrl))
+                {
+                    <MudImage Src="@CompanyLogoUrl" Alt="@(CompanyDisplayName ?? "")" Elevation="0" Width="100" ObjectFit="ObjectFit.Contain" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Primary" />
+                }
+                <MudExGradientText Typo="Typo.subtitle1" style="font-weight:bold">
+                    @DisplayMessage
+                </MudExGradientText>
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Rounded="true" Style="width: 300px" />
+                @if (!HideText)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Default">Vui lòng chờ...</MudText>
+                }
+            </MudStack>
+        </div>
+    </MudOverlay>
+}
+else
+{
+    <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="2" Style="min-height: 300px; width: 100%;">
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Rounded="true" />
+        @if (!string.IsNullOrEmpty(DisplayMessage))
+        {
+            <MudText Typo="Typo.body2" Color="Color.Default" Align="Align.Center">@DisplayMessage</MudText>
+        }
+    </MudStack>
+}
+
+@code
+{
+    [Parameter] public bool IsFullPage { get; set; } = true;
+    [Parameter] public bool HideText { get; set; }
+    [Parameter] public string? PageName { get; set; }
+    /// <summary>Tùy chọn: logo công ty nếu trang cha đã có (không đọc DB trong component này).</summary>
+    [Parameter] public string? CompanyLogoUrl { get; set; }
+    [Parameter] public string? CompanyDisplayName { get; set; }
+    /// <summary>Ghi đè toàn bộ dòng trạng thái (nếu cần).</summary>
+    [Parameter] public string? Message { get; set; }
+
+    private string DisplayMessage { get; set; } = "ĐANG XỬ LÝ...";
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(Message))
+            DisplayMessage = Message;
+        else if (!string.IsNullOrWhiteSpace(PageName))
+            DisplayMessage = $"ĐANG XỬ LÝ {PageName.ToUpperInvariant()}";
+        else
+            DisplayMessage = "ĐANG XỬ LÝ...";
+    }
+}

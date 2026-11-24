@@ -1,0 +1,1533 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Pages.ThuongHieu
+@using MTL.APP.Services
+@using System.ComponentModel.DataAnnotations
+@using FluentValidation;
+@using System.Globalization
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+@using MudBlazor.Extensions.Core
+@using MudBlazor.Extensions
+@using MudBlazor.Utilities
+@using MudExRichTextEditor
+@using static MTL.APP.MTLEnum
+@inject IJSRuntime JSRuntime
+@inject HangHoaService hangHoaService
+@inject UserService userService
+@inject IToastService toastService
+@inject APIWooService wooAPIService
+@inject ISnackbar SnackbarService
+@inject Configs configs
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface mtl-themdon-dialog-actions">
+	<DialogContent>
+		<MudForm @ref="form" Model="@model" Validation=@(Validator.ValidateValue)>
+			<SpinLoader IsLoading=@IsLoadingSave Spinner="SpinnerType.Chase">
+				<LoadingTemplate>
+					<Loading />
+				</LoadingTemplate>
+				<ContentTemplate>
+					<MudGrid Spacing=1>
+						<MudItem xs="12" sm="12" md="12">
+							<MudSelect Required="true"
+									   T=int?
+									   @bind-Value=model.Idloaihanghoadichvu
+									   Label="Chọn loại hình KD"
+									   Margin="Margin.Dense"
+									   Variant="Variant.Outlined"
+									   AnchorOrigin="Origin.BottomCenter">
+								@foreach (var loai in LoaiHHDVList)
+								{
+									<MudSelectItem T=int? Value="@loai.Id">@loai.Loaihinhkinhdoanh</MudSelectItem>
+								}
+							</MudSelect>
+						</MudItem>
+						<MudItem xs="12" sm="12" md="12">
+							<MudTabs Elevation="4" Rounded="true" Centered="true" Color="@Color.Primary">
+								<MudTabPanel Disabled=IsLoadingAPI Icon="@Icons.Material.Filled.List" Text="THÔNG TIN">
+									<br />
+									<MudGrid>
+										<MudItem xs="12" sm="12" md="3">
+											<MudPaper Class="pa-4" Elevation="4">
+												<SpinLoader IsLoading=@IsLoadingAPI Spinner="SpinnerType.Chase">
+													<LoadingTemplate>
+														<Loading />
+													</LoadingTemplate>
+													<ContentTemplate>
+														<MudGrid Spacing=1>
+															<MudItem xs="12" sm="12" md="12">
+																<MudImage Fluid="true" Src="@model.Pic00" Alt="@model.Tensp" />
+
+															</MudItem>
+														</MudGrid>
+													</ContentTemplate>
+												</SpinLoader>
+											</MudPaper>
+										</MudItem>
+										<MudItem xs="12" sm="12" md="9">
+											<MudPaper Class="pa-4" Elevation="4">
+												<MudGrid Spacing=1>
+													<MudItem xs="12" sm="12" md="12">
+														<MudTextField T="string" Label="Tên hàng" For="@(() => model.Tensp)"
+														HelperTextOnFocus="true" ReadOnly=IsLoadingAPI
+														@bind-Text=@model.Tensp />
+													</MudItem>
+													<MudItem xs="12" sm="12" md="12">
+														<MudExGradientText Typo="Typo.body1" style="color:var(--mud-palette-primary); font-weight: bold;"><a target="_blank" href=@model.Link>@model.Link</a></MudExGradientText>
+													</MudItem>
+													<MudItem xs="12" sm="12" md="12">
+														<MudAutocomplete T="MTL_GetAllNhomHangResult" Label="Chọn nhóm hàng"
+														Disabled=IsLoadingAPI Clearable="true"
+														SearchFunc="@SearchNhomHangAsync" MaxItems="100"
+														Value=@mtl_nhomhang
+														ResetValueOnEmptyText=true
+														ValueChanged="NhomHangValueChanged"
+														ToStringFunc="@(e=> e==null?null : $"{e.nhomhang}")">
+														</MudAutocomplete>
+													</MudItem>
+													@if ((bool)userSession.company.IsThuongHieu)
+													{
+														<MudItem xs="7" sm="7" md="10">
+															@if(mtl_thuonghieu!=null)
+															{
+																<MudAutocomplete T="MTL_GetAllThuongHieuResult" Label="Chọn thương hiệu"
+																Disabled=IsLoadingAPI Clearable="true"
+																SearchFunc="@SearchThuongHieuAsync"
+																Value=@mtl_thuonghieu MaxItems="100"
+																ResetValueOnEmptyText=true
+																ValueChanged="ThuongHieuValueChanged"
+																ToStringFunc="@(e=> e==null?null : $"{e.thuonghieu} - ({e.viettat?.Trim()})")" >																			
+																</MudAutocomplete>
+															}
+
+														</MudItem>
+													<MudItem xs="5" sm="5" md="2">
+														<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+														Disabled=IsLoadingAPI
+														OnClick="ThemThuongHieuDialog" Color="Color.Primary">THÊM T.HIỆU</MudButton>
+													</MudItem>
+													}
+													<MudItem xs="4" sm="4" md="4">
+														<MudTextField T="string" Label="Mã hàng"
+														HelperTextOnFocus="true" Disabled=IsLoadingAPI
+														@bind-Text=model.Masp />
+													</MudItem>
+													<MudItem xs="4" sm="4" md="4">
+														<MudTextField T="string" Label="Model"
+														HelperTextOnFocus="true" Disabled=IsLoadingAPI
+														TextChanged="OnTextChanged_Model"
+														Text=@model.Model />
+													</MudItem>
+													<MudItem xs="4" sm="4" md="4">
+														<MudSwitch Value=!model.Active
+														Disabled=IsLoadingAPI Label="Hết hàng"
+														ValueChanged="isHetHang_CheckedChanged"
+														T="bool?" Color="Color.Primary" />
+													</MudItem>
+													<MudItem xs="4" sm="4" md="4">
+														<MudNumericField HideSpinButtons="true"
+														Label="Nhập giá mua vào"
+														@bind-Value=model.Giavon
+														Format="N0"
+														Class="curency"
+														Disabled=IsLoadingAPI />
+													</MudItem>
+													<MudItem xs="4" sm="4" md="4">
+														<MudNumericField HideSpinButtons="true"
+														Label="Nhập giá bán lẻ"
+														@bind-Value=model.Giaban
+														Format="N0"
+														Class="curency"
+														Disabled=IsLoadingAPI />
+													</MudItem>
+													<MudItem xs="4" sm="4" md="4">
+														<MudNumericField HideSpinButtons="true"
+														Label="Nhập giá chưa khuyến mãi"
+														@bind-Value=model.Giathuong
+														Format="N0"
+														Class="curency"
+														Disabled=IsLoadingAPI />
+													</MudItem>
+													@if ((bool)userSession.company.IsKhoHang)
+													{
+														<MudItem xs="4" sm="4" md="4" Class="d-flex align-start justify-center">
+													<MudSelect Label="Kho hàng" T="int?"
+														@bind-Value=model.Idvitri
+														Disabled=IsLoadingAPI
+														AnchorOrigin="Origin.BottomCenter">
+																@if (ViTriList != null)
+																{
+																	foreach (var item in ViTriList)
+																	{
+																		<MudSelectItem T="int?" Value="@item.Id">@item.Vitri</MudSelectItem>
+																	}
+																}
+															</MudSelect>
+														</MudItem>
+													}
+													@if ((bool)userSession.company.IsBaoHanh)
+													{
+														<MudItem xs="4" sm="4" md="4">
+													<MudSelect Label="Bảo hành" T="int?"
+														@bind-Value=model.IdBaoHanh
+														Disabled=IsLoadingAPI
+														AnchorOrigin="Origin.BottomCenter">
+																@if (BaoHanhList != null)
+																{
+																	foreach (var item in BaoHanhList)
+																	{
+																		<MudSelectItem T="int?" Value="@item.Id">@item.Baohanh</MudSelectItem>
+																	}
+																}
+															</MudSelect>
+														</MudItem>
+													}
+													<MudItem xs="4" sm="4" md="4">
+														<MudSelect Label="Đơn vị tính" T="int?"
+														@bind-Value=model.Iddonvitinh
+														Disabled=IsLoadingAPI
+														AnchorOrigin="Origin.BottomCenter">
+															@if (DVTList != null)
+															{
+																foreach (var item in DVTList)
+																{
+																	<MudSelectItem T="int?" Value="@item.Id">@item.Donvitinh</MudSelectItem>
+																}
+															}
+														</MudSelect>
+													</MudItem>
+
+													@if (model.Idloaihanghoadichvu == 1)
+													{
+														<MudItem xs="12" sm="12" md="12">
+															<MudTextField T="string" Label="Block Woo Sản phẩm" Disabled=IsLoadingAPI 
+															HelperTextOnFocus="true"
+															@bind-Text=model.WooBlockSanpham />
+														</MudItem>
+													}
+													else if (model.Idloaihanghoadichvu == 3)
+													{
+														<MudItem xs="12" sm="12" md="12">
+															<MudExRichTextEdit @bind-Value=@block_woo_sanpham_ghepnoi ReadOnly=IsLoadingAPI
+															EnableResize="true" Height="400"
+															Class="m-2">
+															</MudExRichTextEdit>
+														</MudItem>
+													}
+
+
+
+
+
+												</MudGrid>
+											</MudPaper>
+										</MudItem>
+									</MudGrid>
+								</MudTabPanel>
+								@if (model.Idloaihanghoadichvu == 3) // Là thành phần *@
+								{
+									int SLHHTP = 0;
+									if (@ListHangHoaThanhPhan != null)
+									{
+										SLHHTP = ListHangHoaThanhPhan.Count;
+									}
+									<MudTabPanel Disabled=IsLoadingAPI Icon="@Icons.Material.Filled.AddBox" Text="THÀNH PHẦN" BadgeData="@SLHHTP">
+										<br />
+										<MudPaper Class="pa-4" Elevation="4">
+											<MudGrid>
+												<MudItem xs="12" sm="12" md="6">
+													<MudButton Variant="Variant.Filled"
+													FullWidth=true StartIcon="@Icons.Material.Filled.Add"
+													Disabled=IsLoadingAPI
+													OnClick="ThemHangHoaThanhPhan"
+													Color="Color.Secondary">THÊM MỚI THÀNH PHẦN</MudButton>
+												</MudItem>
+												<MudItem xs="12" sm="12" md="6">
+													<MudButton Variant="Variant.Filled"
+													FullWidth=true StartIcon="@Icons.Material.Filled.Add"
+													Disabled=IsLoadingAPI
+													OnClick="NhanBanThanhPhan"
+													Color=Color.Tertiary>NHÂN BẢN THÀNH PHẦN</MudButton>
+												</MudItem>
+												<MudItem xs="12" sm="12" md="12">
+													<MudTable Items="@ListHangHoaThanhPhan"
+													Hover="true"
+													Striped="true"
+													Bordered="false"
+													RowsPerPage="50"
+													Class="mudtable-center-header">
+														<HeaderContent>
+															<MudTh Style="width:40px; text-align:center;">T.TÁC</MudTh>
+															<MudTh Style="width:40px; text-align:center;">ẢNH</MudTh>
+															<MudTh>SẢN PHẨM THÀNH PHẦN</MudTh>
+															<MudTh Style="width:250px; text-align:right;">BlOCK</MudTh>
+															<MudTh Style="width:50px; text-align:right;">SL</MudTh>
+															<MudTh Style="width:80px; text-align:right;">Đ.GIÁ</MudTh>
+															<MudTh Style="width:80px; text-align:right;">T.TIỀN</MudTh>
+															<MudTh Style="width:90px; text-align:center;">B.HÀNH</MudTh>
+														</HeaderContent>
+														<RowTemplate Context="sanphamthanhphan">
+															<MudTd DataLabel="T.TÁC">
+																<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+																	<MudIconButton @onclick="@(() => SuaHangHoaThanhPhan(sanphamthanhphan))"
+																	Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+																	Color="Color.Primary" Size="Size.Medium" />
+																	<MudIconButton @onclick="@(() => Delete_HangHoaThanhPhan(sanphamthanhphan))"
+																	Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled"
+																	Color="Color.Error" Size="Size.Medium" />
+																</MudButtonGroup>
+															</MudTd>
+															<MudTd DataLabel="ẢNH">
+																@{
+																	string url_anhdaidien = userSession.company.Logourl;
+																	if (((MTL_GetSanPhamThanhPhanResult)sanphamthanhphan).pic00 != null)
+																	{
+																		url_anhdaidien = ((MTL_GetSanPhamThanhPhanResult)sanphamthanhphan).pic00;
+																	}
+																	<img src=@url_anhdaidien alt="" width="30px" height="30px">
+																}
+															</MudTd>
+															<MudTd DataLabel="SẢN PHẨM THÀNH PHẦN">
+																@{
+																	var webUrl = ((MTL_GetSanPhamThanhPhanResult)sanphamthanhphan).linksanpham;
+
+																	if (webUrl != null)
+																	{
+																		if (webUrl != "")
+																		{
+																			<a target="_blank" href=@webUrl>@sanphamthanhphan.tensp</a>
+																		}
+																		else
+																		{
+																			<a target="_blank">@sanphamthanhphan.tensp</a>
+																		}
+																	}
+																	else
+																	{
+																		<a target="_blank">@sanphamthanhphan.tensp</a>
+																	}
+																}
+															</MudTd>
+															<MudTd DataLabel="SL">
+																<p style="color:black ;text-align:right;">@sanphamthanhphan.woo_block_sanpham</p>
+															</MudTd>
+															<MudTd DataLabel="SL">
+																<p style="color:black ;text-align:right;">@sanphamthanhphan.sl</p>
+															</MudTd>
+															<MudTd DataLabel="Đ.GIÁ">
+																<p style="color:var(--mud-palette-primary) ;text-align:right;">@FormatCurrency(sanphamthanhphan.giaban)</p>
+															</MudTd>
+															<MudTd DataLabel="T.TIỀN">
+																<p style="font-weight: bold; color:red ;text-align:right;">@FormatCurrency(sanphamthanhphan.thanhtien)</p>
+															</MudTd>
+															<MudTd DataLabel="B.HÀNH">
+																<p style="color:black ;text-align:right;">
+																	@BaoHanhList.Where(p => p.Id == sanphamthanhphan.idbaohanh).FirstOrDefault().Baohanh
+																</p>
+															</MudTd>
+														</RowTemplate>
+														<FooterContent>
+															<MudTd ColSpan="2" Style="text-align:right; font-weight:bold;">Chủng loại SP: @ListHangHoaThanhPhan.Count</MudTd>
+															<MudTd ColSpan="2" Style="text-align:right; font-weight:bold;">Số lượng: @ListHangHoaThanhPhan.Sum(x => x.sl)</MudTd>
+															<MudTd ColSpan="2" Style="text-align:right; font-weight:bold;">Tổng cộng:</MudTd>
+															<MudTd Style="text-align:center; font-weight:bold; color:red;">
+																@FormatCurrency(ListHangHoaThanhPhan.Sum(x => x.thanhtien))
+															</MudTd>
+														</FooterContent>
+														<PagerContent>
+															<MudTablePager PageSizeOptions="new int[] { 20,50 }" />
+														</PagerContent>
+													</MudTable>
+												</MudItem>
+											</MudGrid>
+										</MudPaper>
+									</MudTabPanel>
+								}
+								@{
+									var tenWoo = "WOO - " + @model.WooId.ToString();
+									<MudTabPanel Disabled=IsLoadingAPI Icon="@Icons.Material.Filled.Web" Text=@tenWoo>
+										<br />
+										<MudPaper Class="pa-4" Elevation="4">
+											@{
+												CultureInfo Culture_vn = new CultureInfo("vn-VN", false);
+												Culture_vn.DateTimeFormat.ShortDatePattern = "dd/MM/yyyy";
+												Culture_vn.DateTimeFormat.DateSeparator = "/";
+												Culture_vn.NumberFormat.PercentDecimalSeparator = ".";
+											}
+											<MudGrid Spacing=1>
+												<MudItem xs="6" sm="6" md="2">
+													<MudTextField T="DateTime" @bind-Value=@_filterAPI.date_created
+													Format="s" Label="Ngày tạo" InputType="InputType.DateTimeLocal" />
+												</MudItem>
+												<MudItem xs="6" sm="6" md="2">
+													<MudTextField T="DateTime" @bind-Value=@_filterAPI.date_modified
+													Format="s" Label="Ngày cập nhật" InputType="InputType.DateTimeLocal" />
+												</MudItem>
+												<MudItem xs="12" sm="12" md="8">
+													<MudTextField T="string" Label="Gõ hàng hóa cần tìm"
+													style="color:blue; font-weight: bold;"
+													TextChanged="OnSearchAPITextChanged"
+													HelperTextOnFocus="true" Disabled=IsLoadingAPI
+													Text=@_filterAPI.v_timhanghoa />
+												</MudItem>
+												<MudItem xs="12" sm="12" md="5">
+													<MudRadioGroup T="string" Value="@_filterAPI.v_tonkho" SelectedOptionChanged="OnRadioTonKhoChange">
+														<MudRadio Value=MTLEnum.TonKhoAPI.TatCa Color="Color.Primary">TẤT CẢ</MudRadio>
+														<MudRadio Value=MTLEnum.TonKhoAPI.ConHang Color="Color.Secondary">CÒN HÀNG</MudRadio>
+														<MudRadio Value=MTLEnum.TonKhoAPI.ChoHang Color="Color.Success">CHỜ HÀNG</MudRadio>
+														<MudRadio Value=MTLEnum.TonKhoAPI.HetHang Color="Color.Primary">HẾT HÀNG</MudRadio>
+													</MudRadioGroup>
+												</MudItem>
+												<MudItem xs="3" sm="3" md="1">
+													<MudButton Size=Size.Small Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Pageview"
+													FullWidth="true" Disabled=IsLoadingAPI
+													OnClick="@Trang1" Color="Color.Primary">Trang 1</MudButton>
+												</MudItem>
+												<MudItem xs="3" sm="3" md="1">
+													<MudButton Size=Size.Small Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Pageview"
+													FullWidth="true" Disabled=IsLoadingAPI
+													OnClick="@Trang2" Color="Color.Primary">Trang 2</MudButton>
+												</MudItem>
+												<MudItem xs="3" sm="3" md="1">
+													<MudButton Size=Size.Small Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Pageview"
+													FullWidth="true" Disabled=IsLoadingAPI
+													OnClick="@Trang3" Color="Color.Primary">Trang 3</MudButton>
+												</MudItem>
+												<MudItem xs="3" sm="3" md="1">
+													<MudButton Size=Size.Small Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Pageview"
+													FullWidth="true" Disabled=IsLoadingAPI
+													OnClick="@Trang4" Color="Color.Primary">Trang 4</MudButton>
+												</MudItem>
+												<MudItem xs="3" sm="3" md="1">
+													<MudButton Size=Size.Small Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Pageview"
+													FullWidth="true" Disabled=IsLoadingAPI
+													OnClick="@Trang5" Color="Color.Primary">Trang 5</MudButton>
+												</MudItem>
+												<MudItem xs="3" sm="3" md="1">
+													<MudButton Size=Size.Small Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Pageview"
+													FullWidth="true" Disabled=IsLoadingAPI
+													OnClick="@Trang6" Color="Color.Primary">Trang 6</MudButton>
+												</MudItem>
+												<MudItem xs="3" sm="3" md="1">
+													<MudButton Size=Size.Small Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Pageview"
+													FullWidth="true" Disabled=IsLoadingAPI
+													OnClick="@Trang7" Color="Color.Primary">Trang 7</MudButton>
+												</MudItem>
+												<MudItem xs="12" sm="12" md="12">
+													<SpinLoader IsLoading="IsLoadingAPI" Spinner="SpinnerType.Chase">
+														<LoadingTemplate>
+															<Loading />
+														</LoadingTemplate>
+														<ContentTemplate>
+															@if (productlist_API != null)
+															{
+																<MudTable Items="@productlist_API"
+																Hover="true"
+																Striped="true"
+																Bordered="false"
+																RowsPerPage="50"
+																Class="mudtable-center-header">
+																	<HeaderContent>
+																		<MudTh Style="width:40px; text-align:center;">T.TÁC</MudTh>
+																		<MudTh Style="width:40px; text-align:center;">WOO</MudTh>
+																		<MudTh Style="width:40px; text-align:center;">ẢNH</MudTh>
+																		<MudTh>SẢN PHẨM</MudTh>
+																		<MudTh Style="width:90px; text-align:center;">TỒN</MudTh>
+																		<MudTh Style="width:90px; text-align:center;">GIÁ SALE</MudTh>
+																		<MudTh Style="width:90px; text-align:center;">GIÁ BÁN</MudTh>
+																	</HeaderContent>
+																	<RowTemplate Context="contextWoo">
+																		<MudTd DataLabel="T.TÁC">
+																			<MudIconButton OnClick="@(() => DongBoWoo(contextWoo))" Icon="@Icons.Material.Filled.Check"
+																			Variant="Variant.Filled" Color="Color.Error" Size="Size.Medium" />
+																		</MudTd>
+																		<MudTd DataLabel="WOO">
+																			@{
+																				var permalink = ((APP.WooRestAPI.Product)contextWoo).permalink;
+																				string product_id = ((APP.WooRestAPI.Product)contextWoo).id.ToString();
+																				<a target="_blank" href=@permalink style="color: red">@product_id</a>
+																			}
+																		</MudTd>
+																		<MudTd DataLabel="ẢNH">
+																			@{
+																				List<MTL.APP.WooRestAPI.image> images = ((APP.WooRestAPI.Product)contextWoo).images;
+																				string url_image = "";
+																				if (images.Count > 0)
+																					url_image = images[0].src;
+																				else url_image = userSession.company.Logourl;
+																				<img src=@url_image alt="MTL Technology" width="30px" height="30px">
+																			}
+																		</MudTd>
+																		<MudTd DataLabel="SẢN PHẨM">@contextWoo.name</MudTd>
+																		<MudTd DataLabel="TỒN">
+																			@{
+																				string stock = ((APP.WooRestAPI.Product)contextWoo).stock_status;
+																				if (stock == "instock") stock = "Còn";
+																				else if (stock == "outofstock") stock = "Hết";
+																				else if (stock == "onbackorder") stock = "Chờ";
+																				<p style="font-weight: bold; color: red;text-align:right;">@stock</p>
+																			}
+																		</MudTd>
+																		<MudTd DataLabel="GIÁ SALE">
+																			<p style="color:var(--mud-palette-primary);text-align:right;">@FormatCurrency(contextWoo.sale_price)</p>
+																		</MudTd>
+																		<MudTd DataLabel="GIÁ BÁN">
+																			<p style="color:red;text-align:right;">@FormatCurrency(contextWoo.regular_price)</p>
+																		</MudTd>
+																	</RowTemplate>
+																	<PagerContent>
+																		<MudTablePager PageSizeOptions="new int[] { 50, 100 }" />
+																	</PagerContent>
+																</MudTable>
+															}
+														</ContentTemplate>
+													</SpinLoader>
+												</MudItem>
+											</MudGrid>
+										</MudPaper>
+									</MudTabPanel>
+								}
+								@if (WooProduct_Return != null)
+								{
+									<MudTabPanel Disabled=IsLoadingAPI Icon="@Icons.Material.Filled.Home" Text="MÔ TẢ">
+										<br />
+										<MudPaper Class="pa-4" Elevation="4">
+											<MudGrid>
+												<MudItem xs="12" sm="12" md="12">
+													<MudExRichTextEdit @bind-Value=@model.Mota
+													EnableResize="true"
+													Class="m-2">
+													</MudExRichTextEdit>
+												</MudItem>
+												<MudItem xs="12" sm="12" md="12">
+													<MudExRichTextEdit Height="800" @bind-Value=@model.Motachitiet
+													EnableResize="true"
+													Class="m-2">
+													</MudExRichTextEdit>
+												</MudItem>
+											</MudGrid>
+										</MudPaper>
+									</MudTabPanel>
+								}
+								<MudTabPanel Disabled=IsLoadingAPI Icon="@Icons.Material.Filled.Info" Text="BỔ SUNG" BadgeDot="true" BadgeColor="Color.Error">
+									<br />
+									<MudPaper Class="pa-4" Elevation="4">
+										<MudGrid Spacing=1>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập CPU"
+												HelperTextOnFocus="true"
+												@bind-Text=model.Cpu />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập RAM"
+												HelperTextOnFocus="true"
+												@bind-Text=model.Ram />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập HDD"
+												HelperTextOnFocus="true"
+												@bind-Text=model.Ssd />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập VGA"
+												HelperTextOnFocus="true"
+												@bind-Text=model.Vga />
+											</MudItem>
+										</MudGrid>
+									</MudPaper>
+								</MudTabPanel>
+							</MudTabs>
+						</MudItem>
+					</MudGrid>
+				</ContentTemplate>
+			</SpinLoader>
+		</MudForm>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			@if(model.Idloaihanghoadichvu==3)
+			{
+				<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.ContentPasteSearch"
+					Disabled=IsLoadingAPI
+					OnClick="SaveAndCreateContentAsync"
+					Color="Color.Secondary">LƯU VÀ TẠO CONTENT</MudButton>
+			}
+
+			<div class="dlg-footer__spacer"></div>
+
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+				Disabled=IsLoadingAPI
+				OnClick="SaveAsync"
+				Color="Color.Success">LƯU</MudButton>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+				Disabled=IsLoadingAPI
+				OnClick="ClosePopup"
+				Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public List<MTL_GetAllNhomHangResult>? NhomHangParentList { get; set; }
+	[Parameter]
+	public List<MTL_GetAllThuongHieuResult>? ThuongHieuList { get; set; }
+	[Parameter]
+	public List<TblBaoHanh>? BaoHanhList { get; set; }
+	[Parameter]
+	public List<TblVitri>? ViTriList { get; set; }
+	[Parameter]
+	public List<TblDonvitinh>? DVTList { get; set; }
+	[Parameter]
+	public List<LoaiHinhKinhDoanh>? LoaiHHDVList { get; set; }
+	[Parameter]
+	public int idLoaiHHDV { get; set; }
+	[Parameter]
+	public List<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+	[Parameter]
+	public bool isNew { get; set; }
+	[Parameter]
+	public UserSession userSession { get; set; }
+	[Parameter]
+	public TblSanpham HangHoa { get; set; } = new TblSanpham();
+	[Parameter]
+	public string woo_id_nhomhang { get; set; }
+	[Parameter]
+	public List<MTL_GetAllProductsInCompanyResult> ListProductInCompany { get; set; }
+
+	[Parameter]
+	public List<MTL_GetAllProductsInCompanyResult> ListProduct { get; set; }
+
+
+	MTL_GetAllThuongHieuResult mtl_thuonghieu = new MTL_GetAllThuongHieuResult();
+	MTL_GetAllNhomHangResult mtl_nhomhang = new MTL_GetAllNhomHangResult();
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	bool popupThuongHieuVisible { get; set; } = false;
+
+	Int32 id { get; set; }
+	string tensp { get; set; }
+	string block_woo_sanpham_ghepnoi = "";
+
+
+	bool PopupVisible { get; set; }
+	bool PopupVisible_KieuIn { get; set; }
+	bool PopupVisible_DongBo { get; set; }
+	bool isHetHang { get; set; }
+
+
+	HangHoaValidator Validator = new HangHoaValidator();
+	MudForm form;
+	TblSanpham model = new TblSanpham();
+
+	List<TblLoaihanghoadichvu>? LoaiHHDVList_EditForm { get; set; }
+	public TblSanpham _sanpham = new TblSanpham();
+	private ToastParameters _toastParameters;
+
+	List<APP.WooRestAPI.Product>? productlist_API { get; set; }
+	APP.WooRestAPI.Product? product_woo { get; set; }
+	int product_woo_id = 0; // biến xác nhận ID WOO để update hay insert Woo
+	bool LoadingPanel_Visible = true;
+	bool IsLoadingAPI = false;
+	bool IsLoadingSave = false;
+	int idcompany = 0;
+	bool spAo_enable { get; set; } = true;
+	List<MTL_GetSanPhamThanhPhanResult>? ListHangHoaThanhPhan { get; set; }
+	MTL_GetAllProductsResult hanghoathanhphan = null;
+	MudAutocomplete<MTL_GetAllProductsResult> _HangHoaThanhPhanAutoComplete { get; set; }
+	List<MTL_GetAllProductsResult>? ListProduct_ThanhPhan { get; set; }
+	string Wookey { get; set; }
+	string Woosecret { get; set; }
+	string Woourl { get; set; }
+	MTL.APP.WooRestAPI.Product WooProduct_Return { get; set; }
+
+	bool spAo_HHTP_enable { get; set; } = true;
+	string LinkAnhXoa { get; set; }
+	string NoiDungXoa { get; set; }
+	int VisibleIndex_HHTP = 0;
+
+	FilterConditionAPI1 _filterAPI = new FilterConditionAPI1();
+	class FilterConditionAPI1
+	{
+		public string v_tonkho { get; set; } = MTLEnum.TonKhoAPI.TatCa;
+		public string v_timhanghoa { get; set; } = "";
+		public string v_wooid { get; set; } = "";
+		public string v_wooid_all { get; set; } = "";
+		public DateTime date_created { get; set; } = DateTime.Now;
+		public DateTime date_modified { get; set; } = DateTime.Now;
+		public List<MTL.APP.WooRestAPI.tag> woo_tags_data { get; set; }
+	}
+	FilterCondition1 _filter = new FilterCondition1();
+	FilterCondition1 filter_detail = new FilterCondition1();
+	class FilterCondition1
+	{
+		public string v_tonkho { get; set; } = MTLEnum.TonKho.TatCa;
+		public string v_theongay { get; set; } = MTLEnum.SapXepTheoNgay.NgayTao; //"Ngày tạo";
+		public int v_loaihh { get; set; } = 1; // Là : Hàng Hóa
+		public int v_sl { get; set; } = 1; // Là : SL
+		public double v_dongia { get; set; } = 0; // Là : Đon Giá
+		public int v_baohanh { get; set; } = 3; // Là : BH
+		public int v_tensp { get; set; } = 1; // Là :ten Hàng Hóa
+		public string v_loaiHHDVNullText { get; set; } = "Chọn Hàng hóa"; // Là :ten Hàng Hóa
+		public string v_tenspEdit { get; set; } = ""; // Là :ten Hàng Hóa đã Edit
+		public bool v_SPAo { get; set; } = false; // Là :SP Ảo
+		public bool v_HDVAT { get; set; } = false; // Là :Hóa đơn VAT
+		public int v_NhomKhachHang { get; set; } = 1; // Nhóm Khách Hàng : 1 = Khách hàng
+		public int v_loaiphieu { get; set; } = 1; // Là : Tất cả Loại Phiếu
+		public string v_dichvuxuly { get; set; } = "Tất cả"; // Là : Tất cả Loại xữ lý
+		public int v_sodong { get; set; } = 10;
+		public string v_model { get; set; } = "";
+		public string v_masp { get; set; } = "";
+		public int v_idhanghoathanhphan { get; set; } = 0;
+		public int v_idhanghoathanhphan_edittmp { get; set; } = 0;
+	}
+
+	public EventCallback<TblSanpham> OnDialogCallback { get; set; }
+	DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.Medium,
+			MaximizeButton = false,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+		};
+	DialogOptionsEx options_FullScreen = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.ExtraExtraLarge,
+			MaximizeButton = false,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+
+			//FullScreen = true,
+		};
+	MudExRichTextEdit EditorMoTa = new MudExRichTextEdit();
+
+
+
+
+
+
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoadingAPI = true;
+			await LoadConfigFromCompany();
+			// if (idLoaiHHDV == 3)
+			// {
+			await LoadLoaiHangHoaThanhPhanAsync();
+			//}
+			if (isNew)
+			{
+				model = new TblSanpham();
+				model.Idloaihanghoadichvu = idLoaiHHDV;
+				model.Giaban = 0;
+				model.Giathuong = 0;
+				model.Giavon = 0;
+				model.Idcompany = userSession.company.Id;
+				model.Active = true;
+				model.Pic00 = userSession.company.Logourl;
+			}
+			else
+			{
+				//update
+				model = HangHoa;
+				if (woo_id_nhomhang != null) // tìm danh mục WOO
+					_filterAPI.v_wooid_all = woo_id_nhomhang.Trim();
+
+				if(model.Idloaihanghoadichvu==3)
+				{
+					ListHangHoaThanhPhan = await hangHoaService.GetHangHoaThanhPhanAsync(model.Id, userSession.company.Id);
+					await this.Load_block_woo_sanpham_ghepnoi();
+				}
+
+				await this.LoadWooProduct(model.WooId.ToString());
+				if (model.Idthuonghieu != null)
+					mtl_thuonghieu = ThuongHieuList.Where(p => p.id == (int)model.Idthuonghieu).FirstOrDefault();
+				if (model.Idnhomhang != null)
+					mtl_nhomhang = NhomHangParentList.Where(p => p.id == (int)model.Idnhomhang).FirstOrDefault();
+			}
+			IsLoadingAPI = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task Load_block_woo_sanpham_ghepnoi()
+	{
+		block_woo_sanpham_ghepnoi = "";
+		foreach (var item in ListHangHoaThanhPhan)
+		{
+			string rowA =item.woo_block_sanpham;
+			if (rowA != null)
+				block_woo_sanpham_ghepnoi += rowA + "\n";
+		}
+	}
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	async Task LoadWooProduct(string woo_id)
+	{
+		try
+		{
+			this.ResetField();
+			if (woo_id != null && woo_id != "0" && woo_id != "")
+			{
+				WooProduct_Return = await wooAPIService.RetrieveProductAsync(woo_id, userSession.company.Wookey, userSession.company.Woosecret, userSession.company.Woourl);
+				model.Mota = WooProduct_Return.short_description;
+				model.Motachitiet = WooProduct_Return.description;
+				model.Giathuong = double.Parse(WooProduct_Return.regular_price);
+				model.Link = WooProduct_Return.permalink;
+				if (WooProduct_Return.images.Count != 0)
+					model.Pic00 = WooProduct_Return.images[0].src.ToString();
+				_filterAPI.v_timhanghoa = WooProduct_Return.name;
+				_filterAPI.woo_tags_data = WooProduct_Return.tags;
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	void ResetField()
+	{
+		model.Hinhanh1 = userSession.company.Logourl;
+
+		_filterAPI.v_timhanghoa = "";
+		_filterAPI.v_wooid = "";
+
+		_filterAPI.woo_tags_data = null;
+		productlist_API = null;
+	}
+
+	async Task SelectedNhomHangChanged(MTL_GetAllNhomHangResult nhomhang)
+	{
+		_filterAPI.v_wooid_all = nhomhang.wooid_all.Trim();
+	}
+
+	async Task LoadConfigFromCompany()
+	{
+		idcompany = userSession.company.Id;
+		Wookey = userSession.company.Wookey;
+		Woosecret = userSession.company.Woosecret;
+		Woourl = userSession.company.Woourl;
+	}
+
+	async Task OnTextChanged_Model(string newValue)
+	{
+		model.Model = newValue;
+		if (!string.IsNullOrEmpty(newValue))
+		{
+			var item_thuonghieu = ThuongHieuList.FirstOrDefault(o => o.id == model.Idthuonghieu);
+			string tenviettat = "NO";
+			if (item_thuonghieu != null)
+			{
+				tenviettat = item_thuonghieu.viettat.Replace(" ", "");
+			}
+			model.Masp = string.Format("{0}.{1}", tenviettat, model.Model);
+		}
+	}
+
+
+	TblSanpham GetData(TblSanpham mtl_sanpham, bool isUpdate)
+	{
+		if (model.Active == null) model.Active = true;
+
+		if (!isUpdate)
+		{
+			model.Lastupdate = DateTime.Now;
+			model.Iduserlastupdate = userSession.user.UserId;
+		}
+		else
+		{
+			model.Iduserlastcreate = _sanpham.Iduserlastupdate = userSession.user.UserId;
+			model.Beginupdate = _sanpham.Lastupdate = DateTime.Now;
+		}
+		return model;
+	}
+
+	async Task ValueChangedHandler_EditLoaiHH(int newValue)
+	{
+		model.Idloaihanghoadichvu = newValue;
+	}
+
+	async Task GetProductAPI(string page)
+	{
+		try
+		{
+			string searchSP = _filterAPI.v_timhanghoa;
+			string stock_status = "";
+			if (_filterAPI.v_tonkho.ToUpper() == "CÒN HÀNG")
+				stock_status = "instock";
+			else if (_filterAPI.v_tonkho.ToUpper() == "HẾT HÀNG")
+				stock_status = "outofstock";
+			else if (_filterAPI.v_tonkho.ToUpper() == "CHỜ HÀNG")
+				stock_status = "onbackorder";
+			else stock_status = "";
+			productlist_API = await wooAPIService.GetListProductsAsync(page, searchSP, stock_status, userSession.company.Wookey, userSession.company.Woosecret, userSession.company.Woourl);
+
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine(ex.Message);
+		}
+	}
+
+	async Task<MTL.APP.WooRestAPI.Product> SaveWoocommerce(bool isUpdate, bool isCreateContentAuto)
+	{
+		MTL.APP.WooRestAPI.Product product_return = new APP.WooRestAPI.Product();
+		try
+		{
+			int? wooid = model.WooId;
+			List<string> url_image = new List<string>();
+			List<string> WooidCategory = new List<string>();
+			double sale_price = (double)model.Giaban;
+			string stock_status = "";
+			double regular_price = (double)model.Giathuong;
+			if (model.Active == null)
+			{
+				stock_status = "instock";
+			}
+			else
+			{
+				if ((bool)!model.Active) stock_status = "outofstock";
+				else stock_status = "instock";
+			}
+			MTL.APP.WooRestAPI.Product new_pr = new MTL.APP.WooRestAPI.Product();
+			new_pr.name = model.Tensp;
+			new_pr.sale_price = sale_price.ToString();
+			new_pr.stock_status = stock_status;
+			new_pr.regular_price = regular_price.ToString();
+			new_pr.slug = _HandleCommon.RemoveIllegalCharacters(model.Tensp);
+			new_pr.categories = this.GetWooIdCategory(_filterAPI.v_wooid_all);
+
+			if (isCreateContentAuto) // true tạo content
+			{
+				new_pr.description = block_woo_sanpham_ghepnoi;
+			}
+			
+
+			if (isUpdate == true)
+			{
+				if (wooid != null && wooid != 0)
+				{
+					new_pr.id = wooid.ToString();
+					product_return = await wooAPIService.UpdateProductAsync(new_pr, Wookey, Woosecret, Woourl);
+					model.Link = product_return.permalink;
+					if (product_return.images.Count > 0)
+						model.Hinhanh1 = product_return.images[0].src.ToString();
+				}
+			}
+			else
+			{
+				if (product_woo_id == 0)
+				{
+					// tạo mới , chưa có lần nào
+					product_return = await wooAPIService.CreateProductAsync(new_pr, Wookey, Woosecret, Woourl);
+				}
+				else
+				{
+					// cập nhật,
+					product_return = await wooAPIService.UpdateProductAsync(new_pr, Wookey, Woosecret, Woourl);
+				}
+				model.Link = product_return.permalink;
+				if (product_return.images.Count > 0)
+					model.Hinhanh1 = product_return.images[0].src.ToString();
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+
+		return product_return;
+	}
+
+	List<MTL.APP.WooRestAPI.Category> GetWooIdCategory(string wooid_all)
+	{
+		List<string> WooidCategory = new List<string>();
+		string[] arrayStr = wooid_all.Split(new string[] { "-" }, StringSplitOptions.RemoveEmptyEntries);
+		for (int i = 0; i < arrayStr.Length; i++)
+		{
+			WooidCategory.Add(arrayStr[i]);
+		}
+		List<MTL.APP.WooRestAPI.Category> ct = new List<MTL.APP.WooRestAPI.Category> { };
+		foreach (string phantu in WooidCategory)
+		{
+			ct.Add(new MTL.APP.WooRestAPI.Category { id = phantu });
+		}
+
+		return ct;
+	}
+
+	void OnSearchAPITextChanged(string newValue)
+	{
+		_filterAPI.v_timhanghoa = newValue;
+	}
+	async Task btMoLinkWeb()
+	{
+		string link = model.Link;
+		await JSRuntime.InvokeVoidAsync("open", link, "_blank");
+	}
+	void OnPrintButtonClick(CellContext<MTL_GetAllProductsResult> context)
+	{
+		model.Id = context.Item.id;
+		PopupVisible_KieuIn = true;
+	}
+
+	async Task Trang(string page)
+	{
+		IsLoadingAPI = true;
+		await Task.Delay(50);
+		await GetProductAPI(page);
+		IsLoadingAPI = false;
+	}
+
+	async Task Trang1()
+	{
+		await Trang("1");
+	}
+	async Task Trang2()
+	{
+		await Trang("2");
+	}
+	async Task Trang3()
+	{
+		await Trang("3");
+	}
+	async Task Trang4()
+	{
+		await Trang("4");
+	}
+	async Task Trang5()
+	{
+		await Trang("5");
+	}
+	async Task Trang6()
+	{
+		await Trang("6");
+	}
+	async Task Trang7()
+	{
+		await Trang("7");
+	}
+	async Task Trang8()
+	{
+		await Trang("8");
+	}
+
+	async Task SelectedItemHangHoaChanged(MTL_GetAllProductsResult hanghoa)
+	{
+		if (hanghoa != null)
+		{
+			_filter.v_dongia = (double)hanghoa.giaban;
+			_filter.v_baohanh = (int)hanghoa.idBaoHanh;
+			_filter.v_tenspEdit = hanghoa.tensp;
+			_filter.v_masp = hanghoa.masp;
+			_filter.v_idhanghoathanhphan_edittmp = hanghoa.id;
+			_filter.v_idhanghoathanhphan = hanghoa.id;
+		}
+	}
+
+	async Task LoadLoaiHangHoaThanhPhanAsync()
+	{
+		//reset data
+		this.ClearDataAfterProcess_HangHoaThanhPhan();
+		int v_loaihh = 1; // là hàng hóa;
+		ListProduct_ThanhPhan = await hangHoaService.GetAllProductAsync(idcompany, MTLEnum.TonKho.ConHang
+					, v_loaihh //_filter.v_loaihh
+					, _filter.v_theongay);
+	}
+
+	void isSPAo_CheckedChanged(bool value)
+	{
+		_filter.v_SPAo = value;
+		spAo_enable = !_filter.v_SPAo;
+	}
+
+	void ClearDataAfterProcess_HangHoaThanhPhan()
+	{
+		_filter.v_tensp = 0;
+		_filter.v_tenspEdit = "";
+		_filter.v_SPAo = false;
+		_filter.v_sl = 1;
+		_filter.v_dongia = 0;
+		_filter.v_baohanh = 0;
+		hanghoathanhphan = null;
+
+		_filter.v_loaiHHDVNullText = "Chọn hàng hóa thành phần cần thêm.";
+	}
+	void isSPAo_HHTP_CheckedChanged(bool value)
+	{
+		filter_detail.v_SPAo = value;
+		spAo_HHTP_enable = !filter_detail.v_SPAo;
+	}
+
+	async Task OnRadioTonKhoChange(string sender)
+	{
+		_filterAPI.v_tonkho = sender.ToString().ToUpper();
+		IsLoadingAPI = true;
+		await Task.Delay(5);
+		string page = "1";
+		await GetProductAPI(page);
+		IsLoadingAPI = false;
+		StateHasChanged();
+	}
+
+	string GetImageFileName(MTL_GetAllProductsResult product)
+	{
+		string url_anhdaidien = userSession.company.Logourl;
+		if (product.hinhanh1 != null)
+		{
+			url_anhdaidien = product.hinhanh1;
+		}
+		return url_anhdaidien;
+	}
+
+	async Task<IEnumerable<MTL_GetAllThuongHieuResult>> SearchThuongHieuAsync(string searchTerm, CancellationToken token)
+	{
+		if (string.IsNullOrEmpty(searchTerm))
+		{
+			return ThuongHieuList;
+		}
+		var products = ThuongHieuList?
+			.Where(product => product.thuonghieu.Contains(searchTerm, StringComparison.InvariantCultureIgnoreCase))
+			?? Enumerable.Empty<MTL_GetAllThuongHieuResult>();
+		return products;
+	}
+
+	async Task ThuongHieuValueChanged(MTL_GetAllThuongHieuResult thuonghieu)
+	{
+		mtl_thuonghieu = thuonghieu;
+		if (thuonghieu != null)
+		{
+			string _model = "";
+			if (model.Model == null) _model = "";
+			else _model = model.Model?.Trim();
+			model.Masp = thuonghieu.viettat?.Trim() + "." + _model;
+			model.Idthuonghieu = thuonghieu.id;
+		}
+		StateHasChanged();
+	}
+
+	async Task<IEnumerable<MTL_GetAllNhomHangResult>> SearchNhomHangAsync(string searchTerm, CancellationToken token)
+	{
+		if (string.IsNullOrEmpty(searchTerm))
+		{
+			return NhomHangParentList;
+		}
+		var nhomhangs = NhomHangParentList?
+			.Where(nhomhang => nhomhang.nhomhang.Contains(searchTerm, StringComparison.InvariantCultureIgnoreCase))
+
+			?? Enumerable.Empty<MTL_GetAllNhomHangResult>();
+		return nhomhangs;
+	}
+	async Task NhomHangValueChanged(MTL_GetAllNhomHangResult nhomhang)
+	{
+		mtl_nhomhang = nhomhang;
+		if (nhomhang != null)
+		{
+			model.Idnhomhang = nhomhang.id;
+			if (nhomhang.wooid_all != null)
+				_filterAPI.v_wooid_all = nhomhang.wooid_all.Trim();
+		}
+		StateHasChanged();
+	}
+
+	void isHetHang_CheckedChanged(bool? value)
+	{
+		model.Active = !value;
+	}
+
+	async Task<bool> SaveHangHoa(bool isCreateContentAuto)
+	{
+		try
+		{
+			bool val_return = false;
+			IsLoadingSave = true;
+			await Task.Delay(5);
+			MTL.APP.WooRestAPI.Product reurn_product = new APP.WooRestAPI.Product();
+			bool isUpdate = false;
+			if (isNew)
+			{
+				isUpdate = false;
+				model = this.GetData(model, isNew);
+				if (userSession.company.IsActiveApi)
+				{
+					if (model.WooId != null && model.WooId != 0) // chọn WooID có sẳn, ko tạo WooID mới
+					{
+						model.WooId = model.WooId;
+						model.Link = model.Link;
+					}
+					else
+					{
+						reurn_product = await SaveWoocommerce(isUpdate,isCreateContentAuto);
+						model.WooId = int.Parse(reurn_product.id);
+						model.Link = reurn_product.permalink;
+						model.WooSlug = reurn_product.slug;
+
+					
+
+					}
+				}
+				model = await hangHoaService.CreateProductAsync(model);//.SaveAsync("Product/CreateProduct", edit_sanpham);
+				string mess = $"Tạo thành công hàng hóa [{model.Tensp}] ";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			else
+			{
+				isUpdate = true;
+				model = this.GetData(model, isNew);
+				if (userSession.company.IsActiveApi)
+				{
+					reurn_product = await SaveWoocommerce(isUpdate, isCreateContentAuto);
+					if (reurn_product.id != null)
+					{
+						model.WooId = int.Parse(reurn_product.id);
+						model.WooSlug = reurn_product.slug;
+						model.Link = reurn_product.permalink;
+
+						if (reurn_product.images.Count > 0)
+							model.Hinhanh1 = reurn_product.images[0].src.ToString();
+					}
+				}
+				int id = model.Id;
+				model = await hangHoaService.UpdateProductAsync(model);
+				bool result = await hangHoaService.SaveHangHoaThanhPhanAsync(ListHangHoaThanhPhan, model.Id);
+
+				string mess = $"Cập nhật thành công hàng hóa [{model.Tensp}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			IsLoadingSave = false;
+			return true;
+		}
+		catch (Exception)
+		{
+			IsLoadingSave = false;
+			return false;
+		}
+	}
+
+
+	async Task SaveAndCreateContentAsync()
+	{
+		await form.Validate();
+		if (form.IsValid)
+		{
+			await SaveHangHoa(true);
+			MudDialog.Close(DialogResult.Ok(true));
+		}
+		else
+		{
+			IsLoadingSave = false;
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Có lỗi xảy ra, vui lòng xem lại !");
+		}
+	}
+
+	async Task SaveAsync()
+	{
+		await form.Validate();
+		if (form.IsValid)
+		{
+			// if(model.Idloaihanghoadichvu==3)
+			// {
+			// 	var parameters = new DialogParameters<DeleteDialog>();
+			// 	//parameters.Add(x => x.NoiDung, hanghoathanhphan.tensp);
+			// 	var dialog = await DialogService.ShowEx<CorfirmSaveHHTP>("THÔNG BÁO LƯU COMBO HÀNG HÓA", parameters, options);
+			// 	var result = await dialog.Result;
+			// 	if (!result.Canceled)
+			// 	{
+			// 		// // Xóa phần tử khỏi danh sách
+			// 		// ListHangHoaThanhPhan.Remove(context);
+			// 		// // cập nhật giá tổng
+			// 		// model.Giaban = ListHangHoaThanhPhan.Sum(x => x.thanhtien);
+			// 		// // Cập nhật lại giao diện bằng cách gọi StateHasChanged
+			// 		// StateHasChanged();
+			// 		// string mess = $"Xóa thành công hàng hóa thành phần [{hanghoathanhphan.tensp}]";
+			// 		// _HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			// 	}
+			// }
+			await SaveHangHoa(false);
+			MudDialog.Close(DialogResult.Ok(true));
+		}
+		else
+		{
+			IsLoadingSave = false;
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Có lỗi xảy ra, vui lòng xem lại !");
+		}
+	}
+
+	async Task<IEnumerable<MTL_GetAllProductsResult>> SearchHangHoaThanhPhanAsync(string searchTerm, CancellationToken token)
+	{
+		if (string.IsNullOrEmpty(searchTerm))
+		{
+			return ListProduct_ThanhPhan;
+		}
+		var products = ListProduct_ThanhPhan?
+			.Where(product => product.tensp.Contains(searchTerm, StringComparison.InvariantCultureIgnoreCase))
+			?? Enumerable.Empty<MTL_GetAllProductsResult>();
+		return products;
+	}
+	async Task SelectedItemHangHoa_HHTP_Changed(MTL_GetAllProductsResult hanghoa)
+	{
+		if (hanghoa != null)
+		{
+			filter_detail.v_dongia = (double)hanghoa.giaban;
+			filter_detail.v_baohanh = (int)hanghoa.idBaoHanh;
+			filter_detail.v_tenspEdit = hanghoa.tensp;
+			filter_detail.v_masp = hanghoa.masp;
+			filter_detail.v_idhanghoathanhphan_edittmp = hanghoa.id;
+		}
+	}
+
+	async Task HangHoaThanhPhanValueChanged(MTL_GetAllProductsResult hanghoa)
+	{
+		hanghoathanhphan = hanghoa;
+		if (hanghoa != null)
+		{
+			_filter.v_dongia = (double)hanghoa.giaban;
+			_filter.v_baohanh = (int)hanghoa.idBaoHanh;
+			_filter.v_tensp = hanghoa.id;
+			_filter.v_tenspEdit = hanghoa.tensp;
+		}
+	}
+
+	private async Task DongBoWoo(APP.WooRestAPI.Product context)
+	{
+		product_woo = context;
+		string mess = $"Bạn có muốn đồng bộ sản phẩm [{product_woo.name}] ";
+		MudBlazor.MessageBoxOptions messs = new MudBlazor.MessageBoxOptions();
+		var res = await DialogService.ShowConfirmationDialogAsync("ĐỒNG BỘ DỮ LIỆU", mess, "ĐỒNG Ý", "THOÁT", Icons.Material.Sharp.Abc);
+
+		if (res)
+		{
+			if (product_woo.sale_price == "") product_woo.sale_price = "0";
+			if (product_woo.regular_price == "") product_woo.regular_price = "0";
+			product_woo_id = int.Parse(product_woo.id);
+			model.WooId = int.Parse(product_woo.id);
+			model.Tensp = product_woo.name;
+			model.Giaban = double.Parse(product_woo.sale_price);
+			model.Giathuong = double.Parse(product_woo.regular_price);
+			model.Link = product_woo.permalink;
+			if (product_woo.images.Count != 0)
+				model.Pic00 = product_woo.images[0].src.ToString();
+			if (product_woo.stock_status == "outofstock")
+				model.Active = false;
+			else if (product_woo.stock_status == "instock")
+				model.Active = true;
+		}
+		else
+		{
+
+		}
+	}
+
+	async Task OnThuongHieuAddCallback(TblThuonghieu tblThuonghieu)
+	{
+		ThuongHieuList = await hangHoaService.GetThuongHieuAllAsync(idcompany);
+		if (tblThuonghieu != null)
+		{
+			if (tblThuonghieu.Id != 0)
+			{
+				mtl_thuonghieu = ThuongHieuList.Where(p => p.id == tblThuonghieu.Id).FirstOrDefault();
+			}
+		}
+		StateHasChanged();
+	}
+
+	async Task ThemThuongHieuDialog()
+	{
+		var parameters = new DialogParameters<DialogAddThuongHieu>();
+		parameters.Add(x => x.isNew, true);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.OnDialogCallback, new EventCallbackFactory().Create<TblThuonghieu>(this, OnThuongHieuAddCallback));
+		string headerText = "THÊM THƯƠNG HIỆU MỚI";
+		var dialog = await DialogService.ShowEx<DialogAddThuongHieu>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			ThuongHieuList = await hangHoaService.GetThuongHieuAllAsync(userSession.company.Id);
+		}
+	}
+
+	public string FormatCurrency(string amount)
+	{
+		double amount1 = double.Parse(amount);
+		return string.Format("{0:n0}", amount1);
+	}
+	public string FormatCurrency(double? amount)
+	{
+		return string.Format("{0:n0}", amount);
+	}
+	async Task Delete_HangHoaThanhPhan(MTL_GetSanPhamThanhPhanResult context)
+	{
+		MTL_GetSanPhamThanhPhanResult hanghoathanhphan = context;
+		LinkAnhXoa = userSession.company.Logourl;
+		if (hanghoathanhphan.hinhanh1 != null)
+			LinkAnhXoa = string.Format("{0}", hanghoathanhphan.hinhanh1);
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, hanghoathanhphan.tensp);
+		parameters.Add(x => x.LinkAnh, LinkAnhXoa);
+		var dialog = await DialogService.ShowEx<DeleteDialog>("XÓA HÀNG HÓA THÀNH PHẦN", parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			// Xóa phần tử khỏi danh sách
+			ListHangHoaThanhPhan.Remove(context);
+			// cập nhật giá tổng
+			model.Giaban = ListHangHoaThanhPhan.Sum(x => x.thanhtien);
+			// Cập nhật lại giao diện bằng cách gọi StateHasChanged
+			StateHasChanged();
+			string mess = $"Xóa thành công hàng hóa thành phần [{hanghoathanhphan.tensp}]";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+		}
+	}
+	async Task ThemHangHoaThanhPhan()
+	{
+		MTL_GetSanPhamThanhPhanResult thanhphan = new MTL_GetSanPhamThanhPhanResult();
+		var parameters = new DialogParameters<SuaChiTietHangHoaThanhPhan>();
+		parameters.Add(x => x.thanhphan, thanhphan);
+		parameters.Add(x => x.spAo_enable, false); // ko là sp ảo
+		parameters.Add(x => x.company, userSession.company);
+		parameters.Add(x => x.ListProductInCompany, ListProductInCompany);
+		parameters.Add(x => x.BaoHanhList, BaoHanhList);
+		parameters.Add(x => x.isNew, true);
+		parameters.Add(x => x.idsanpham, model.Id);
+		parameters.Add(x => x.ListHangHoaThanhPhan, ListHangHoaThanhPhan);
+		parameters.Add(x => x.OnDialogCallback, new EventCallbackFactory().Create<MTL_GetSanPhamThanhPhanResult>(this, AddRowSPThanhPhan));
+		string headerText = $"Thêm hàng hóa thành phần";
+		var dialog = await DialogService.ShowEx<SuaChiTietHangHoaThanhPhan>(headerText, parameters, options_FullScreen);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+
+		}
+	}
+	async Task SuaHangHoaThanhPhan(MTL_GetSanPhamThanhPhanResult context)
+	{
+		MTL_GetSanPhamThanhPhanResult thanhphan = context;
+		var parameters = new DialogParameters<SuaChiTietHangHoaThanhPhan>();
+		parameters.Add(x => x.thanhphan, thanhphan);
+		parameters.Add(x => x.spAo_enable, false);
+		parameters.Add(x => x.company, userSession.company);
+		parameters.Add(x => x.ListProductInCompany, ListProductInCompany);
+		parameters.Add(x => x.BaoHanhList, BaoHanhList);
+		parameters.Add(x => x.isNew, false);
+		parameters.Add(x => x.idsanpham, model.Id);
+		parameters.Add(x => x.ListHangHoaThanhPhan, ListHangHoaThanhPhan);
+		parameters.Add(x => x.OnDialogCallback, new EventCallbackFactory().Create<MTL_GetSanPhamThanhPhanResult>(this, UpdateRowSPThanhPhan));
+		string headerText = $"Sửa hàng hóa thành phần [{thanhphan.tensp}]";
+		var dialog = await DialogService.ShowEx<SuaChiTietHangHoaThanhPhan>(headerText, parameters, options_FullScreen);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+
+		}
+	}
+
+	async Task AddRowSPThanhPhan(MTL_GetSanPhamThanhPhanResult thanhphan)
+	{
+		thanhphan.tensp = thanhphan.tensp;
+		if (thanhphan.idhanghoathanhphan == null) // là SP ảo
+			thanhphan.idhanghoathanhphan = 0;
+		// else thanhphan.idhanghoathanhphan = thanhphan.idhanghoathanhphan;
+		thanhphan.masp = thanhphan.masp;
+		thanhphan.sl = thanhphan.sl;
+		thanhphan.giaban = thanhphan.giaban;
+		thanhphan.thanhtien = thanhphan.sl * thanhphan.giaban;
+		thanhphan.idbaohanh = thanhphan.idbaohanh;
+		thanhphan.beginupdate = DateTime.Now;
+		thanhphan.lastupdate = DateTime.Now;
+		thanhphan.chietkhau = 0;
+		ListHangHoaThanhPhan.Add(thanhphan);
+		// cập nhật giá tổng
+		model.Giaban = ListHangHoaThanhPhan.Sum(x => x.thanhtien);
+	}
+
+	async Task UpdateRowSPThanhPhan(MTL_GetSanPhamThanhPhanResult thanhphan)
+	{
+		// Tìm phần tử cần cập nhật trong danh sách dựa vào id
+		var itemToUpdate = ListHangHoaThanhPhan.FirstOrDefault(x => x.id == thanhphan.id);
+
+		// Tìm chỉ số của phần tử cần cập nhật
+		var index = ListHangHoaThanhPhan.FindIndex(x => x.id == thanhphan.id);
+
+		if (index != -1) // Nếu tìm thấy phần tử
+		{
+			// Cập nhật các thuộc tính của phần tử đã tìm thấy
+			ListHangHoaThanhPhan[index].tensp = thanhphan.tensp;
+			ListHangHoaThanhPhan[index].masp = thanhphan.masp;
+			ListHangHoaThanhPhan[index].sl = thanhphan.sl;
+			ListHangHoaThanhPhan[index].giaban = thanhphan.giaban;
+			ListHangHoaThanhPhan[index].thanhtien = thanhphan.sl * thanhphan.giaban;
+			ListHangHoaThanhPhan[index].idbaohanh = thanhphan.idbaohanh;
+			ListHangHoaThanhPhan[index].lastupdate = DateTime.Now;
+			ListHangHoaThanhPhan[index].chietkhau = thanhphan.chietkhau;
+			ListHangHoaThanhPhan[index].issanphamao = thanhphan.issanphamao;
+			// Cập nhật giá tổng sau khi thay đổi
+			model.Giaban = ListHangHoaThanhPhan.Sum(x => x.thanhtien);
+		}
+
+	}
+	async Task NhanBanThanhPhan()
+	{
+		var parameters = new DialogParameters<NhanBanThanhPhanDialog>();
+		//parameters.Add(x => x.thanhphan, thanhphan);
+		parameters.Add(x => x.company, userSession.company);
+		parameters.Add(x => x.ListProduct, ListProduct);
+		parameters.Add(x => x.idsanpham, model.Id);
+		parameters.Add(x => x.ListHangHoaThanhPhan, ListHangHoaThanhPhan);
+		parameters.Add(x => x.OnDialogCallback, new EventCallbackFactory().Create<MTL_GetAllProductsInCompanyResult>(this, NhanBanThanhPhanExcute));
+		string headerText = $"Nhân bản thành phần [{model.Tensp}]";
+		var dialog = await DialogService.ShowEx<NhanBanThanhPhanDialog>(headerText, parameters, options_FullScreen);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+
+		}
+	}
+	async Task NhanBanThanhPhanExcute(MTL_GetAllProductsInCompanyResult nhanban)
+	{
+		//lấy danh sách hàng hóa thành phần cần nhân bản
+		List<MTL_GetSanPhamThanhPhanResult>? ListHangHoaThanhPhanNhanBan =
+		await hangHoaService.GetHangHoaThanhPhanAsync(nhanban.id, userSession.company.Id);
+
+		foreach (var item in ListHangHoaThanhPhanNhanBan)
+		{
+			await AddRowSPThanhPhan(item);
+		}
+	}
+
+	private async Task CaptureScreen()
+	{
+		await JSRuntime.InvokeVoidAsync("capture");
+	}
+
+}

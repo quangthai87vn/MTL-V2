@@ -1,0 +1,187 @@
+{
+  "name": "MTL.CRM Zalo OA - Real-time",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zalo-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Zalo Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        208,
+        -464
+      ],
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "id": "91a6038c-5277-4f4e-8276-4a4e04efc010",
+      "typeVersion": 2.1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1800,
+        -440
+      ],
+      "id": "33f7d7dd-ee42-4b78-a118-e2e73087ffec",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Zalo OA webhook data\nconst body = $input.first().json.body;\nconst eventName = body.event_name || 'unknown';\nconst msg = body.message || {};\n\n// Get sender info\nlet userId = '';\nlet userName = '';\nlet userAvatar = '';\n\nif (body.sender && body.sender.id) {\n  userId = body.sender.id;\n  userName = body.sender.name || '';\n}\n\n// Parse message type and content\nlet messageType = 'text';\nlet messageText = '';\nlet mediaUrl = '';\n\nif (eventName === 'user_send_text') {\n  messageType = 'text';\n  messageText = msg.text || '';\n} else if (eventName === 'user_send_image') {\n  messageType = 'image';\n  messageText = '[Hinh anh]';\n  if (msg.attachments && msg.attachments[0] && msg.attachments[0].payload) {\n    mediaUrl = msg.attachments[0].payload.url || '';\n  }\n} else if (eventName === 'user_send_file') {\n  messageType = 'file';\n  messageText = '[File]';\n  if (msg.attachments && msg.attachments[0] && msg.attachments[0].payload) {\n    mediaUrl = msg.attachments[0].payload.url || '';\n  }\n} else if (eventName === 'user_send_link') {\n  messageType = 'link';\n  messageText = msg.text || '[Link]';\n} else if (eventName === 'user_send_sticker') {\n  messageType = 'sticker';\n  messageText = '[Sticker]';\n} else if (eventName === 'user_send_location') {\n  messageType = 'location';\n  messageText = msg.text || '[Vi tri]';\n} else if (eventName === 'follow') {\n  messageType = 'system';\n  messageText = 'Nguoi dung da theo doi OA';\n} else if (eventName === 'unfollow') {\n  messageType = 'system';\n  messageText = 'Nguoi dung da bo theo doi OA';\n} else {\n  messageText = msg.text || JSON.stringify(msg);\n}\n\nreturn {\n  json: {\n    event: eventName,\n    userId: userId,\n    userName: userName,\n    userAvatar: userAvatar,\n    messageType: messageType,\n    message: messageText,\n    mediaUrl: mediaUrl,\n    msgId: msg.msg_id || ''\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        -460
+      ],
+      "id": "5d2d3ae8-1fc5-4f8e-87eb-76021232b2b7",
+      "name": "Parse Webhook"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.zalo.me/v2.0/{{ $json.userId }}/info?fields=birthdate,gender,name,picture,phone&access_token={{ $env.ZALO_ACCESS_TOKEN }}"
+      },
+      "name": "Get User Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        -360
+      ],
+      "id": "get-user-info-1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lay thong tin user tu Zalo API response\nconst zaloResponse = $input.first().json;\nconst webhookData = $('Parse Webhook').first().json;\n\n// Check for Zalo API error\nif (zaloResponse.error && zaloResponse.error !== 0) {\n  // Khong lay duoc thong tin user, van tiep tuc\n  return {\n    json: {\n      ...webhookData,\n      userName: webhookData.userName || 'Khach hang Zalo',\n      userAvatar: ''\n    }\n  };\n}\n\n// Extract user info from Zalo API response\nconst userName = zaloResponse.name || webhookData.userName || 'Khach hang Zalo';\nconst userAvatar = (zaloResponse.picture && zaloResponse.picture.data && zaloResponse.picture.data.url) \n  ? zaloResponse.picture.data.url \n  : '';\n\nreturn {\n  json: {\n    ...webhookData,\n    userName: userName,\n    userAvatar: userAvatar\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        -460
+      ],
+      "id": "code-user-info",
+      "name": "Set User Info"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.appUrl }}/api/zalo/receive",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"event\": \"{{ $json.event }}\",\n  \"userId\": \"{{ $json.userId }}\",\n  \"userName\": \"{{ $json.userName }}\",\n  \"userAvatar\": \"{{ $json.userAvatar }}\",\n  \"messageType\": \"{{ $json.messageType }}\",\n  \"message\": \"{{ $json.message }}\",\n  \"mediaUrl\": \"{{ $json.mediaUrl }}\"\n}",
+        "options": {}
+      },
+      "name": "Send to MTL App",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        -460
+      ],
+      "id": "send-to-mtl-app",
+      "credentials": {
+        "httpHeaderAuth": []
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get MTL App URL from environment\nconst appUrl = $env.MTL_APP_URL || 'http://localhost:5000';\nconst webhookData = $('Set User Info').first().json;\n\nreturn {\n  json: {\n    ...webhookData,\n    appUrl: appUrl\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        -460
+      ],
+      "id": "set-app-url",
+      "name": "Set App URL"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Zalo Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get User Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Info": {
+      "main": [
+        [
+          {
+            "node": "Set User Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set User Info": {
+      "main": [
+        [
+          {
+            "node": "Set App URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set App URL": {
+      "main": [
+        [
+          {
+            "node": "Send to MTL App",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to MTL App": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "realtime-001",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "Jrdt0AVj5tpFqfj6",
+  "tags": []
+}

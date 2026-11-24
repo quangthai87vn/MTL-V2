@@ -1,0 +1,600 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using System.ComponentModel.DataAnnotations
+@using FluentValidation;
+@using MudBlazor.Extensions.Options
+@inject KhachHangService khachHangService
+@inject ISnackbar SnackbarService
+@inject NavigationManager navigationManager
+@inject IWebHostEnvironment env
+@inject InvoiceService invoiceService
+@inject MudBlazor.IDialogService DialogService
+@inject ZnsVeSinhCampaignService znsCampaignService
+
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface mtl-themdon-dialog-actions">
+	<DialogContent>
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="false" HideText="true" />
+		}
+		else
+		{
+			<MudForm @ref="form" Model="@model" Validation=@(Validator.ValidateValue) >
+				<MudGrid Spacing=1>
+					<MudItem xs="12" sm="12" md="5">
+						<MudPaper Class="pa-4" Elevation="2">
+											<MudExGradientText Animate="true" Typo="Typo.h6" style="font-weight: bold; text-align:left">THÔNG TIN</MudExGradientText>
+											<MudGrid Spacing=1 >
+												<MudItem xs="12" sm="12" md="12">
+													 <img class="mx-auto d-block" src=@GetImageProductFileName(model)
+														 width="250" height="100%" />
+												</MudItem>
+												<MudItem xs="12" sm="12" md="12">
+													<MudProgressLinear Color="Color.Error" Value="@ProgressPercentage" Size="Size.Medium" Class="my-7">
+														<MudText Typo="Typo.subtitle1" Color="Color.Primary">
+															<b>@ProgressPercentage %</b>
+														</MudText>
+													</MudProgressLinear>
+													<MudFileUpload T="IBrowserFile" Accept=".png, .jpg" FilesChanged="UploadProductImage" MaximumFileCount="100">
+														<ButtonTemplate>
+															<MudButton HtmlTag="label"
+																	   Variant="Variant.Filled"
+																	   Color="Color.Primary"
+																	   StartIcon="@Icons.Material.Filled.CloudUpload">
+																Upload ảnh đại diện
+															</MudButton>
+														</ButtonTemplate>
+													</MudFileUpload>
+												</MudItem>
+												<MudItem xs="12" sm="12" md="12">
+													<MudSelect Label="Nhóm khách hàng" T="int?"
+															   @bind-Value=model.Idnhomkhachhang Disabled=true
+															   AnchorOrigin="Origin.BottomCenter">
+														@if (ListNhomKhachHang != null)
+														{
+															foreach (var item in ListNhomKhachHang)
+															{
+																<MudSelectItem T="int?" Value="@item.Id">@item.Nhomkhachhang</MudSelectItem>
+															}
+														}
+													</MudSelect>
+												</MudItem>
+												<MudItem xs="9" sm="9" md="6">
+													<MudTextField Immediate="true"
+																  For="@(() => model.Dienthoai)"
+																  T="string" Label="Điện thoại"
+																  Margin="Margin.Dense" Variant="Variant.Outlined"
+																  HelperTextOnFocus="true" Disabled=SDT_Enable
+																  Class="mud-input-emphasis"
+																  Text=@model.Dienthoai TextChanged=SDT_TextChanged />
+												</MudItem>
+
+												<MudItem xs="12" sm="12" md="6">
+													<MudTextField For=@(() => model.Makh) Immediate="true"
+																  Margin="Margin.Dense" Variant="Variant.Outlined"
+																  T="string" Label="Mã CCCD"
+																  Class="mud-input-emphasis"
+																  HelperTextOnFocus="true"
+																  @bind-Text=model.Makh />
+												</MudItem>
+												<MudItem xs="12" sm="12" md="12">
+													<MudTextField For=@(() => model.Fullname) Immediate="true"
+																  T="string" Label="Họ tên"
+																  style="color:var(--mud-palette-primary) ;font-weight: bold; !important;"
+																  HelperTextOnFocus="true"
+																  @bind-Text=model.Fullname />
+												</MudItem>
+
+												<MudItem xs="12" sm="12" md="12">
+													<MudTextField For=@(() => model.Diachi) T="string" Label="Địa chỉ thường trú"
+																  HelperTextOnFocus="true"
+																  @bind-Text=model.Diachi />
+												</MudItem>
+												<MudItem xs="6" sm="6" md="4">
+													<MudTextField For=@(() => model.Mabuudien) T="string" Label="Mã bưu điện"
+																  HelperTextOnFocus="true"
+																  @bind-Text=model.Mabuudien />
+												</MudItem>
+												<MudItem xs="6" sm="6" md="4">
+													<MudTextField For=@(() => model.Email) T="string" Label="Email"
+																  @bind-Text=model.Email />
+												</MudItem>
+
+												<MudItem xs="6" sm="6" md="4">
+													<MudTextField For=@(() => model.Website) T="string" Label="Website"
+																  HelperTextOnFocus="true"
+																  @bind-Text=model.Website />
+												</MudItem>
+
+												<MudItem xs="6" sm="6" md="4">
+													<MudTextField For=@(() => model.Tenfacebook) T="string" Label="Tên Facebook"
+																  HelperTextOnFocus="true" style="color:var(--mud-palette-primary) !important;"
+																  @bind-Text=model.Tenfacebook />
+												</MudItem>
+												<MudItem xs="6" sm="6" md="4">
+													<MudTextField For=@(() => model.Facebook) T="string" Label="Link Facebook"
+																  HelperTextOnFocus="true" style="color:var(--mud-palette-primary) !important;"
+																  @bind-Text=model.Facebook />
+												</MudItem>
+												<MudItem xs="6" sm="6" md="4">
+													<MudTextField For=@(() => model.Masothue) T="string" Label="Mã số thuế"
+																  HelperTextOnFocus="true"
+																  @bind-Text=model.Masothue />
+												</MudItem>
+
+												<MudItem xs="12" sm="12" md="12">
+													<MudTextField For=@(() => model.Ghichu) T="string" Label="Ghi chú"
+																  HelperTextOnFocus="true" Lines="2"
+																  @bind-Text=model.Ghichu />
+												</MudItem>
+
+											</MudGrid>
+										</MudPaper>
+					</MudItem>
+
+						<MudItem xs="12" sm="12" md="7">
+							<MudPaper Class="pa-4" Elevation="2">
+								<MudExGradientText Animate="false" Typo="Typo.h6" style="font-weight: bold; text-align:left">CÓ @HoaDonKhachHang.Count HOÁ ĐƠN ĐÃ THANH TOÁN: TRỊ GIÁ @FormatCurrency(HoaDonKhachHang.Sum(x => x.thanhtoan)) VNĐ</MudExGradientText>
+
+							@* 	<MudExGradientText Animate="true" Typo="Typo.h6" style="font-weight: bold; text-align:left">2. ĐƠN HÀNG ĐÃ THANH TOÁN</MudExGradientText> *@
+								<MudGrid Spacing=1>
+									<MudItem xs="12" sm="12" md="12">
+										<MudTable Items="@HoaDonKhachHang"
+												  Hover="true"
+												  Striped="true"
+												  Bordered="false"
+												  RowsPerPage="50"
+												  Class="mudtable-center-header">
+
+											<RowTemplate Context="contextInvoice">
+												@{
+													string rowStyle = "";
+													if (!(bool)contextInvoice.isDichVuDaXuLy) // chưa xữ lý
+													{
+														rowStyle = "background-color:rgb(248, 187, 187);";
+													}
+													else if (contextInvoice.idLoaiPhieu == 4) // báo giá
+													{
+														rowStyle = "background-color:rgb(181, 237, 234);";
+													}
+
+													string tenloaiphieu = @MTLEnum.GetListLoaiPhieu().Where(p => p.Id == (int)@contextInvoice.idLoaiPhieu).FirstOrDefault().Loaiphieu.ToUpper();
+													string MaHD = @contextInvoice.mahd.ToUpper();
+												}
+												@* <MudTd DataLabel="THÔNG TIN ĐƠN HÀNG" Style="@rowStyle">
+													<MudGrid Spacing=1>
+														<MudItem xs="12" sm="12" md="12">
+															@tenloaiphieu : @MaHD - Ngày lập : @Convert.ToDateTime(contextInvoice.ngaylapphieu).ToString("dd/MM/yyyy") - Ngày HĐ : @Convert.ToDateTime(contextInvoice.ngaytraphieu).ToString("dd/MM/yyyy")
+														</MudItem>
+														<MudItem xs="12" sm="12" md="12">
+															<MudExGradientText Typo="Typo.body1"
+																			   style="font-weight: bold; text-align:left">
+																@contextInvoice.ghichukohienbill
+															</MudExGradientText>
+														</MudItem>
+													</MudGrid>
+												</MudTd> *@
+
+												<MudTd DataLabel="THÔNG TIN ĐƠN HÀNG" Style="@rowStyle">
+													<MudGrid Spacing=1>
+														<MudItem xs="12" sm="12" md="12">
+															@{
+																string LinkURLA4 = string.Format("/HoaDon/A4/{0}", contextInvoice.mahd);
+															}
+															@* <a target="_blank" href=@LinkURLA4> @MaHD -  @Convert.ToDateTime(contextInvoice.ngaytraphieu).ToString("dd/MM/yyyy")</a>
+															<p style="font-weight: bold; color:red; text-align:right;">@FormatCurrency(contextInvoice.thanhtoan)</p> *@
+
+															<MudStack Row="true">
+																<MudItem xs="6" sm="6" md="8">
+																	@tenloaiphieu :
+																	<MudLink target="_blank" Href=@LinkURLA4>@MaHD - Ngày lập: @Convert.ToDateTime(contextInvoice.ngaylapphieu).ToString("dd/MM/yyyy") -  Ngày HĐ: @Convert.ToDateTime(contextInvoice.ngaytraphieu).ToString("dd/MM/yyyy")</MudLink>
+																</MudItem>
+																<MudItem xs="6" sm="6" md="4">
+																	<MudNumericField HideSpinButtons="true"
+																					 Label="Thanh toán" Value=@FormatCurrency(contextInvoice.thanhtoan)
+																					 Format="N0" ReadOnly="true"
+																					 Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.AttachMoney"
+																					 Class="curency" />
+																</MudItem>
+															</MudStack>
+														</MudItem>
+														<MudItem xs="12" sm="12" md="12">
+															@contextInvoice.ghichukohienbill
+														</MudItem>
+													</MudGrid>
+												</MudTd>
+												@* <MudTd DataLabel="T.TOÁN" Style="@rowStyle">
+													<p style="font-weight: bold; color:red; text-align:right;">@FormatCurrency(contextInvoice.thanhtoan)</p>
+												</MudTd> *@
+											</RowTemplate>
+											@* <FooterContent>
+
+												<MudTd ColSpan="1" Style="text-align:right; font-weight:bold; color:red;">Số HĐ: @HoaDonKhachHang.Count - Tổng cộng: @FormatCurrency(HoaDonKhachHang.Sum(x => x.thanhtoan)) </MudTd>
+											</FooterContent> *@
+											<PagerContent>
+												<MudTablePager PageSizeOptions="new int[] { 50, 100 }" />
+											</PagerContent>
+										</MudTable>
+									</MudItem>
+								</MudGrid>
+								<MudGrid Spacing="1">
+									<MudItem xs="12" sm="12" md="12">
+										<MudPaper Elevation="0" Class="rounded-lg mt-2" Style="border:1px solid var(--mud-palette-lines-default);">
+											<MudStack Spacing="1" Class="pa-3">
+												<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+													<MudExGradientText Animate="false" Typo="Typo.h6" style="font-weight: bold; text-align:left">NHẬT KÝ GỬI ZNS THEO SỐ ĐIỆN THOẠI</MudExGradientText>
+													<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+														<MudText Typo="Typo.caption" Class="mud-text-secondary">
+															SĐT: <strong>@model?.Dienthoai</strong> · @(ListZnsHistory?.Count ?? 0) tin đã gửi
+														</MudText>
+														<MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+																	   OnClick="LoadZnsHistoryAsync" Title="Tải lại" />
+													</MudStack>
+												</MudStack>
+												@if (ListZnsHistory != null && ListZnsHistory.Any())
+												{
+													<MudTable Items="@ListZnsHistory"
+															  Hover="true"
+															  Striped="true"
+															  Dense="true"
+															  Bordered="true"
+															  Class="mudtable-center-header mtl-standard-grid"
+															  FixedHeader="true"
+															  Height="180px">
+														<HeaderContent>
+															<MudTh Style="width:130px; min-width:130px; text-align:center;">NGÀY GỬI</MudTh>
+															<MudTh Style="width:90px; min-width:80px; text-align:center;">KẾT QUẢ</MudTh>
+															<MudTh Style="width:60px; min-width:60px; text-align:center;">HTTP</MudTh>
+															<MudTh Style="min-width:120px;">MẪU ZNS</MudTh>
+															<MudTh>NỘI DUNG</MudTh>
+														</HeaderContent>
+														<RowTemplate Context="zns">
+															<MudTd DataLabel="NGÀY GỬI" Style="text-align:center;">@FormatNgayGui(zns.Ngaygui)</MudTd>
+															<MudTd DataLabel="KẾT QUẢ" Style="text-align:center;">
+																@if (zns.Thanhcong)
+																{
+																	<MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Thành công</MudChip>
+																}
+																else
+																{
+																	<MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">Thất bại</MudChip>
+																}
+															</MudTd>
+															<MudTd DataLabel="HTTP" Style="text-align:center;">@(zns.HttpStatus?.ToString() ?? "—")</MudTd>
+															<MudTd DataLabel="MẪU">
+																<MudText Typo="Typo.caption" Style="font-weight:600;">@(zns.Tenmau ?? "—")</MudText>
+																<MudText Typo="Typo.caption" Class="mud-text-secondary">ID @(zns.Idtemplate?.ToString() ?? "—")</MudText>
+															</MudTd>
+															<MudTd DataLabel="NỘI DUNG">
+																<MudText Typo="Typo.caption" Style="white-space:pre-wrap; line-height:1.4; max-height:50px; overflow:hidden;">
+																	@(TruncateZnsContent(zns.Noidungxemtruoc, 150))
+																</MudText>
+															</MudTd>
+														</RowTemplate>
+														<NoRecordsContent>
+															<MudText Typo="Typo.body2" Class="mud-text-secondary">Chưa có tin nhắn ZNS nào được gửi.</MudText>
+														</NoRecordsContent>
+													</MudTable>
+												}
+												else
+												{
+													<MudPaper Elevation="0" Class="pa-3 rounded-lg" Style="border:1px dashed var(--mud-palette-lines-default);">
+														<MudStack AlignItems="AlignItems.Center" Spacing="1">
+															<MudIcon Icon="@Icons.Material.Filled.Sms" Size="Size.Large" Class="mud-text-secondary" Style="opacity:0.4" />
+															<MudText Typo="Typo.body2" Class="mud-text-secondary">Chưa có tin nhắn ZNS nào được gửi cho SĐT này.</MudText>
+														</MudStack>
+													</MudPaper>
+												}
+											</MudStack>
+										</MudPaper>
+									</MudItem>
+								</MudGrid>
+							</MudPaper>
+						</MudItem>
+				</MudGrid>
+			</MudForm>
+		}
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="SaveAsync" Disabled="@IsLoading" Color="Color.Success">LƯU THÔNG TIN</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Disabled="@IsLoading" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	private MudTheme Theme = new MudTheme();
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public UserSession userSession { get; set; }
+	[Parameter]
+	public int Id { get; set; }
+	[Parameter]
+	public int idcompany { get; set; }
+	[Parameter]
+	public bool isNew { get; set; }
+	[Parameter]
+	public TblUser KhachHang { get; set; } = new TblUser();
+	[Parameter]
+	public int Idnhomkhachhang { get; set; }  // 1: Khách hàng, 2: nhân viên, 3: Nhà cung cấp
+	[Parameter]
+	public EventCallback<TblUser> OnDialogCallback { get; set; }
+	public IEnumerable<TblNhomkhachhang>? ListNhomKhachHang { get; set; }
+
+
+	public List<MTL_GetAllInvoice_byKhachHangResult>? HoaDonKhachHang { get; set; }
+
+	public List<TblLoaiChamSocKh> LoaiChamSocKhachHang { get; set; }
+
+	List<TblZnsGuiNhatKy> ListZnsHistory { get; set; } = new();
+
+
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	string _tmpDienThoai = "";
+	TblUser khach = new TblUser();
+
+	public bool SDT_Enable { get; set; } = false;
+	string EmailMask { get; set; } = @"(\w|[.-])+@(\w|-)+\.(\w|-){2,4}";
+
+	bool IsLoading = true;
+	TblUser model = new TblUser();
+	KhachHangValidator Validator = new KhachHangValidator();
+	MudForm form;
+
+	string url_anhdaidien = "";
+	MarkupString AlertMessage = new MarkupString("<strong>No file selected</strong>");
+	string AlertClass = "alert alert-info";
+	int ProgressPercentage = 0;
+	IBrowserFile selectedFile;
+	long maxFileSize = 1024L * 1024L * 1024L * 2L;
+	string[] allowedExtensions = { ".jpg", ".png", ".jpeg", ".mp4" };
+	bool IsUploadDisabled = true;
+	private Guid inputFileId = Guid.NewGuid();
+	IList<IBrowserFile> files = new List<IBrowserFile>();
+
+
+
+	DialogOptionsEx options = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.ExtraExtraLarge,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+
+	};
+	DialogOptionsEx options_dialog = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.ExtraLarge,
+			MaximizeButton = false,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+			FullScreen = false
+		};
+
+	private async void UploadProductImage(IBrowserFile file)
+	{
+		files.Add(file);
+		//TODO upload the files to the server
+		await OnSubmit();
+	}
+	private async Task OnSubmit()
+	{
+		if (files != null)
+		{
+			IsUploadDisabled = true;
+			selectedFile = files[0];
+			Stream stream = selectedFile.OpenReadStream(maxFileSize);
+			//string path_saveimage = "/uploads/GYM/members";// mtlsettings.urluploadGame;// userSession.company.UploadProductUrl;
+			//var path = $"{env.WebRootPath}\\{path_saveimage}\\{selectedFile.Name}";
+			var path = $"{env.WebRootPath}\\uploads\\{userSession.company.UploadUrl}\\customer\\{selectedFile.Name}";
+			//var path = $"{env.WebRootPath}\\Uploads\\GYM\\members\\{selectedFile.Name}";
+			//var path = $"{path_saveimage}/{selectedFile.Name}";
+			using FileStream fs = File.Create(path);
+			// Set buffer size to 512 KB.
+			int bufferSize = 512 * 1024;
+			byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(bufferSize);
+			int bytesRead;
+			long totalBytesRead = 0;
+			long fileSize = selectedFile.Size;
+			// Use a timer to update the UI every few hundred milliseconds.
+			using var timer = new Timer(_ => InvokeAsync(() => StateHasChanged()));
+			timer.Change(TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
+			try
+			{
+				while ((bytesRead = await stream.ReadAsync(buffer)) != 0)
+				{
+					totalBytesRead += bytesRead;
+					ProgressPercentage = (int)(100 * totalBytesRead / fileSize);
+					await fs.WriteAsync(buffer, 0, bytesRead);
+				}
+			}
+			finally
+			{
+				System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+			}
+			// Stop the timer and update the UI with the final progress.
+			timer.Change(Timeout.Infinite, Timeout.Infinite);
+			ProgressPercentage = 100;
+			// inputFileId = Guid.NewGuid();
+			// var uri = $"{navigationManager.BaseUri}Uploads/ChoVietJapan/products";
+			// url_anhdaidien = $"{uri}/{selectedFile.Name}";
+			model.Picture = selectedFile.Name;
+			files.Clear();
+			this.StateHasChanged();
+		}
+	}
+
+	string GetImageProductFileName(TblUser pd)
+	{
+		string url_anhdaidien = "/images/icons/nopicture.png";//mtlsettings.defaultimage;
+		if (pd.Picture != null)
+		{
+			string path_saveimage = $"/uploads/{userSession.company.UploadUrl}/customer/{pd.Picture}";
+			//mtlsettings.urluploadGame;
+			//var path_saveimage = $"{env.WebRootPath}{userSession.company.UploadUrl}\\members";
+
+			//var path = $"{path_saveimage}\\{pd.Picture}";
+			url_anhdaidien = path_saveimage;
+		}
+		return url_anhdaidien;
+	}
+
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			ListNhomKhachHang = await khachHangService.GetAllNhomKhachHang();
+			LoaiChamSocKhachHang = await khachHangService.GetAllLoaiChamSocKhachHangAsync();
+			if (isNew)
+			{
+				model = new TblUser();
+				model.Id = 0;
+				model.Active = true;
+				model.Idnhomkhachhang = Idnhomkhachhang;// Là Khách hàng
+				model.Idcompany = idcompany;
+				model.Idusercreate = model.Iduserlastupdate = userSession.user.UserId;
+				// Gộp dữ liệu từ caller (vd: phiếu thu — SĐT đã gõ trước khi mở popup)
+				if (KhachHang != null)
+				{
+					if (!string.IsNullOrWhiteSpace(KhachHang.Dienthoai))
+						model.Dienthoai = KhachHang.Dienthoai.Trim();
+					if (!string.IsNullOrWhiteSpace(KhachHang.Fullname))
+						model.Fullname = KhachHang.Fullname;
+					if (!string.IsNullOrWhiteSpace(KhachHang.Diachi))
+						model.Diachi = KhachHang.Diachi;
+					if (!string.IsNullOrWhiteSpace(KhachHang.Makh))
+						model.Makh = KhachHang.Makh;
+				}
+				if (string.IsNullOrWhiteSpace(model.Fullname))
+					model.Fullname = "";
+			}
+			else
+			{
+				//update
+				model = KhachHang;
+				model.Iduserlastupdate = userSession.user.UserId;
+				SDT_Enable = true;
+				await LoadZnsHistoryAsync();
+			}
+			await LayDuLieuKhachHang();
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	async Task LayDuLieuKhachHang()
+	{
+		IsLoading = true;
+		HoaDonKhachHang = await invoiceService.GetAllInvoiceByKhachHangAsync(idcompany, model.Id);
+		IsLoading = false;
+	}
+
+
+	async Task SDT_TextChanged(string Dienthoai)
+	{
+		model.Dienthoai = Dienthoai.Replace("_", "");
+		_tmpDienThoai = Dienthoai.Replace("_", "");
+		model = await khachHangService.CheckSDTKhachHangExitsAsync(idcompany, model);
+		if (model.Dienthoai == null) // chưa có thông tin khách
+		{
+			model.Idnhomkhachhang = Idnhomkhachhang;// chọn nhóm
+			model.Fullname = "Khách VIP";
+			model.Dienthoai = _tmpDienThoai;
+		}
+		else
+		{
+			await LayDuLieuKhachHang();
+		}
+
+	}
+
+	async Task SaveAsync()
+	{
+		await form.Validate();
+		if (form.IsValid)
+		{
+			khach = await khachHangService.SaveKhachHangAsync(model, userSession);
+			KhachHang.Id = khach.Id;
+			string mess = $"Cập nhật thông tin [{model.Fullname}] thành công";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			await OnDialogCallback.InvokeAsync(KhachHang);
+
+			MudDialog.Close(DialogResult.Ok(khach));
+		}
+		else
+		{
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Có lỗi xảy ra, vui lòng xem lại !");
+		}
+	}
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+
+	public string FormatCurrency(double? amount)
+	{
+		return string.Format("{0:n0}", amount);
+	}
+
+	static string TruncateZnsContent(string? s, int max)
+	{
+		if (string.IsNullOrEmpty(s)) return "";
+		var t = s.Trim();
+		return t.Length <= max ? t : t[..max] + "…";
+	}
+
+	/// <summary>Format ngày gửi ZNS, xử lý năm không hợp lệ.</summary>
+	static string FormatNgayGui(DateTime ngaygui) =>
+		ngaygui.Year >= 1900 ? ngaygui.ToString("dd/MM/yyyy HH:mm") : "—";
+
+	async Task LoadZnsHistoryAsync()
+	{
+		try
+		{
+			var phone = model?.Dienthoai;
+			if (!string.IsNullOrWhiteSpace(phone))
+			{
+				ListZnsHistory = await znsCampaignService.GetZnsHistoryByPhoneAsync(
+					idcompany, phone);
+			}
+		}
+		catch (Exception)
+		{
+			ListZnsHistory = new();
+		}
+	}
+
+}
+
+}

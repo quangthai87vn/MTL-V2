@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MTL.Api/MTL.Api.csproj" />
+    <Project Path="src/MTL.Domain/MTL.Domain.csproj" />
+    <Project Path="src/MTL.Infrastructure/MTL.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MTL.Domain.Tests/MTL.Domain.Tests.csproj" />
+    <Project Path="tests/MTL.Infrastructure.Tests/MTL.Infrastructure.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/MTL.LegacyMigration/MTL.LegacyMigration.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,75 @@
+/* ProductAPI — chỉ toolbar / phân trang / footer (thẻ sản phẩm: wwwroot/css/main.css .mtl-prod-*) */
+
+.mtl-product-api-root {
+	--mtl-papi-radius: 10px;
+}
+
+.mtl-product-api-stat-em {
+	color: var(--mud-palette-primary);
+	font-weight: 700;
+}
+
+.mtl-product-api-root .mtl-product-api-filter-select {
+	min-width: 0;
+	flex: 1 1 120px;
+	max-width: 200px;
+}
+
+@media (max-width: 599px) {
+	.mtl-product-api-root .mtl-product-api-filter-select {
+		flex: 1 1 calc(50% - 6px);
+		max-width: none;
+	}
+}
+
+.mtl-product-api-search-row {
+	width: 100%;
+	gap: 10px;
+	align-items: stretch;
+}
+
+.mtl-product-api-pagination-scroll {
+	overflow-x: auto;
+	overflow-y: hidden;
+	max-width: 100%;
+	-webkit-overflow-scrolling: touch;
+	padding-bottom: 6px;
+	margin-top: 4px;
+}
+
+.mtl-product-api-pagination-flex {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.mtl-product-api-pagination-scroll ::deep .mud-pagination {
+	flex-wrap: nowrap;
+	justify-content: flex-start;
+	min-height: 40px;
+}
+
+@media (max-width: 599px) {
+	.mtl-product-api-search-row.mud-stack-row {
+		flex-direction: column !important;
+		align-items: stretch !important;
+	}
+}
+
+.mtl-product-api-cards-footer {
+	border-top: 1px solid var(--mud-palette-lines-default);
+	margin-top: 8px;
+	padding-top: 12px;
+}
+
+/* Thẻ API: danh mục canh giữa (giá: main.css .mtl-prod-card__price-*) */
+.mtl-product-api-root .mtl-product-api-card-cat {
+	width: 100%;
+	text-align: center;
+	align-self: center;
+	white-space: normal;
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+

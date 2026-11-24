@@ -1,0 +1,201 @@
+@page "/DSHopDong"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+@using MudBlazor
+
+@inject IJSRuntime JSRuntime
+@inject HopDongService hopDongService
+@inject UserService userService
+@inject IToastService toastService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<style>
+	.my-style {
+		font-weight: bold !important;
+		color: #0d6efd;
+	}
+</style>
+
+<AuthorizeView Context="auth">
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.Assignment" Title="DANH SÁCH HỢP ĐỒNG">
+			<Actions>
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Class="mtl-header-action-btn"
+							   Disabled=IsLoading Href="/AddHopDong/Add" Color="Color.Primary">THÊM HỢP ĐỒNG</MudButton>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FileDownload" Class="mtl-header-action-btn"
+							   Disabled=IsLoading OnClick="ExportXlsx" Color="Color.Error">XUẤT EXCEL</MudButton>
+				</MudStack>
+			</Actions>
+			<ChildContent>
+				<MudTextField @bind-Value="_searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+							  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+							  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search" />
+			</ChildContent>
+		</PageStandardHeader>
+
+		<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+			@if (IsLoading)
+			{
+				<Loading IsFullPage="false" PageName="HỢP ĐỒNG" />
+			}
+			else
+			{
+				<MudDivider Class="mud-width-full" />
+				<MudDataGrid T="HopDong"
+							 Items="@DataList"
+							 Filterable="true"
+							 FilterMode="@DataGridFilterMode.Simple"
+							 QuickFilterFilter="@_quickFilter"
+							 Sortable="true"
+							 Hover="true"
+							 Striped="true"
+							 Bordered="true"
+							 Dense="true"
+							 RowsPerPage="50"
+							 ShowMenuIcon="false"
+							 Hideable="true"
+							 ShowColumnOptions="true"
+							 HorizontalScrollbar="true"
+							 ColumnResizeMode="ResizeMode.Column"
+							 Loading="IsLoading"
+							 Class="MTLGrid mtl-standard-grid">
+					<LoadingContent><MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText></LoadingContent>
+					<ToolBarContent>
+						<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+							<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+							<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+							<MudSpacer />
+						</MudStack>
+					</ToolBarContent>
+							<Columns>
+								<TemplateColumn T="HopDong" Title="THAO TÁC" HeaderStyle="width:88px; min-width:88px;" Filterable="false" Sortable="false" Hideable="false" StickyLeft="true">
+									<CellTemplate>
+										<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+											@{
+												string link = "/AddHopDong/" + context.Item.Id;
+											}
+											<MudIconButton Href=@link
+														   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+														   Color="Color.Primary" Size="Size.Medium" Title="Sửa" />
+										</MudButtonGroup>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<PropertyColumn Property="x => x.Noidunghd" Title="NỘI DUNG HĐ" HeaderStyle="min-width:280px; width:320px;" Filterable="true" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Tenkhachhang" Title="TÊN KHÁCH HÀNG" HeaderStyle="min-width:140px; width:180px;" Filterable="true" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Sdtkhachhang" Title="SỐ ĐT KH" HeaderStyle="min-width:110px; width:120px;" Filterable="true" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Giatrihd" Title="GIÁ TRỊ HĐ" HeaderStyle="min-width:120px; width:130px;" Filterable="false" Format="N0" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Tongthanhtoan" Title="TỔNG T.TOÁN" HeaderStyle="min-width:130px; width:150px;" Filterable="false" Format="N0" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Ngayky" Title="NGÀY KÝ" HeaderStyle="min-width:120px; width:130px;" Filterable="true" Format="dd/MM/yyyy" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Ngaytaiky" Title="NGÀY TÁI KÝ" HeaderStyle="min-width:120px; width:130px;" Filterable="true" Format="dd/MM/yyyy" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Diachikhachhang" Title="ĐỊA CHỈ" HeaderStyle="min-width:180px; width:220px;" Filterable="true" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Sohd" Title="SỐ HĐ" HeaderStyle="min-width:100px; width:120px;" Filterable="true" HiddenChanged="OnColumnVisibilityChanged" />
+								<PropertyColumn Property="x => x.Nguoichiutrachnhiem" Title="NGƯỜI LIÊN HỆ" HeaderStyle="min-width:140px; width:180px;" Filterable="true" HiddenChanged="OnColumnVisibilityChanged" />
+							</Columns>
+							<NoRecordsContent>
+								<MudText Typo="Typo.body1">Không có dữ liệu hợp đồng hoặc không tìm thấy theo bộ lọc.</MudText>
+							</NoRecordsContent>
+							<PagerContent>
+								<MudText Typo="Typo.body2" Class="pa-2">
+									Tổng số: <strong>@(DataList?.Count() ?? 0)</strong> hợp đồng
+								</MudText>
+								<MudDataGridPager T="HopDong" PageSizeOptions="new int[] { 25, 50, 100, 200 }" />
+							</PagerContent>
+						</MudDataGrid>
+			}
+		</MudPaper>
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+
+	UserSession userSession { get; set; }
+	bool IsLoading = true;
+
+	DialogOptionsEx options = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.Medium,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	IEnumerable<HopDong>? DataList { get; set; }
+	IEnumerable<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	string NoiDungXoa = "";
+
+	string _searchString = "";
+	private Func<HopDong, bool> _quickFilter => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchString))
+			return true;
+		if (x.Noidunghd?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Tenkhachhang?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Sdtkhachhang?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Sohd?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		return false;
+	};
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			userSession = await configs.LoadAllConfig();
+			DataList = await hopDongService.GetAllHopDongAsync();
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task ExportXlsx()
+	{
+		if (DataList == null || !DataList.Any())
+		{
+			SnackbarService.Add("Không có dữ liệu để xuất.", Severity.Warning);
+			return;
+		}
+		var exportData = DataList.Select(h => new
+		{
+			h.Id,
+			h.Noidunghd,
+			h.Tenkhachhang,
+			h.Sdtkhachhang,
+			h.Giatrihd,
+			h.Tongthanhtoan,
+			Ngayky = h.Ngayky?.ToString("dd/MM/yyyy"),
+			Ngaytaiky = h.Ngaytaiky?.ToString("dd/MM/yyyy"),
+			h.Diachikhachhang,
+			h.Sohd,
+			h.Nguoichiutrachnhiem
+		}).ToList();
+		await JSRuntime.InvokeVoidAsync("exportToExcel",
+			"DSHopDong",
+			new[] { "ID", "Nội dung HĐ", "Tên KH", "SĐT KH", "Giá trị HĐ", "Tổng TT", "Ngày ký", "Ngày tái ký", "Địa chỉ KH", "Số HĐ", "Người liên hệ" },
+			exportData.Select(e => new object[] { e.Id, e.Noidunghd, e.Tenkhachhang, e.Sdtkhachhang, e.Giatrihd, e.Tongthanhtoan, e.Ngayky, e.Ngaytaiky, e.Diachikhachhang, e.Sohd, e.Nguoichiutrachnhiem }).ToList()
+		);
+	}
+
+	Task OnColumnVisibilityChanged(bool _)
+		=> InvokeAsync(StateHasChanged);
+
+}

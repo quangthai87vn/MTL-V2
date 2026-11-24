@@ -1,0 +1,116 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using MTL.DEV.Handlers;
+@inject UserService userService
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		<MudGrid Spacing=1>
+			<MudItem xs="12" sm="12" md="12">
+				<MudTextField T="string"
+							  Label="Nhập Mật khẩu mới ..."
+							  Required=true
+							  HelperText="Nhập Mật khẩu cần đổi"
+							  HelperTextOnFocus="true"
+							  InputType="@PasswordInput"
+							  Adornment="Adornment.End"
+							  AdornmentIcon="@PasswordInputIcon"
+							  OnAdornmentClick="ButtonTestclick"
+							  AdornmentAriaLabel="Hiện mật khẩu"
+							  @bind-Text=@newpass />	
+			</MudItem>
+		</MudGrid>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="ChangePassClick" Color="Color.Success">ĐỔI MẬT KHẨU</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public User curentUser { get; set; }
+
+	public string newpass { get; set; }
+
+	bool isShow;
+	InputType PasswordInput = InputType.Password;
+	string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+	void ButtonTestclick()
+	{
+		@if (isShow)
+		{
+			isShow = false;
+			PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+			PasswordInput = InputType.Password;
+		}
+		else
+		{
+			isShow = true;
+			PasswordInputIcon = Icons.Material.Filled.Visibility;
+			PasswordInput = InputType.Text;
+		}
+	}
+	async Task ChangePassClick()
+	{
+		try
+		{
+			User returnedUser = new User();
+			returnedUser.UserId = curentUser.UserId;
+			returnedUser.Password = newpass;
+			returnedUser = await userService.ChangePassTaiKhoanAsync(returnedUser);
+			if (returnedUser.UserId != 0)
+			{
+				string mess = $"Đổi mật khẩu cho tài khoản [{returnedUser.Fullname}] thành công";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+				MudDialog.Close();
+			}
+			else
+			{
+				string mess = $"Đổi mật khẩu cho tài khoản [{returnedUser.Fullname}] không thành công";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+
+
+
+}
+
+

@@ -1,0 +1,2193 @@
+@page "/product1111"
+@using Blazored.Toast
+@using MTL.APP.Models
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MTL.APP.Models;
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+
+@inject IJSRuntime JSRuntime
+@inject HangHoaService hangHoaService
+@inject UserService userService
+@inject NavigationManager NavigationManager
+@inject IToastService toastService
+@inject ProtectedLocalStorage BrowserStorage
+@inject APIWooService wooAPIService
+@inject Configs configs
+@attribute [Authorize]
+
+<style>
+	.my-style {
+		font-weight: bold !important;
+		color: #0d6efd;
+	}
+</style>
+
+<AuthorizeView>
+	<Authorized>
+		<div class="card-body">
+			<DxFormLayout CssClass="w-100">
+				<DxFormLayoutItem Caption="" ColSpanSm="2" Context="sohd">
+					<DxButton RenderStyle="ButtonRenderStyle.Primary" CssClass="w-100"
+							  Text="THÊM" Title="THÊM"
+							  Enabled=!IsLoading
+							  SizeMode="SizeMode.Large"
+							  IconCssClass="fas fa-plus-circle" Click="ShowNewForm" />
+				</DxFormLayoutItem>
+				<DxFormLayoutItem Caption="" ColSpanSm="2" Context="sohd">
+					<DxButton RenderStyle="ButtonRenderStyle.Danger" CssClass="w-100"
+							  Text="EXCELL" Title="XUẤT EXCELL"
+							  Enabled=!IsLoading
+							  SizeMode="SizeMode.Large"
+							  IconCssClass="fas fa-file-export" Click="ExportXlsx" />
+				</DxFormLayoutItem>
+				<DxFormLayoutItem Caption="Tồn kho:" ColSpanMd="2" Context="TonKho">
+					<DxComboBox Data=@MTLEnum.TonKho.data CssClass="w-100"
+								Enabled=!IsLoading
+								Value=@_filter.v_tonkho
+								ValueChanged="@((string v) => ValueChangedHandler_TonKho(v))" />
+				</DxFormLayoutItem>
+				<DxFormLayoutItem Caption="Loại hình KD:" ColSpanMd="2" Context="LoaiHH">
+					<DxComboBox Data="@LoaiHHDVList" CssClass="w-100"
+								Enabled=!IsLoading
+								NullText="Chọn loại hàng hóa - dịch vụ ..."
+								ShowValidationIcon="true"
+								TextFieldName="Loaihanghoadichvu"
+								ValueFieldName="Id"
+								Value="_filter.v_loaihh"
+								ValueChanged="@((int v) => ValueChangedHandler_LoaiHH(v))" />
+				</DxFormLayoutItem>
+				<DxFormLayoutItem Caption="Theo ngày:" ColSpanMd="2" Context="TheoNgay">
+					<DxComboBox Data=@MTLEnum.SapXepTheoNgay.data CssClass="w-100"
+								Enabled=!IsLoading
+								Value="@_filter.v_theongay"
+								ValueChanged="@((string v) => ValueChangedHandler_Day(v))" />
+				</DxFormLayoutItem>
+				<DxFormLayoutItem Caption="Số dòng:" ColSpanMd="2" Context="sodong">
+					<DxComboBox Data=@MTLEnum.SoDongHienThi.data CssClass="w-100"
+								Enabled=!IsLoading
+								ShowValidationIcon="true"
+								Value=_filter.v_sodong
+								ValueChanged="@((int v) => ValueChangedHandler_SoDong(v))"
+								NullText="Chọn số dòng">
+					</DxComboBox>
+				</DxFormLayoutItem>
+				<SpinLoader IsLoading=@IsLoading Spinner="SpinnerType.Chase">
+					<LoadingTemplate>
+						<Loading />
+					</LoadingTemplate>
+					<ContentTemplate>
+						@{
+							<DxFormLayoutItem Caption="" ColSpanMd="12" Context="sosptrentrang">
+								<DxGrid Data="@ListProduct" @ref=MyGrid
+										KeyFieldName="id"
+										CssClass=" MTLGrid dx-datagrid-headers "
+										PageSize=_filter.v_sodong
+										PagerPosition="GridPagerPosition.Bottom"
+										ShowFilterRow="true"
+										ColumnResizeMode="GridColumnResizeMode.ColumnsContainer"
+										CustomizeCellDisplayText="Grid_CustomizeCellDisplayText"
+										CustomizeElement="Grid_CustomizeElement"
+										CustomizeEditModel="Grid_CustomizeEditModel"
+										EditModelSaving="OnEditModelSaving"
+										PageIndexChanged=OnPageProductListIndexChanged
+										UnboundColumnData=ProductListCustomUnboundColumnData
+										ShowSearchBox="true"
+										SearchBoxInputDelay="200"
+										SearchBoxNullText="Gõ nội dung cần tìm ..."
+										PopupEditFormCssClass="PopupEditFormService"
+										EditFormButtonsVisible=false
+										VirtualScrollingEnabled="false"
+										EditMode="GridEditMode.PopupEditForm">
+									<Columns>
+										<DxGridCommandColumn Width="150px" NewButtonVisible=false>
+											<CellDisplayTemplate Context="Edit_Delete">
+												@*
+											@{
+											string urledit = string.Format("/ThemHangHoa/{0}/{1}", _filter.v_loaihh, (Edit_Delete.DataItem as MTL_GetAllProductsResult).id);
+											}
+											<a href=@urledit class="btn btn-primary" role="button">
+											<span class="btn-label"><i class="fas fa-edit"></i></span>
+											</a>*@
+												<a @onclick="@(() => ShowEditForm(Edit_Delete))" class="btn btn-primary" role="button">
+													<span class="btn-label"><i class="fas fa-edit"></i></span>
+												</a>
+												<a @onclick="@(() => OnDeleteButtonClick(Edit_Delete))" class="btn btn-danger" role="button">
+													<span class="btn-label"><i class="fas fa-trash"></i></span>
+												</a>
+												<a @onclick="@(() => OnPrintButtonClick(Edit_Delete))" target="_blank" class="btn btn-warning" role="button">
+													<span class="btn-label"><i class="fas fa-print"></i></span>
+												</a>
+											</CellDisplayTemplate>
+										</DxGridCommandColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.active) Caption="H.HÀNG" Width="70px" UnboundType="GridUnboundColumnType.Boolean">
+											<CellDisplayTemplate Context="c_active">
+												<DxCheckBox CssClass="d-inline-block"
+															CheckType="CheckType.Switch"
+															Enabled="false"
+															Checked="!(bool)c_active.Value" />
+											</CellDisplayTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.pic00) Caption="ẢNH" Width="60" FilterRowOperatorType="GridFilterRowOperatorType.Contains">
+											<CellDisplayTemplate Context="c_model">
+												@{
+													string url_anhdaidien = company.Logourl;
+													if (((MTL_GetAllProductsResult)c_model.DataItem).pic00 != null)
+													{
+														url_anhdaidien = ((MTL_GetAllProductsResult)c_model.DataItem).pic00;
+													}
+													<img src=@url_anhdaidien alt="" width="50px" height="50px">
+												}
+											</CellDisplayTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.tensp) Caption="SẢN PHẨM" Width="350" FilterRowOperatorType="GridFilterRowOperatorType.Contains" />
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.idnhomhang) Caption="NHÓM HÀNG" Width="150" TextAlignment="GridTextAlignment.Right" SortMode="GridColumnSortMode.DisplayText">
+											<FilterRowCellTemplate Context="c_nhomhangparent">
+												<DxComboBox Value="(int?)c_nhomhangparent.FilterRowValue"
+															ValueChanged="(int? v) => c_nhomhangparent.FilterRowValue = v"
+															Data=NhomHangParentList ValueFieldName="id" TextFieldName="nhomhang"
+															FilteringMode="DataGridFilteringMode.Contains"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.giaban) Caption="GIÁ BÁN" Width="100" DisplayFormat="C0" TextAlignment="GridTextAlignment.Right" />
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.iddonvitinh) Caption="ĐVT" Width="70" TextAlignment="GridTextAlignment.Right">
+											<FilterRowCellTemplate Context="c_DVTList">
+												<DxComboBox Value="(int?)c_DVTList.FilterRowValue"
+															ValueChanged="(int? v) => c_DVTList.FilterRowValue = v"
+															Data=DVTList ValueFieldName="Id" TextFieldName="Donvitinh"
+															FilteringMode="DataGridFilteringMode.Contains"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.masp) Caption="MÃ HÀNG" Width="120" TextAlignment="GridTextAlignment.Right" />
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.model) Context="model" Caption="MODEL" Width="140" TextAlignment="GridTextAlignment.Right">
+											<HeaderCaptionTemplate>
+												<span title="Click xem chi tiết ">MODEL</span>
+											</HeaderCaptionTemplate>
+											<CellDisplayTemplate Context="c_model">
+												@{
+													var webUrl = ((MTL_GetAllProductsResult)c_model.DataItem).link;
+													var t_Model = c_model.Value;
+													if (webUrl != null)
+													{
+														if (webUrl != "")
+														{
+															<a target="_blank" href=@webUrl style="color: red">@t_Model</a>
+														}
+														else
+														{
+															<a target="_blank" style="color: black">@t_Model</a>
+														}
+													}
+													else
+													{
+														<a target="_blank" style="color: black">@t_Model</a>
+													}
+												}
+											</CellDisplayTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.idthuonghieu) Caption="T.HIỆU" Width="80" TextAlignment="GridTextAlignment.Right" SortMode="GridColumnSortMode.DisplayText">
+											<FilterRowCellTemplate Context="c_ThuongHieuList">
+												<DxComboBox Value="(int?)c_ThuongHieuList.FilterRowValue"
+															ValueChanged="(int? v) => c_ThuongHieuList.FilterRowValue = v"
+															Data=ThuongHieuList ValueFieldName="id" TextFieldName="thuonghieu"
+															FilteringMode="DataGridFilteringMode.Contains"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.woo_id) Caption="WOO" Width="60" DisplayFormat="N0" TextAlignment="GridTextAlignment.Right">
+											<CellDisplayTemplate Context="c_model">
+												@{
+													var webUrl = ((MTL_GetAllProductsResult)c_model.DataItem).link;
+													var t_Model = c_model.Value;
+													if (webUrl != null)
+													{
+														if (webUrl != "")
+														{
+															<a target="_blank" href=@webUrl style="color: red">@t_Model</a>
+														}
+														else
+														{
+															<a target="_blank" style="color: black">@t_Model</a>
+														}
+													}
+													else
+													{
+														<a target="_blank" style="color: black">@t_Model</a>
+													}
+												}
+											</CellDisplayTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.idBaoHanh) Caption="B.HÀNH" Width="80" TextAlignment="GridTextAlignment.Right">
+											<FilterRowCellTemplate Context="c_BaoHanhList">
+												<DxComboBox Value="(int?)c_BaoHanhList.FilterRowValue"
+															ValueChanged="(int? v) => c_BaoHanhList.FilterRowValue = v"
+															Data=BaoHanhList ValueFieldName="Id" TextFieldName="Baohanh"
+															FilteringMode="DataGridFilteringMode.Contains"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.giathuong) Caption="G.THƯỜNG" Width="100" DisplayFormat="C0" TextAlignment="GridTextAlignment.Right" />
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.giavon) Caption="GÍA NHẬP" Width="100" DisplayFormat="C0" TextAlignment="GridTextAlignment.Right" />
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.idvitri) Caption="KHO HÀNG" Width="140" TextAlignment="GridTextAlignment.Right">
+											<FilterRowCellTemplate Context="c_ViTriList">
+												<DxComboBox Value="(int?)c_ViTriList.FilterRowValue"
+															ValueChanged="(int? v) => c_ViTriList.FilterRowValue = v"
+															Data=ViTriList ValueFieldName="Id" TextFieldName="Vitri"
+															FilteringMode="DataGridFilteringMode.Contains"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.lastupdate) Caption="CẬP NHẬT" Width="100" TextAlignment="GridTextAlignment.Right" DisplayFormat="dd/MM/yyyy HH:mm:ss">
+											<FilterRowCellTemplate Context="c_lastupdate">
+												<DxDateEdit Date="(DateTime?)c_lastupdate.FilterRowValue"
+															DateChanged="(DateTime? v) => c_lastupdate.FilterRowValue = v"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Never" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.iduserlastupdate) Caption="NGƯỜI UPDATE" Width="150" TextAlignment="GridTextAlignment.Right" SortMode="GridColumnSortMode.DisplayText">
+											<FilterRowCellTemplate Context="c_iduserlastupdate">
+												<DxComboBox Value="(int?)c_iduserlastupdate.FilterRowValue"
+															ValueChanged="(int? v) => c_iduserlastupdate.FilterRowValue = v"
+															Data=UserList ValueFieldName="userid" TextFieldName="Fullname"
+															FilteringMode="DataGridFilteringMode.Contains"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.beginupdate) Caption="NGÀY TẠO" Width="100" TextAlignment="GridTextAlignment.Right" DisplayFormat="dd/MM/yyyy HH:mm:ss">
+											<FilterRowCellTemplate Context="c_beginupdate">
+												<DxDateEdit Date="(DateTime?)c_beginupdate.FilterRowValue"
+															DateChanged="(DateTime? v) => c_beginupdate.FilterRowValue = v"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Never" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+										<DxGridDataColumn FieldName=@nameof(MTL_GetAllProductsResult.iduserlastcreate) Caption="NGƯỜI TẠO" Width="150" TextAlignment="GridTextAlignment.Right" SortMode="GridColumnSortMode.DisplayText">
+											<FilterRowCellTemplate Context="c_iduserlastcreate">
+												<DxComboBox Value="(int?)c_iduserlastcreate.FilterRowValue"
+															ValueChanged="(int? v) => c_iduserlastcreate.FilterRowValue = v"
+															Data=UserList ValueFieldName="userid" TextFieldName="Fullname"
+															FilteringMode="DataGridFilteringMode.Contains"
+															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+											</FilterRowCellTemplate>
+										</DxGridDataColumn>
+									</Columns>
+									<EditFormTemplate Context="EditForm">
+										<SpinLoader IsLoading=@IsLoadingSave Spinner="SpinnerType.Chase">
+											<LoadingTemplate>
+												<Loading />
+											</LoadingTemplate>
+											<ContentTemplate>
+												@{
+													mtl_product = (MTL_GetAllProductsResult)EditForm.EditModel;
+													if ((MTL_GetAllProductsResult)EditForm.EditModel != null)
+													{
+														<div class="card-body">
+															<DxFormLayout CssClass="w-100">
+																<DxFormLayoutItem Caption="" ColSpanSm="12" Context="luu">
+																	<DxButton RenderStyle="ButtonRenderStyle.Primary" CssClass="w-100"
+																			  Text="LƯU THÔNG TIN" Title="LƯU THÔNG TIN"
+																			  SubmitFormOnClick="true"
+																			  SizeMode="SizeMode.Large"
+																			  Enabled=!IsLoadingAPI
+																			  IconCssClass="fas fa-save" />
+																</DxFormLayoutItem>
+																<DxFormLayoutItem Caption="Loại hình KD :" ColSpanSm="12" BeginRow=true Context="luu">
+																	<DxComboBox Data="@LoaiHHDVList_EditForm"
+																				NullText="Chọn loại hình KD ..."
+																				ShowValidationIcon="true"
+																				ValueFieldName="@nameof(TblLoaihanghoadichvu.Id)"
+																				TextFieldName="@nameof(TblLoaihanghoadichvu.Loaihanghoadichvu)"
+																				@bind-Value=mtl_product.idloaihanghoadichvu
+																				Enabled=false />
+																</DxFormLayoutItem>
+																<DxFormLayoutItem Caption="" ColSpanSm="12" BeginRow=true Context="luu">
+																	@{
+																		var tenWoo = "WOO - " + @mtl_product.woo_id.ToString();
+																	}
+																	<DxTabs TabsPosition=TabsPosition.Top ScrollMode="TabsScrollMode.Auto" @bind-ActiveTabIndex="@ActiveTabIndex">
+																		<DxTab Text="THÔNG TIN" TabIconCssClass="fas fa-home"></DxTab>
+																		<DxTab Text="MÔ TẢ" TabIconCssClass="fas fa-university"></DxTab>
+																		<DxTab Text=@tenWoo TabIconCssClass="fab fa-wordpress"></DxTab>
+																		<DxTab Text="THÀNH PHẦN" TabIconCssClass="fas fa-vector-square"></DxTab>
+																		<DxTab Text="BỔ SUNG" TabIconCssClass="fas fa-vector-square"></DxTab>
+																	</DxTabs>
+																</DxFormLayoutItem>
+																<DxFormLayoutItem Caption="" ColSpanSm="12" BeginRow=true Context="luu">
+																	@switch (ActiveTabIndex)
+																	{
+																		case 0:
+																			<DxFormLayout CssClass="w-100">
+																				<div class="col-md-4">
+																					<div class="row">
+																						<div class="col-md-12">
+																							<DxFormLayoutItem Caption="" ColSpanMd="12" Context="anh" BeginRow="true">
+																								<SpinLoader IsLoading="IsLoadingAPI" Spinner="SpinnerType.Chase">
+																									<LoadingTemplate>
+																										<Loading />
+																									</LoadingTemplate>
+																									<ContentTemplate>
+																										<p>
+																											@{
+																												<img src="@image_product" class="img-fluid" />
+																											}
+																										</p>
+																									</ContentTemplate>
+																								</SpinLoader>
+																							</DxFormLayoutItem>
+																						</div>
+																					</div>
+																				</div>
+																				<div class="col-md-8">
+																					<DxFormLayoutGroup Caption="THÔNG TIN CƠ BẢN" CssClass="w-100" CaptionCssClass="my-style">
+																						<DxFormLayoutItem Context="_nhomhang" Caption="Nhóm hàng:" ColSpanMd="12" BeginRow=true>
+																							<DxComboBox Data=@NhomHangParentList CssClass="w-100" Enabled=!IsLoadingAPI
+																										@bind-Value="mtl_product.idnhomhang"
+																										ValueFieldName="id"
+																										TextFieldName="nhomhang"
+																										ShowValidationIcon="true"
+																										SelectedItemChanged="@((MTL_GetAllNhomHangResult n_hang) => SelectedNhomHangChanged(n_hang))"
+																										NullText="Chọn nhóm hàng ...">
+																							</DxComboBox>
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Mã hàng:" ColSpanMd="6" Context="MaHang" BeginRow="true">
+																							<DxTextBox NullText="Nhập mã hàng ..." CssClass="w-100"
+																									   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+																									   ShowValidationIcon="true" Enabled=!IsLoadingAPI
+																									   @bind-Text="mtl_product.masp" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Model:" ColSpanMd="6" Context="Model">
+																							<DxTextBox NullText="Nhập Model ..." CssClass="w-100"
+																									   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+																									   ShowValidationIcon="true" Enabled=!IsLoadingAPI
+																									   Text="@mtl_product.model"
+																									   TextExpression="@(() => mtl_product.model)"
+																									   TextChanged="@((value) => OnTextChanged_Model(value))" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Tên hàng:" ColSpanMd="12" Context="TenHang" BeginRow="true">
+																							<DxTextBox NullText="Nhập tên hàng ..." CssClass="w-100"
+																									   ShowValidationIcon="true" Enabled=!IsLoadingAPI
+																									   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+																									   @bind-Text="mtl_product.tensp" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Đường dẩn:" ColSpanMd="10" Context="DuongDanTinh">
+																							<DxTextBox NullText="Nhập tên đường dẩn ..." ReadOnly=true
+																									   style="color:var(--mud-palette-primary); font-weight: bold;"
+																									   ShowValidationIcon="true" Enabled=!IsLoadingAPI
+																									   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+																									   @bind-Text="mtl_product.link" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="" ColSpanMd="2" Context="DuongDanTinh">
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary"
+																									  Text="Mở" Title="Mở Website" CssClass="w-100"
+																									  SizeMode="SizeMode.Medium" Enabled=!IsLoadingAPI
+																									  Click="btMoLinkWeb"
+																									  IconCssClass="fas fa-globe-europe" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Context="_giavon" Caption="Giá nhập:" ColSpanMd="4" BeginRow=true>
+																							<DxSpinEdit @bind-Value="mtl_product.giavon"
+																										style="color:red; font-weight: bold;"
+																										NullText="Nhập giá mua vào ..." Enabled=!IsLoadingAPI
+																										ShowValidationIcon="true"
+																										DisplayFormat="C0"
+																										InputCssClass="spinEditInput" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Context="_giaban" Caption="Giá bán:" ColSpanMd="4">
+																							<DxSpinEdit @bind-Value="mtl_product.giaban"
+																										style="color:red; font-weight: bold;" Enabled=!IsLoadingAPI
+																										NullText="Nhập giá bán lẻ ..."
+																										ShowValidationIcon="true"
+																										DisplayFormat="C0" InputCssClass="spinEditInput" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Context="_giathuong" Caption="Giá thường:" ColSpanMd="4">
+																							<DxSpinEdit @bind-Value="mtl_product.giathuong" Enabled=!IsLoadingAPI
+																										style="color:red; font-weight: bold;"
+																										NullText="Nhập giá chưa khuyến mãi ..."
+																										ShowValidationIcon="true"
+																										DisplayFormat="C0"
+																										InputCssClass="spinEditInput" />
+																						</DxFormLayoutItem>
+																						@{
+																							if ((bool)company.IsThuongHieu)
+																							{
+																								<DxFormLayoutItem Context="_thuonghieu" Caption="Thương hiệu:" ColSpanMd="10" BeginRow=true>
+																									<DxComboBox Data=@ThuongHieuList CssClass="w-100"
+																												@bind-Value="mtl_product.idthuonghieu" Enabled=!IsLoadingAPI
+																												ValueFieldName="id"
+																												TextFieldName="thuonghieu"
+																												ShowValidationIcon="true"
+																												FilteringMode="DataGridFilteringMode.Contains"
+																												SelectedItemChanged="@((MTL_GetAllThuongHieuResult t_hieu) => SelectedThuongHieuChanged(t_hieu))"
+																												NullText="Chọn thương hiệu ...">
+																									</DxComboBox>
+																								</DxFormLayoutItem>
+																								<DxFormLayoutItem Context="themthuonghieu" Caption="" ColSpanMd="2">
+																									<DxButton RenderStyle="ButtonRenderStyle.Primary" CssClass="w-100"
+																											  Text="Thêm" Title="Thêm thương hiệu" Click="ShowThuongHieuPopup"
+																											  SizeMode="SizeMode.Medium" Enabled=!IsLoadingAPI
+																											  IconCssClass="fas fa-plus-circle" />
+																								</DxFormLayoutItem>
+																							}
+																							if ((bool)company.IsKhoHang)
+																							{
+																								<DxFormLayoutItem Context="_khohang" Caption="Kho hàng:" ColSpanMd="6">
+																									<DxComboBox Data=@ViTriList
+																												@bind-Value="mtl_product.idvitri" CssClass="w-100" Enabled=!IsLoadingAPI
+																												ValueFieldName="Id"
+																												TextFieldName="Vitri"
+																												ShowValidationIcon="true"
+																												NullText="Chọn kho hàng ...">
+																									</DxComboBox>
+																								</DxFormLayoutItem>
+																							}
+																							if ((bool)company.IsBaoHanh)
+																							{
+																								<DxFormLayoutItem Context="_baohanh" Caption="Bảo hành:" ColSpanMd="6">
+																									<DxComboBox Data=@BaoHanhList
+																												@bind-Value="mtl_product.idBaoHanh" CssClass="w-100" Enabled=!IsLoadingAPI
+																												ValueFieldName="Id"
+																												TextFieldName="Baohanh"
+																												ShowValidationIcon="true"
+																												NullText="Chọn bảo hành ...">
+																									</DxComboBox>
+																								</DxFormLayoutItem>
+																							}
+																						}
+																						<DxFormLayoutItem Context="_donvitinh" Caption="Đơn vị tính:" ColSpanMd="6">
+																							<DxComboBox Data=@DVTList
+																										@bind-Value="mtl_product.iddonvitinh" CssClass="w-100" Enabled=!IsLoadingAPI
+																										ValueFieldName="Id"
+																										TextFieldName="Donvitinh"
+																										ShowValidationIcon="true"
+																										NullText="Chọn đơn vị tính ...">
+																							</DxComboBox>
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Hết hàng:" ColSpanMd="6" Context="HetHang">
+																							<DxCheckBox CheckType="CheckType.Checkbox" CssClass="w-100" Enabled=!IsLoadingAPI
+																										LabelPosition="LabelPosition.Left"
+																										Alignment="CheckBoxContentAlignment.SpaceBetween"
+																										@bind-Checked=mtl_product.hethang>
+																							</DxCheckBox>
+																						</DxFormLayoutItem>
+																					</DxFormLayoutGroup>
+																				</div>
+																			</DxFormLayout>
+																			break;
+																		case 1:
+																			<DxFormLayout CssClass="w-100">
+																				<div class="col-md-12">
+																					<DxFormLayoutGroup Caption="MÔ TẢ" CssClass="w-100" CaptionCssClass="my-style">
+																						<DxFormLayoutItem Caption="Mô tả ngắn:" ColSpanMd="12" Context="MoTaNgan" BeginRow="true">
+																							<CKEditorBlazor Id="editorOptions_motangan" @bind-Value=@editorOptions_motangan.InitialText>
+																							</CKEditorBlazor>
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Mô tả chi tiết:" ColSpanMd="12" Context="MoTaChiTiet" BeginRow="true">
+																							<CKEditorBlazor Id="editorOptions_motachitiet" @bind-Value=@editorOptions_motachitiet.InitialText>
+																							</CKEditorBlazor>
+																						</DxFormLayoutItem>
+																					</DxFormLayoutGroup>
+																				</div>
+																			</DxFormLayout>
+																			break;
+																		case 2:
+																			<DxFormLayout CssClass="w-100">
+
+																				@{
+																					CultureInfo Culture_vn = new CultureInfo("vn-VN", false);
+																					Culture_vn.DateTimeFormat.ShortDatePattern = "dd/MM/yyyy";
+																					Culture_vn.DateTimeFormat.DateSeparator = "/";
+																					Culture_vn.NumberFormat.PercentDecimalSeparator = ".";
+																				}
+																				<DxFormLayoutItem Caption="Ngày tạo" ColSpanMd="3" BeginRow=true Context="c_ngaytaoAPI">
+																					<DxDateEdit @bind-Date=@_filterAPI.date_created
+																								Mask=@DateTimeMask.ShortDateTime
+																								ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Never">
+																						<DxDateTimeMaskProperties Culture=@Culture_vn />
+																					</DxDateEdit>
+																				</DxFormLayoutItem>
+																				<DxFormLayoutItem Caption="Ngày cập nhật" ColSpanMd="3" Context="c_ngaycapnhatAPI">
+																					<DxDateEdit @bind-Date=@_filterAPI.date_modified
+																								Mask=@DateTimeMask.ShortDateTime
+																								ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Never">
+																						<DxDateTimeMaskProperties Culture=@Culture_vn />
+																					</DxDateEdit>
+																				</DxFormLayoutItem>
+																				<DxFormLayoutItem Caption="Tìm sản phẩm" ColSpanMd="6" Context="CPU">
+																					<DxTextBox NullText="Gõ hàng hóa cần tìm..."
+																							   ShowValidationIcon="true" TextChanged="@((newValue) => OnSearchAPITextChanged(newValue))"
+																							   Text="@_filterAPI.v_timhanghoa" TextExpression="@(() => _filterAPI.v_timhanghoa)"
+																							   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+																				</DxFormLayoutItem>
+
+																				<div class="col-md-4">
+																					<DxFormLayoutGroup Caption="TỒN KHO" CssClass="w-100" CaptionCssClass="my-style">
+																						<DxFormLayoutItem Caption="" ColSpanMd="12" Context="TONKHO" BeginRow="true">
+																							<div class="btn-group" role="group" aria-label="Basic radio toggle button group">
+																								<input @onclick="@(() => OnRadioTonKhoChange(MTLEnum.TonKhoAPI.TatCa))" type="radio" class="btn-check" name="btnradio" id="TATCA" autocomplete="off" checked>
+																								<label class="btn btn-outline-primary" for="TATCA">TẤT CẢ</label>
+																								<input @onclick="@(() => OnRadioTonKhoChange(MTLEnum.TonKhoAPI.ConHang))" type="radio" class="btn-check" name="btnradio" id="CONHANG" autocomplete="off">
+																								<label class="btn btn-outline-primary" for="CONHANG">CÒN HÀNG</label>
+																								<input @onclick="@(() => OnRadioTonKhoChange(MTLEnum.TonKhoAPI.ChoHang))" type="radio" class="btn-check" name="btnradio" id="CHOHANG" autocomplete="off">
+																								<label class="btn btn-outline-primary" for="CHOHANG">CHỜ HÀNG</label>
+																								<input @onclick="@(() => OnRadioTonKhoChange(MTLEnum.TonKhoAPI.HetHang))" type="radio" class="btn-check" name="btnradio" id="HETHANG" autocomplete="off">
+																								<label class="btn btn-outline-primary" for="HETHANG">HẾT HÀNG</label>
+																							</div>
+																						</DxFormLayoutItem>
+																					</DxFormLayoutGroup>
+																					<DxFormLayoutGroup Caption="TÌM KIẾM SẢN PHẨM" CssClass="w-100" CaptionCssClass="my-style">
+																						<DxFormLayoutItem Context="phantrang1" Caption="" ColSpanMd="12">
+																							<DxButton Context="bt1" RenderStyle="ButtonRenderStyle.Primary" style="float:left"
+																									  Text="Trang 1" Title="Trang 1"
+																									  SizeMode="SizeMode.Medium" Click="@Trang1"
+																									  IconCssClass="fas fa-calendar-alt">
+																							</DxButton>
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left;margin-left:5px"
+																									  Text="Trang 2" Title="Trang 2" Click="@Trang2"
+																									  SizeMode="SizeMode.Medium"
+																									  IconCssClass="fas fa-calendar-alt">
+																							</DxButton>
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left;margin-left:5px"
+																									  Text="Trang 3" Title="Trang 3" Click="@Trang3"
+																									  SizeMode="SizeMode.Medium"
+																									  IconCssClass="fas fa-calendar-alt">
+																							</DxButton>
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left;margin-left:5px"
+																									  Text="Trang 4" Title="Trang 4" Click="@Trang4"
+																									  SizeMode="SizeMode.Medium"
+																									  IconCssClass="fas fa-calendar-alt">
+																							</DxButton>
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Context="phantrang2" Caption="" ColSpanMd="12">
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left"
+																									  Text="Trang 5" Title="Trang 5" Click="@Trang5"
+																									  SizeMode="SizeMode.Medium"
+																									  IconCssClass="fas fa-calendar-alt">
+																							</DxButton>
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left;margin-left:5px"
+																									  Text="Trang 6" Title="Trang 6" Click="@Trang6"
+																									  SizeMode="SizeMode.Medium"
+																									  IconCssClass="fas fa-calendar-alt">
+																							</DxButton>
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left;margin-left:5px"
+																									  Text="Trang 7" Title="Trang 7" Click="@Trang7"
+																									  SizeMode="SizeMode.Medium"
+																									  IconCssClass="fas fa-calendar-alt">
+																							</DxButton>
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left;margin-left:5px"
+																									  Text="Trang 8" Title="Trang 8" Click="@Trang8"
+																									  SizeMode="SizeMode.Medium"
+																									  IconCssClass="fas fa-calendar-alt">
+																							</DxButton>
+																						</DxFormLayoutItem>
+																					</DxFormLayoutGroup>
+																					<DxFormLayoutGroup Caption="TỪ KHÓA SẢN PHẨM" CssClass="w-100 filter-group" CaptionCssClass="my-style">
+																						<DxTagBox Data="@_filterAPI.woo_tags_data"
+																								  NullText="Nhập từ khóa sản phẩm..."
+																								  TData="API.WooRestAPI.tag"
+																								  TValue="API.WooRestAPI.tag"
+																								  TextFieldName="@nameof(API.WooRestAPI.tag.name)"
+																								  @bind-Values="@_filterAPI.woo_tags_data"
+																								  AllowCustomTags="true"
+																								  ListRenderMode="ListRenderMode.Virtual"
+																								  CssClass="cw-480">
+																						</DxTagBox>
+																					</DxFormLayoutGroup>
+																				</div>
+																				<div class="col-md-8">
+																					<DxFormLayoutGroup Caption="LỌC SẢN PHẨM WOOCOMMERCE API" CssClass="w-100 filter-group" CaptionCssClass="my-style">
+																						<SpinLoader IsLoading="IsLoadingAPI" Spinner="SpinnerType.Chase">
+																							<LoadingTemplate>
+																								<Loading />
+																							</LoadingTemplate>
+																							<ContentTemplate>
+																								@if (productlist_API != null)
+																								{
+																									<DxGrid KeyFieldName="id" Data=productlist_API @ref=MyGrid_API
+																											PageSize=7
+																											CssClass=" MTLGrid dx-datagrid-headers "
+																											PagerPosition="GridPagerPosition.Top"
+																											ShowFilterRow="true"
+																											ColumnResizeMode="GridColumnResizeMode.ColumnsContainer"
+																											CustomizeElement="GridAPI_CustomizeElement"
+																											SearchBoxInputDelay="200"
+																											SearchBoxNullText="Gõ nội dung cần tìm ...">
+																										<Columns>
+
+																											<DxGridCommandColumn Width="50px" NewButtonVisible=false>
+																												<CellDisplayTemplate Context="Select">
+																													<a @onclick="@(() => OnSelectWooButtonClick(Select))" class="btn btn-danger" role="button">
+																														<span class="btn-label"><i class="fas fa-check"></i></span>
+																													</a>
+																												</CellDisplayTemplate>
+																											</DxGridCommandColumn>
+																											<DxGridDataColumn FieldName="@nameof(MTL.APP.WooRestAPI.tag.name)"
+																															  Caption="WOO" Width="53"
+																															  FilterRowOperatorType="GridFilterRowOperatorType.Contains">
+																												<CellDisplayTemplate Context="c_model">
+																													@{
+																														var permalink = ((API.WooRestAPI.Product)c_model.DataItem).permalink;
+																														string product_id = ((API.WooRestAPI.Product)c_model.DataItem).id.ToString();
+																														<a target="_blank" href=@permalink style="color: red">@product_id</a>
+																													}
+																												</CellDisplayTemplate>
+																											</DxGridDataColumn>
+																											<DxGridDataColumn FieldName="stock_status"
+																															  Caption="ẢNH"
+																															  Width="70"
+																															  TextAlignment="GridTextAlignment.Right">
+																												<CellDisplayTemplate Context="c_model">
+																													@{
+																														List<MTL.APP.WooRestAPI.image> images = ((API.WooRestAPI.Product)c_model.DataItem).images;
+																														string url_image = "";
+																														if (images.Count > 0)
+																															url_image = images[0].src;
+																														else url_image = image_product;
+																														<img src=@url_image alt="MTL Technology" width="50px" height="50px">
+																													}
+																												</CellDisplayTemplate>
+																											</DxGridDataColumn>
+																											<DxGridDataColumn FieldName="name"
+																															  Caption="SẢN PHẨM"
+																															  FilterRowOperatorType="GridFilterRowOperatorType.Contains" />
+																											<DxGridDataColumn FieldName="stock_status"
+																															  Caption="TỒN"
+																															  Width="60"
+																															  TextAlignment="GridTextAlignment.Right">
+																												<CellDisplayTemplate Context="c_model">
+																													@{
+																														string stock = ((API.WooRestAPI.Product)c_model.DataItem).stock_status;
+																														if (stock == "instock") stock = "Còn";
+																														else if (stock == "outofstock") stock = "Hết";
+																														else if (stock == "onbackorder") stock = "Chờ";
+																														<a target="_blank" style="color: red">@stock</a>
+																													}
+																												</CellDisplayTemplate>
+																											</DxGridDataColumn>
+																											<DxGridDataColumn FieldName="sale_price"
+																															  Caption="G.SALE"
+																															  Width="85" DisplayFormat="{0:n0}"
+																															  TextAlignment="GridTextAlignment.Right" />
+																											<DxGridDataColumn FieldName="regular_price"
+																															  Caption="G.BÁN"
+																															  Width="85" DisplayFormat="{0:n0}"
+																															  TextAlignment="GridTextAlignment.Right" />
+																										</Columns>
+																									</DxGrid>
+																								}
+																							</ContentTemplate>
+																						</SpinLoader>
+																					</DxFormLayoutGroup>
+																				</div>
+																			</DxFormLayout>
+																			break;
+																		case 3:
+																			<DxFormLayout CssClass="w-100">
+																				<div class="col-md-12">
+																					<DxFormLayoutGroup Caption="THÊM THÀNH PHẦN CHO HÀNG HÓA" CssClass="w-100" CaptionCssClass="my-style">
+																						<DxFormLayoutItem Field="id" Context="HangHoaDV" Caption="Chọn thành phần:" ColSpanMd="12">
+																							<DxComboBox Data=@ListProduct_ThanhPhan Context="listpd"
+																										@bind-Value="_filter.v_tensp"
+																										ValueFieldName="id"
+																										TextFieldName="tensp"
+																										ShowValidationIcon="true"
+																										@bind-NullText="_filter.v_loaiHHDVNullText"
+																										ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+																										FilteringMode="DataGridFilteringMode.Contains"
+																										Enabled=@spAo_enable
+																										DropDownWidthMode=DropDownWidthMode.EditorWidth
+																										DropDownCssClass="combo-dropdown"
+																										SelectedItemChanged="@((MTL_GetAllProductsResult hanghoa) => SelectedItemHangHoaChanged(hanghoa))">
+
+
+																								@*     EditFormat="{0} {2}"
+																			<Columns>
+																			<DxListEditorColumn FieldName="tensp"
+																			Caption="Hàng hóa"
+																			Width="400px" />
+																			<DxListEditorColumn FieldName="giaban"
+																			Caption="Giá bán"
+																			Width="100px" />
+																			<DxListEditorColumn FieldName="model"
+																			Caption="Model"
+																			Width="100px" />
+																			</Columns>*@
+																								<ItemTemplate>
+																									<div class="combobox-item-template">
+																										@{
+																											MTL_GetAllProductsResult pd = (MTL_GetAllProductsResult)listpd;
+																										}
+																										<img src=@GetImageFileName(listpd) width="120px" height="120px" />
+																										<div class="combobox-item-template-text">
+																											<span class="combobox-item-tensp">@pd.tensp </span>
+																											<span>Nhóm hàng: @pd.nhomhang</span>
+																											<span>Bảo hành: @pd.baohanh</span>
+																											<span class="combobox-item-price">@pd.giaban.ToString("C0")</span>
+																										</div>
+																									</div>
+																								</ItemTemplate>
+
+
+
+																							</DxComboBox>
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Sản phẩm:" ColSpanMd="9" Context="sanphamedit" BeginRow="true">
+																							<DxTextBox NullText="Nhập sản phẩm ..."
+																									   style="color:red; font-weight: bold;"
+																									   @bind-Text="_filter.v_tenspEdit"
+																									   Enabled=@_filter.v_SPAo
+																									   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+																									   ShowValidationIcon="true" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Sản phẩm ảo:" ColSpanMd="3" Context="SPAo">
+																							<DxCheckBox CheckType="CheckType.Checkbox"
+																										LabelPosition="LabelPosition.Right"
+																										Alignment="CheckBoxContentAlignment.Center"
+																										Checked=_filter.v_SPAo
+																										CheckedExpression="@(() => _filter.v_SPAo)"
+																										CheckedChanged="@((bool value) => isSPAo_CheckedChanged(value))">
+																							</DxCheckBox>
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Số lượng:" ColSpanMd="3" Context="v_sl" BeginRow="true">
+																							<DxSpinEdit @bind-Value="_filter.v_sl"
+																										style="color:red; font-weight: bold;"
+																										NullText="Nhập SL ..."
+																										ShowValidationIcon="true"
+																										InputCssClass="spinEditInput" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="Đơn giá:" ColSpanMd="4" Context="v_dongia">
+																							<DxSpinEdit @bind-Value="_filter.v_dongia"
+																										style="color:red; font-weight: bold;"
+																										NullText="Nhập đơn giá ..."
+																										DisplayFormat="C0"
+																										ShowValidationIcon="true"
+																										InputCssClass="spinEditInput" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Context="BaoHanh" Caption="Bảo hành:" ColSpanMd="3">
+																							<DxComboBox Data=@BaoHanhList
+																										style="color:red; font-weight: bold;"
+																										@bind-Value="_filter.v_baohanh"
+																										ValueFieldName="Id"
+																										TextFieldName="Baohanh"
+																										ShowValidationIcon="true"
+																										NullText="Chọn bảo hành ...">
+																							</DxComboBox>
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Context="btBaoHanh" Caption="" ColSpanMd="2">
+																							<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left"
+																									  Text="THÊM T.PHẦN" Title="THÊM T.PHẦN"
+																									  SizeMode="SizeMode.Large"
+																									  Click="btThemThanhPhan_Click"
+																									  IconCssClass="fas fa-plus-circle" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="" ColSpanMd="12" BeginRow="true" Context="Thanhphan">
+																							<DxGrid KeyFieldName="id" @ref=MyGrid_ThanhPhan
+																									Data="@ListHangHoaThanhPhan"
+																									ColumnResizeMode="GridColumnResizeMode.ColumnsContainer"
+																									CssClass=" MTLGrid dx-datagrid-headers "
+																									PageSize="20"
+																									PagerPosition="GridPagerPosition.TopAndBottom"
+																									ShowFilterRow="true"
+																									EditFormButtonsVisible=false
+																									EditModelSaving="OnEditModelSaving_HangHoaThanhPhan"
+																									CustomizeCellDisplayText="GridThanhPhan_CustomizeCellDisplayText"
+																									CustomizeSummaryDisplayText="GridThanhPhan_CustomizeSummaryDisplayText"
+																									EditMode="GridEditMode.PopupEditForm"
+																									PopupEditFormCssClass="PopupEditFormService"
+																									CustomizeElement="Grid_CustomizeElement">
+																								<Columns>
+																									@if (ListHangHoaThanhPhan != null)
+																									{
+
+																										<DxGridCommandColumn Width="100px" NewButtonVisible=false>
+																											<CellDisplayTemplate Context="Edit_Delete1">
+																												<a @onclick="@(() => ShowEditForm_HangHoaThanhPhan(Edit_Delete1))" class="btn btn-warning" role="button">
+																													<span class="btn-label"><i class="fas fa-edit"></i></span>
+																												</a>
+																												<a class="btn btn-danger" role="button" @onclick="@(() => Delete_HangHoaThanhPhan(Edit_Delete1))">
+																													<span class="btn-label"><i class="fas fa-trash"></i></span>
+																												</a>
+																											</CellDisplayTemplate>
+																										</DxGridCommandColumn>
+																										<DxGridDataColumn FieldName=@nameof(MTL_GetSanPhamThanhPhanResult.pic00) Caption="ẢNH" Width="60" FilterRowOperatorType="GridFilterRowOperatorType.Contains">
+																											<CellDisplayTemplate Context="c_model">
+																												@{
+																													string url_anhdaidien = company.Logourl;
+																													if (((MTL_GetSanPhamThanhPhanResult)c_model.DataItem).pic00 != null)
+																													{
+																														url_anhdaidien = ((MTL_GetSanPhamThanhPhanResult)c_model.DataItem).pic00;
+																													}
+																													<img src=@url_anhdaidien alt="" width="50px" height="50px">
+																												}
+																											</CellDisplayTemplate>
+																										</DxGridDataColumn>
+																										<DxGridDataColumn FieldName="tensp" Caption="SẢN PHẨM">
+																											<CellDisplayTemplate Context="c_model">
+																												@{
+																													var webUrl = ((MTL_GetSanPhamThanhPhanResult)c_model.DataItem).linksanpham;
+																													var t_Model = c_model.Value;
+																													if (webUrl != null)
+																													{
+																														if (webUrl != "")
+																														{
+																															<a target="_blank" href=@webUrl>@t_Model</a>
+																														}
+																														else
+																														{
+																															<a target="_blank">@t_Model</a>
+																														}
+																													}
+																													else
+																													{
+																														<a target="_blank">@t_Model</a>
+																													}
+																												}
+																											</CellDisplayTemplate>
+																										</DxGridDataColumn>
+																										<DxGridDataColumn FieldName="sl" Caption="S.L" Width="70" TextAlignment="GridTextAlignment.Right" />
+																										<DxGridDataColumn FieldName="giaban" Caption="Đ.GIÁ" Width="100" DisplayFormat="C0" TextAlignment="GridTextAlignment.Right" />
+																										<DxGridDataColumn FieldName="thanhtien" Caption="T.TIỀN" Width="150" DisplayFormat="C0" TextAlignment="GridTextAlignment.Right" />
+																										<DxGridDataColumn FieldName="idbaohanh" Caption="B.HÀNH" Width="70" TextAlignment="GridTextAlignment.Right">
+																											<FilterRowCellTemplate Context="c_BaoHanhList">
+																												<DxComboBox Value="(int?)c_BaoHanhList.FilterRowValue"
+																															ValueChanged="(int? v) => c_BaoHanhList.FilterRowValue = v"
+																															Data=BaoHanhList ValueFieldName="Id" TextFieldName="Baohanh"
+																															FilteringMode="DataGridFilteringMode.Contains"
+																															ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+																											</FilterRowCellTemplate>
+																										</DxGridDataColumn>
+																									}
+																								</Columns>
+																								<EditFormTemplate Context="EditForm_Detail">
+																									<div class="card-body">
+																										<div class="row">
+																											<div class="col-md-12">
+																												<DxFormLayout CssClass="w-100">
+																													<DxButton RenderStyle="ButtonRenderStyle.Primary" style="float:left"
+																															  Text="LƯU THÔNG TIN" Title="LƯU THÔNG TIN"
+																															  SubmitFormOnClick="true"
+																															  SizeMode="SizeMode.Large"
+																															  IconCssClass="fas fa-save" />
+																													<DxButton RenderStyle="ButtonRenderStyle.Danger" style="float:left;margin-left:5px"
+																															  Text="ĐÓNG" Title="ĐÓNG" Click="@(() => MyGrid_ThanhPhan.CancelEditAsync())"
+																															  SizeMode="SizeMode.Large"
+																															  IconCssClass="fas fa-window-close" />
+																												</DxFormLayout>
+																											</div>
+																										</div>
+																										<br />
+																										<div class="row">
+																											<DxFormLayout CssClass="w-100">
+																												<DxFormLayoutItem Field="id" Context="Loaihang" Caption="Chọn thành phần:" ColSpanMd="12" BeginRow="true">
+																													<DxComboBox Data=@ListProduct_ThanhPhan Context="listpd"
+																																@bind-Value="filter_detail.v_tensp"
+																																ValueFieldName="id"
+																																TextFieldName="tensp"
+																																ShowValidationIcon="true"
+																																@bind-NullText="filter_detail.v_loaiHHDVNullText"
+																																ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+																																FilteringMode="DataGridFilteringMode.Contains"
+																																DropDownWidthMode=DropDownWidthMode.EditorWidth
+																																DropDownCssClass="combo-dropdown"
+																																Enabled=@spAo_HHTP_enable
+																																SelectedItemChanged="@((MTL_GetAllProductsResult hanghoa) => SelectedItemHangHoa_HHTP_Changed(hanghoa))">
+																														@*   EditFormat="{0} {2}"
+																									<Columns>
+																									<DxListEditorColumn FieldName="tensp"
+																									Caption="Hàng hóa"
+																									Width="400px" />
+																									<DxListEditorColumn FieldName="giaban"
+																									Caption="Giá bán"
+																									Width="100px" />
+																									<DxListEditorColumn FieldName="model"
+																									Caption="Model"
+																									Width="100px" />
+																									</Columns>*@
+
+																														<ItemTemplate>
+																															<div class="combobox-item-template">
+																																@{
+																																	MTL_GetAllProductsResult pd = (MTL_GetAllProductsResult)listpd;
+																																}
+																																<img src=@GetImageFileName(listpd) width="120px" height="120px" />
+																																<div class="combobox-item-template-text">
+																																	<span class="combobox-item-tensp">@pd.tensp </span>
+																																	<span>Nhóm hàng: @pd.nhomhang</span>
+																																	<span>Bảo hành: @pd.baohanh</span>
+																																	<span class="combobox-item-price">@pd.giaban.ToString("C0")</span>
+																																</div>
+																															</div>
+																														</ItemTemplate>
+																													</DxComboBox>
+																												</DxFormLayoutItem>
+																												<DxFormLayoutItem Caption="Sản phẩm:" ColSpanMd="9" Context="sanphamedit" BeginRow="true">
+																													<DxTextBox NullText="Nhập sản phẩm ..."
+																															   style="color:red; font-weight: bold;"
+																															   @bind-Text="filter_detail.v_tenspEdit"
+																															   Enabled=@filter_detail.v_SPAo
+																															   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto"
+																															   ShowValidationIcon="true" />
+																												</DxFormLayoutItem>
+																												<DxFormLayoutItem Caption="Sản phẩm ảo:" ColSpanMd="3" Context="SPAo">
+																													<DxCheckBox CheckType="CheckType.Checkbox"
+																																LabelPosition="LabelPosition.Right"
+																																Alignment="CheckBoxContentAlignment.Center"
+																																Checked=filter_detail.v_SPAo
+																																CheckedExpression="@(() => filter_detail.v_SPAo)"
+																																CheckedChanged="@((bool value) => isSPAo_HHTP_CheckedChanged(value))">
+																													</DxCheckBox>
+																												</DxFormLayoutItem>
+																												<DxFormLayoutItem Caption="Số lượng:" ColSpanMd="3" Context="v_sl" BeginRow="true">
+																													<DxSpinEdit @bind-Value="filter_detail.v_sl"
+																																style="color:red; font-weight: bold;"
+																																NullText="Nhập SL ..."
+																																ShowValidationIcon="true"
+																																InputCssClass="spinEditInput" />
+																												</DxFormLayoutItem>
+																												<DxFormLayoutItem Caption="Đơn giá:" ColSpanMd="4" Context="v_dongia">
+																													<DxSpinEdit @bind-Value="filter_detail.v_dongia"
+																																style="color:red; font-weight: bold;"
+																																NullText="Nhập đơn giá ..."
+																																DisplayFormat="C0"
+																																ShowValidationIcon="true"
+																																InputCssClass="spinEditInput" />
+																												</DxFormLayoutItem>
+																												<DxFormLayoutItem Context="BaoHanh" Caption="Bảo hành:" ColSpanMd="3">
+																													<DxComboBox Data=@BaoHanhList
+																																style="color:red; font-weight: bold;"
+																																@bind-Value="filter_detail.v_baohanh"
+																																ValueFieldName="Id"
+																																TextFieldName="Baohanh"
+																																ShowValidationIcon="true"
+																																NullText="Chọn bảo hành ...">
+																													</DxComboBox>
+																												</DxFormLayoutItem>
+																											</DxFormLayout>
+																										</div>
+																									</div>
+																								</EditFormTemplate>
+																								<TotalSummary>
+																									<DxGridSummaryItem SummaryType="GridSummaryItemType.Count" Name="tensp1" FieldName="tensp" />
+																									<DxGridSummaryItem SummaryType="GridSummaryItemType.Sum" Name="sl1" FieldName="sl" />
+																									<DxGridSummaryItem SummaryType="GridSummaryItemType.Sum" Name="thanhtien1" FieldName="thanhtien" />
+																								</TotalSummary>
+																							</DxGrid>
+																							<DxPopup @bind-Visible="@PopupVisible_sptp" HeaderText="XÓA HÀNG HÓA THÀNH PHẦN!" Width="auto" Height="auto" CloseOnOutsideClick="false">
+																								<span class="btn-label"><i class="fas fa-question-circle"></i></span>
+																								Thao tác này sẽ <b style='color:red !important;'>XÓA HÀNG HÓA THÀNH PHẦN "@ten_sp_xoa"</b>.<br /> Dữ liệu sẽ không phục hồi được, Bạn có chắc không ?
+																								<div class="dxbl-grid-confirm-dialog-buttons">
+																									<a @onclick="@XoaSPTP_OnConfirmButtonClick" class="btn btn-primary" role="button">
+																										<span class="btn-label"><i class="far fa-thumbs-up"></i> Đồng ý</span>
+																									</a>
+																									&nbsp; &nbsp;
+																									<a @onclick="@XoaSPTP_OnCancelButtonClick" class="btn btn-danger" role="button">
+																										<span class="btn-label"><i class="fas fa-window-close"></i> Hủy bỏ</span>
+																									</a>
+																								</div>
+																							</DxPopup>
+																						</DxFormLayoutItem>
+																					</DxFormLayoutGroup>
+																				</div>
+
+																			</DxFormLayout>
+																			break;
+																		case 4:
+																			<DxFormLayout CssClass="w-100">
+																				<div class="col-md-12">
+																					<DxFormLayoutGroup Caption="THÔNG TIN BỔ SUNG" CssClass="w-100" CaptionCssClass="my-style">
+																						<DxFormLayoutItem Caption="CPU:" ColSpanMd="12" Context="CPU" BeginRow="true">
+																							<DxTextBox NullText="Nhập CPU ..."
+																									   ShowValidationIcon="true"
+																									   @bind-Text="mtl_product.cpu"
+																									   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="RAM:" ColSpanMd="12" Context="RAM" BeginRow="true">
+																							<DxTextBox NullText="Nhập RAM ..."
+																									   ShowValidationIcon="true"
+																									   @bind-Text="mtl_product.ram"
+																									   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="HDD:" ColSpanMd="12" Context="HDD" BeginRow="true">
+																							<DxTextBox NullText="Nhập HDD ..."
+																									   ShowValidationIcon="true"
+																									   @bind-Text="mtl_product.ssd"
+																									   ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+																						</DxFormLayoutItem>
+																						<DxFormLayoutItem Caption="VGA:" ColSpanMd="12" Context="VGA" BeginRow="true">
+																							<DxTextBox NullText="Nhập VGA ..."
+																									   ShowValidationIcon="true"
+																									   @bind-Text="mtl_product.vga" ClearButtonDisplayMode="DataEditorClearButtonDisplayMode.Auto" />
+																						</DxFormLayoutItem>
+																					</DxFormLayoutGroup>
+																				</div>
+																			</DxFormLayout>
+																			break;
+																	}
+																</DxFormLayoutItem>
+															</DxFormLayout>
+														</div>
+													}
+												}
+											</ContentTemplate>
+										</SpinLoader>
+									</EditFormTemplate>
+									<TotalSummary>
+										<DxGridSummaryItem SummaryType="GridSummaryItemType.Count" FieldName="tensp" />
+									</TotalSummary>
+								</DxGrid>
+							</DxFormLayoutItem>
+						}
+					</ContentTemplate>
+				</SpinLoader>
+			</DxFormLayout>
+
+		</div>
+
+		<DxPopup @bind-Visible=@PopupVisible
+				 @ref=XoaHangHoaPopup
+				 HeaderText="XÓA HÀNG HÓA!"
+				 ShowHeader=false
+				 MaxWidth="350"
+				 AllowDrag=true
+				 CloseOnOutsideClick="false">
+			<DeleteDialog NoiDung=@NoiDungXoa
+						  Visible=@PopupVisible
+						  LinkAnh=@LinkAnhXoa
+						  OnDeleteCallback=@OnConfirmButtonClick
+						  MyEditPopup=XoaHangHoaPopup>
+			</DeleteDialog>
+		</DxPopup>
+		<DxPopup AllowDrag=true HeaderText="CHỌN KIỂU IN" @bind-Visible=@PopupVisible_KieuIn @ref=KieuInPopup
+				 Width="400" Height="auto" CloseOnOutsideClick="false" Context="sssss">
+			<div class="row">
+				<div class="col-md-12">
+					<h7 class="pb-2"><span class="btn-label"></span> Chọn kiểu in bạn muốn !</h7>
+				</div>
+			</div>
+			<div class="dxbl-grid-confirm-dialog-buttons">
+				<a @onclick=@Print_TemDan class="btn btn-primary" role="button">
+					<span class="btn-label"><i class="fas fa-save"></i> IN TEM DÁN</span>
+				</a>
+				&nbsp; &nbsp;
+			</div>
+		</DxPopup>
+		<DxPopup AllowDrag=true
+				 CssClass="PopupWooAsys"
+				 @bind-Visible="@PopupVisible_DongBo"
+				 HeaderText="Đồng bộ dữ liệu với Website !"
+				 CloseOnOutsideClick="false">
+			<DxFormLayout CssClass="w-100">
+				@{
+					string url_image = "";
+					string product_woo_sale_price = "";
+					string product_woo_regular_price = "";
+					string product_woo_permalink = "";
+					string product_woo_id = "";
+					string product_woo_name = "";
+					if (product_woo != null)
+					{
+						if (@product_woo.images.Count > 0)
+							url_image = @product_woo.images[0].src;
+						else url_image = image_product;
+						product_woo_sale_price = @product_woo.sale_price;
+						product_woo_regular_price = @product_woo.regular_price;
+						product_woo_permalink = @product_woo.permalink;
+						product_woo_id = @product_woo.id;
+						product_woo_name = @product_woo.name;
+					}
+					else
+					{
+
+					}
+				}
+				<div class="col-md-5">
+					<DxFormLayoutItem Caption="" ColSpanMd="12" Context="anh" BeginRow="true">
+						<p>
+							<img src=@url_image alt="MTL Technology" class="img-fluid">
+						</p>
+					</DxFormLayoutItem>
+				</div>
+				<div class="col-md-7">
+					<DxFormLayoutItem Caption="" ColSpanMd="12" Context="anh" BeginRow="true">
+						<b style='color:red !important;'>Bạn có muốn đồng bộ sản phẩm  [@product_woo_id] này không ?</b>
+						<br />- Sản phẩm: @product_woo_name
+						<br />- Giá bán:  @string.Format("{0:n0}", @product_woo_sale_price)
+						<br />- Giá thường: @string.Format("{0:n0}", @product_woo_regular_price)
+						<br />- Đường dẩn:  <a target="_blank" href=@product_woo_permalink style="color: red">@product_woo_permalink</a>
+						<br />Bấm Cập Nhật để thực hiện đồng bộ dữ liệu đa nền tảng ?
+					</DxFormLayoutItem>
+				</div>
+			</DxFormLayout>
+			<div class="dxbl-grid-confirm-dialog-buttons">
+				<a @onclick="@OnConfirm_DongBoWoo" class="btn btn-primary" role="button">
+					<span class="btn-label"><i class="far fa-thumbs-up"></i> Cập nhật</span>
+				</a>
+				&nbsp; &nbsp;
+				<a @onclick="@OnCancel_DongBoWoo" class="btn btn-danger" role="button">
+					<span class="btn-label"><i class="fas fa-window-close"></i> Hủy bỏ</span>
+				</a>
+			</div>
+		</DxPopup>
+		<DxPopup @bind-Visible="@popupThuongHieuVisible"
+				 AllowDrag=true
+				 @ref=ThuongHieuPopup
+				 HeaderText="THÊM THƯƠNG HIỆU !"
+				 Width="auto"
+				 Height="auto"
+				 Closed="PopupThuongHieuClosed"
+				 CloseOnOutsideClick="false">
+			<AddThuongHieu Visible="@popupThuongHieuVisible"
+						   MyEditPopup=ThuongHieuPopup
+						   isNew=true
+						   mtl_thuonghieu=mtl_thuonghieu
+						   ThuongHieuList=ThuongHieuList
+						   Iduserlastcreate=Iduserlastcreate
+						   Iduserlastupdate=Iduserlastupdate
+						   idcompany=idcompany>
+			</AddThuongHieu>
+		</DxPopup>
+
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+	UserSession userSession { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	DxPopup ThuongHieuPopup { get; set; }
+	bool popupThuongHieuVisible { get; set; } = false;
+	MTL_GetAllThuongHieuResult mtl_thuonghieu = new MTL_GetAllThuongHieuResult();
+
+	int Sodonghienthi = 10;
+	int ActiveTabIndex { get; set; } = 0;
+	EditorOptions editorOptions_motachitiet = new EditorOptions();
+	EditorOptions editorOptions_motangan = new EditorOptions();
+	private string? image_product = "/images/logo.png";
+	Int32 id { get; set; }
+
+	string? tensp { get; set; }
+	bool IsLoading = false;
+	IGrid? MyGrid { get; set; }
+	IGrid? MyGrid_API { get; set; }
+	IGrid? MyGrid_ThanhPhan { get; set; }
+	bool PopupVisible { get; set; }
+	bool PopupVisible_KieuIn { get; set; }
+	bool PopupVisible_DongBo { get; set; }
+	bool isHetHang { get; set; }
+
+	public List<MTL_GetAllProductsResult>? ListProduct { get; set; }
+	public MTL_GetAllProductsResult mtl_product = new MTL_GetAllProductsResult();
+	IEnumerable<MTL_GetAllNhomHangResult>? NhomHangParentList { get; set; }
+	IEnumerable<MTL_GetAllThuongHieuResult>? ThuongHieuList { get; set; }
+	IEnumerable<TblBaoHanh>? BaoHanhList { get; set; }
+	IEnumerable<TblVitri>? ViTriList { get; set; }
+	IEnumerable<TblDonvitinh>? DVTList { get; set; }
+	IEnumerable<TblLoaihanghoadichvu>? LoaiHHDVList { get; set; }
+	IEnumerable<TblLoaihanghoadichvu>? LoaiHHDVList_EditForm { get; set; }
+	public TblSanpham _sanpham = new TblSanpham();
+	private ToastParameters _toastParameters;
+	IEnumerable<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+	FilterCondition _filter = new FilterCondition();
+	FilterConditionAPI _filterAPI = new FilterConditionAPI();
+	List<APP.WooRestAPI.Product>? productlist_API { get; set; }
+	APP.WooRestAPI.Product? product_woo { get; set; }
+	int product_woo_id = 0; // biến xác nhận ID WOO để update hay insert Woo
+	bool LoadingPanel_Visible = true;
+	bool IsLoadingAPI = false;
+	bool IsLoadingSave = false;
+	int idcompany = 0;
+	bool spAo_enable { get; set; } = true;
+	public List<MTL_GetSanPhamThanhPhanResult>? ListHangHoaThanhPhan { get; set; }
+	public List<MTL_GetAllProductsResult>? ListProduct_ThanhPhan { get; set; }
+	string Wookey { get; set; }
+	string Woosecret { get; set; }
+	string Woourl { get; set; }
+	MTL.APP.WooRestAPI.Product WooProduct_Return { get; set; }
+	Int32 id_sptp_xoa { get; set; }
+	string? ten_sp_xoa { get; set; }
+	bool PopupVisible_sptp { get; set; }
+	bool spAo_HHTP_enable { get; set; } = true;
+	string LinkAnhXoa { get; set; }
+	string NoiDungXoa { get; set; }
+	public DxPopup? XoaHangHoaPopup { get; set; }
+	public DxPopup? KieuInPopup { get; set; }
+	public MTL_GetAllProductsResult curent_product_select = new MTL_GetAllProductsResult();
+	FilterCondition filter_detail = new FilterCondition();
+	class FilterCondition
+	{
+		public string v_tonkho { get; set; } = MTLEnum.TonKho.TatCa;
+		public string v_theongay { get; set; } = MTLEnum.SapXepTheoNgay.NgayTao; //"Ngày tạo";
+		public int v_loaihh { get; set; } = 1; // Là : Hàng Hóa
+		public int v_sl { get; set; } = 1; // Là : SL
+		public double v_dongia { get; set; } = 0; // Là : Đon Giá
+		public int v_baohanh { get; set; } = 3; // Là : BH
+		public int v_tensp { get; set; } = 1; // Là :ten Hàng Hóa
+		public string v_loaiHHDVNullText { get; set; } = "Chọn Hàng hóa"; // Là :ten Hàng Hóa
+		public string v_tenspEdit { get; set; } = ""; // Là :ten Hàng Hóa đã Edit
+		public bool v_SPAo { get; set; } = false; // Là :SP Ảo
+		public bool v_HDVAT { get; set; } = false; // Là :Hóa đơn VAT
+		public int v_NhomKhachHang { get; set; } = 1; // Nhóm Khách Hàng : 1 = Khách hàng
+		public int v_loaiphieu { get; set; } = 1; // Là : Tất cả Loại Phiếu
+		public string v_dichvuxuly { get; set; } = "Tất cả"; // Là : Tất cả Loại xữ lý
+		public int v_sodong { get; set; } = 10;
+		public string v_model { get; set; } = "";
+		public string v_masp { get; set; } = "";
+		public int v_idhanghoathanhphan { get; set; } = 0;
+		public int v_idhanghoathanhphan_edittmp { get; set; } = 0;
+	}
+
+	async Task OnRadioTonKhoChange(string sender)
+	{
+		IsLoadingAPI = true;
+		await Task.Delay(10);
+		_filterAPI.v_tonkho = sender.ToString().ToUpper();
+		string page = "1";
+		await GetProductAPI(page);
+		IsLoadingAPI = false;
+		StateHasChanged();
+	}
+
+	class FilterConditionAPI
+	{
+		public string v_tonkho { get; set; } = MTLEnum.TonKhoAPI.TatCa;
+		public string v_timhanghoa { get; set; } = "";
+		public string v_wooid { get; set; } = "";
+		public string v_wooid_all { get; set; } = "";
+		public DateTime date_created { get; set; } = DateTime.Now;
+		public DateTime date_modified { get; set; } = DateTime.Now;
+		// public List<MTL.APP.WooRestAPI.tag>? woo_tags_data { get; set; } = null;
+		public List<MTL.APP.WooRestAPI.tag> woo_tags_data { get; set; }
+	}
+
+
+
+	async Task ShowNewForm()
+	{
+		MyGrid.BeginUpdate();
+		IsLoadingAPI = true;
+		MyGrid.PopupEditFormHeaderText = "THÊM MỚI HÀNG HÓA - DỊCH VỤ";
+		this.ResetField();
+		ListHangHoaThanhPhan = new List<MTL_GetSanPhamThanhPhanResult>();
+
+		if (mtl_product.idloaihanghoadichvu == 3)
+		{
+			await LoadLoaiHangHoaThanhPhanAsync();
+		}
+		MyGrid.StartEditNewRowAsync();
+		IsLoadingAPI = false;
+		MyGrid.EndUpdate();
+	}
+	async Task ShowEditForm(GridCommandColumnCellDisplayTemplateContext context)
+	{
+		try
+		{
+			MyGrid.BeginUpdate();
+			IsLoadingAPI = true;
+			MyGrid.PopupEditFormHeaderText = string.Format("CHỈNH SỬA: {0}", (context.DataItem as MTL_GetAllProductsResult).tensp.ToUpper());
+			string woo_id = (context.DataItem as MTL_GetAllProductsResult).woo_id.ToString();
+			MyGrid.StartEditRowAsync(context.VisibleIndex);
+			string woo_id_nhomhang = ((MTL_GetAllProductsResult)context.DataItem).woo_id_nhomhang;
+			if (woo_id_nhomhang != null)
+				_filterAPI.v_wooid_all = ((MTL_GetAllProductsResult)context.DataItem).woo_id_nhomhang.Trim();
+			int idsanpham = ((MTL_GetAllProductsResult)context.DataItem).id;
+			if (mtl_product.idloaihanghoadichvu == 3)
+			{
+				await LoadLoaiHangHoaThanhPhanAsync();
+			}
+			ListHangHoaThanhPhan = await hangHoaService.GetHangHoaThanhPhanAsync(idsanpham, idcompany);
+			await this.LoadWooProduct(woo_id);
+			IsLoadingAPI = false;
+			MyGrid.EndUpdate();
+		}
+		catch (Exception)
+		{
+			IsLoadingAPI = false;
+		}
+	}
+
+	async Task LoadWooProduct(string woo_id)
+	{
+		// await Task.Delay(10);
+		this.ResetField();
+		if (woo_id != null && woo_id != "0" && woo_id != "")
+		{
+
+			WooProduct_Return = await wooAPIService.RetrieveProductAsync(woo_id, userSession.company.Wookey, userSession.company.Woosecret, userSession.company.Woourl);
+			mtl_product.mota = WooProduct_Return.short_description;
+			mtl_product.motachitiet = WooProduct_Return.description;
+			mtl_product.giathuong = double.Parse(WooProduct_Return.regular_price);
+			mtl_product.link = WooProduct_Return.permalink;
+			if (WooProduct_Return.images.Count != 0)
+				image_product = WooProduct_Return.images[0].src.ToString();
+			editorOptions_motachitiet.InitialText = mtl_product.motachitiet;
+			editorOptions_motangan.InitialText = mtl_product.mota;
+			//  await GetProductAPI();
+			// truyền value woo
+			_filterAPI.v_timhanghoa = WooProduct_Return.name;
+			_filterAPI.woo_tags_data = WooProduct_Return.tags;
+
+			// _filterAPI.date_created = WooProduct_Return.date_created;
+			// _filterAPI.date_modified = WooProduct_Return.date_modified;
+
+
+		}
+		//else
+		//{
+		//    this.ResetField();
+		//}
+	}
+
+	void ResetField()
+	{
+		image_product = userSession.company.Logourl;
+		editorOptions_motachitiet.InitialText = "";
+		editorOptions_motangan.InitialText = "";
+		_filterAPI.v_timhanghoa = "";
+		_filterAPI.v_wooid = "";
+		ActiveTabIndex = 0;
+		_filterAPI.woo_tags_data = null;
+		productlist_API = null;
+	}
+
+	void OnDeleteButtonClick(GridCommandColumnCellDisplayTemplateContext context)
+	{
+		id = (context.DataItem as MTL_GetAllProductsResult).id;
+		tensp = (context.DataItem as MTL_GetAllProductsResult).tensp;
+
+		NoiDungXoa = string.Format("{0}", tensp);
+		LinkAnhXoa = userSession.company.Logourl;
+		if ((context.DataItem as MTL_GetAllProductsResult).hinhanh1 != null)
+			LinkAnhXoa = string.Format("{0}", (context.DataItem as MTL_GetAllProductsResult).hinhanh1);
+
+		PopupVisible = true;
+	}
+	async Task OnConfirmButtonClick()
+	{
+		await hangHoaService.DeleteProductAsync(id);//("Product/DeleteAsync/", id);
+		PopupVisible = false;
+		await FilterDataList();
+		this.ShowToastMessagebox(2, "Hàng hóa", tensp);
+	}
+	void OnCancelButtonClick()
+	{
+		PopupVisible = false;
+	}
+	async Task ValueChangedHandler_TonKho(string newValue)
+	{
+		IsLoadingAPI = true;
+		// await Task.Delay(2);
+		_filter.v_tonkho = newValue;
+		await FilterDataList();
+		IsLoadingAPI = false;
+	}
+	async Task ValueChangedHandler_Day(string newValue)
+	{
+		_filter.v_theongay = newValue;
+		await FilterDataList();
+	}
+
+	async Task ValueChangedHandler_LoaiHH(int newValue)
+	{
+		_filter.v_loaihh = newValue;
+		NhomHangParentList = await hangHoaService.MTL_GetAllNhomHangAsync(_filter.v_loaihh, idcompany);
+		await FilterDataList();
+	}
+
+	async Task FilterDataList()
+	{
+		ListProduct = await hangHoaService.GetAllProductAsync(idcompany, _filter.v_tonkho
+					, _filter.v_loaihh
+					, _filter.v_theongay);
+	}
+
+	async Task SelectedThuongHieuChanged(MTL_GetAllThuongHieuResult thuonghieu)
+	{
+		string model = "";
+		if (mtl_product.model == null) model = "";
+		else model = mtl_product.model.Trim();
+		mtl_product.masp = thuonghieu.viettat.Trim() + "." + model;
+	}
+
+	async Task SelectedNhomHangChanged(MTL_GetAllNhomHangResult nhomhang)
+	{
+		_filterAPI.v_wooid_all = nhomhang.wooid_all.Trim();
+	}
+
+	async Task ExportXlsx()
+	{
+		await MyGrid.ExportToXlsxAsync("DanhSachSanPham", new GridXlExportOptions() { });
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			await LoadConfigFromCompany();
+			await FilterDataList();
+			NhomHangParentList = await hangHoaService.MTL_GetAllNhomHangAsync(_filter.v_loaihh, idcompany);
+			ThuongHieuList = await hangHoaService.GetThuongHieuAllAsync(idcompany);
+			BaoHanhList = await hangHoaService.GetBaoHanhAsync();
+			ViTriList = await hangHoaService.GetViTriAsync(idcompany);
+			DVTList = await hangHoaService.GetDonViTinhAsync();
+			LoaiHHDVList = await hangHoaService.GetLoaiHHDVAllAsync();
+			LoaiHHDVList_EditForm = LoaiHHDVList;
+			UserList = await userService.GetAllUserCompanyAsync(idcompany);//await userService.GetUserAsync();
+			IsLoading = false;
+		}
+		catch (Exception)
+		{
+			IsLoading = false;
+		}
+	}
+	async Task LoadConfigFromCompany()
+	{
+		userSession = await configs.LoadAllConfig();
+		Wookey = userSession.company.Wookey;
+		Woosecret = userSession.company.Woosecret;
+		Woourl = userSession.company.Woourl;
+		Sodonghienthi = userSession.company.Sodonghienthi;
+		_filter.v_sodong = Sodonghienthi;
+	}
+	void Grid_CustomizeCellDisplayText(GridCustomizeCellDisplayTextEventArgs e)
+	{
+		try
+		{
+			if (e.FieldName == "idnhomhang")
+			{
+				if (e.Value != null)
+				{
+					if (NhomHangParentList != null)
+						e.DisplayText = NhomHangParentList.Where(p => p.id == (int)e.Value).FirstOrDefault().v_nhomhang;
+				}
+			}
+			else if (e.FieldName == "idthuonghieu")
+			{
+				if (e.Value != null)
+				{
+					if (ThuongHieuList != null)
+						e.DisplayText = ThuongHieuList.Where(p => p.id == (int)e.Value).FirstOrDefault().thuonghieu;
+				}
+			}
+			else if (e.FieldName == "idBaoHanh")
+			{
+				if (e.Value != null)
+				{
+					if (BaoHanhList != null)
+						e.DisplayText = BaoHanhList.Where(p => p.Id == (int)e.Value).FirstOrDefault().Baohanh;
+				}
+			}
+			else if (e.FieldName == "idvitri")
+			{
+				if (e.Value != null)
+				{
+					if (ViTriList != null)
+						e.DisplayText = ViTriList.Where(p => p.Id == (int)e.Value).FirstOrDefault().Vitri;
+				}
+			}
+			else if (e.FieldName == "iddonvitinh")
+			{
+				if (e.Value != null)
+				{
+					if (DVTList != null)
+						e.DisplayText = DVTList.Where(p => p.Id == (int)e.Value).FirstOrDefault().Donvitinh;
+				}
+			}
+			else if (e.FieldName == "iduserlastupdate" || e.FieldName == "iduserlastcreate")
+			{
+				if (e.Value != null)
+				{
+					if (UserList != null)
+						e.DisplayText = UserList.Where(p => p.userid == (int)e.Value).FirstOrDefault().Fullname;
+				}
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	void OnTextChanged_Model(string newValue)
+	{
+		mtl_product.model = newValue;
+		if (!string.IsNullOrEmpty(newValue))
+		{
+			var item_thuonghieu = ThuongHieuList.FirstOrDefault(o => o.id == mtl_product.idthuonghieu);
+			string tenviettat = "NO";
+			if (item_thuonghieu != null)
+			{
+				tenviettat = item_thuonghieu.viettat.Replace(" ", "");
+			}
+			mtl_product.masp = string.Format("{0}.{1}", tenviettat, mtl_product.model);
+		}
+	}
+
+	void Grid_CustomizeElement(GridCustomizeElementEventArgs e)
+	{
+		if (e.ElementType == GridElementType.SearchBoxContainer)
+		{
+			e.Style = "Width: 100%";
+		}
+		//HOVER
+		if (e.ElementType == GridElementType.DataRow)
+			e.CssClass = " highlighted-item rowheight";
+		if (e.ElementType == GridElementType.DataRow && e.VisibleIndex % 2 == 1)
+		{
+			e.CssClass += " alt-item";
+		}
+		if (e.ElementType == GridElementType.HeaderCell)
+		{
+			e.CssClass += " header-bold";
+		}
+
+		// if (e.ElementType == GridElementType.DataCell
+		//     && ((DevExpress.Blazor.DxGridDataColumn)e.Column).FieldName == "giaban")
+		// {
+		//     e.CssClass += " item-tongtien";
+		// }
+		// if (e.ElementType == GridElementType.DataCell
+		//     && ((DevExpress.Blazor.DxGridDataColumn)e.Column).FieldName == "giathuong")
+		// {
+		//     e.CssClass += " item-tongtien";
+		// }
+		// if (e.ElementType == GridElementType.DataCell
+		//    && ((DevExpress.Blazor.DxGridDataColumn)e.Column).FieldName == "giavon")
+		// {
+		//     e.CssClass += " item-tongtien";
+		// }
+		// if (e.ElementType == GridElementType.DataCell
+		//  && ((DevExpress.Blazor.DxGridDataColumn)e.Column).FieldName == "thanhtien")
+		// {
+		//     e.CssClass += " item-tongtien";
+		// }
+
+		if (e.ElementType == GridElementType.DataCell)
+		{
+			string FieldName = ((DevExpress.Blazor.DxGridDataColumn)e.Column).FieldName;
+			if (FieldName == "thanhtoan"
+				|| FieldName == "tongtien"
+				|| FieldName == "dongia"
+				|| FieldName == "thanhtien"
+				|| FieldName == "giathuong"
+				|| FieldName == "giavon"
+				|| FieldName == "giaban"
+				|| FieldName == "giamgia")
+			{
+				e.CssClass += " item-tongtien";
+			}
+		}
+
+
+
+
+	}
+	TblSanpham convertMTL(MTL_GetAllProductsResult mtl_sanpham, bool isUpdate)
+	{
+		_sanpham.Id = mtl_sanpham.id;
+		_sanpham.Idloaihanghoadichvu = mtl_sanpham.idloaihanghoadichvu;
+		_sanpham.Masp = mtl_sanpham.masp;
+		_sanpham.Model = mtl_sanpham.model;
+		_sanpham.Tensp = mtl_sanpham.tensp;
+		_sanpham.Link = mtl_sanpham.link;
+		_sanpham.Idnhomhang = mtl_sanpham.idnhomhang;
+		_sanpham.Idthuonghieu = mtl_sanpham.idthuonghieu;
+		_sanpham.Idvitri = mtl_sanpham.idvitri;
+		_sanpham.IdBaoHanh = mtl_sanpham.idBaoHanh;
+		_sanpham.Iddonvitinh = mtl_sanpham.iddonvitinh;
+		_sanpham.Giaban = mtl_sanpham.giaban;
+		_sanpham.Giathuong = mtl_sanpham.giathuong;
+		_sanpham.Giavon = mtl_sanpham.giavon;
+		_sanpham.Mota = mtl_sanpham.mota;
+		_sanpham.Motachitiet = mtl_sanpham.motachitiet;
+		_sanpham.Ssd = mtl_sanpham.ssd;
+		_sanpham.Ram = mtl_sanpham.ram;
+		_sanpham.Cpu = mtl_sanpham.cpu;
+		_sanpham.Vga = mtl_sanpham.vga;
+		_sanpham.Active = !mtl_sanpham.hethang;
+		_sanpham.Beginupdate = mtl_sanpham.beginupdate;
+		_sanpham.Lastupdate = DateTime.Now;
+		_sanpham.Iduserlastcreate = mtl_sanpham.iduserlastcreate;
+		_sanpham.Iduserlastupdate = userSession.user.UserId;
+		_sanpham.Isdelete = false; // ko xóa
+		_sanpham.Hinhanh1 = mtl_sanpham.hinhanh1;
+		_sanpham.Hinhanh2 = mtl_sanpham.hinhanh2;
+		_sanpham.Hinhanh3 = mtl_sanpham.hinhanh3;
+		_sanpham.Hinhanh4 = mtl_sanpham.hinhanh4;
+		_sanpham.Hinhanh5 = mtl_sanpham.hinhanh5;
+		_sanpham.Pic00 = image_product;
+		_sanpham.Video = mtl_sanpham.video;
+		_sanpham.Mavach = mtl_sanpham.mavach;
+		_sanpham.WooId = mtl_sanpham.woo_id;
+		_sanpham.Idcompany = idcompany;
+
+		if (!isUpdate)
+		{
+			_sanpham.Lastupdate = DateTime.Now;
+			_sanpham.Iduserlastupdate = userSession.user.UserId;
+		}
+		else
+		{
+			_sanpham.Iduserlastcreate = _sanpham.Iduserlastupdate = userSession.user.UserId;
+			_sanpham.Beginupdate = _sanpham.Lastupdate = DateTime.Now;
+		}
+		return _sanpham;
+	}
+
+	async Task OnEditModelSaving(GridEditModelSavingEventArgs e)
+	{
+		try
+		{
+			IsLoadingSave = true;
+			await Task.Delay(5);
+			var mtl_edit_sanpham = (MTL_GetAllProductsResult)e.EditModel;
+			TblSanpham edit_sanpham;//= this.convertMTL(mtl_edit_sanpham);
+			MTL.APP.WooRestAPI.Product reurn_product = new APP.WooRestAPI.Product();
+			bool isUpdate = false;
+			if (e.IsNew)
+			{
+				isUpdate = false;
+				edit_sanpham = this.convertMTL(mtl_edit_sanpham, e.IsNew);
+				if (userSession.company.IsActiveApi)
+				{
+					if (mtl_product.woo_id != null && mtl_product.woo_id != 0) // chọn WooID có sẳn, ko tạo WooID mới
+					{
+						edit_sanpham.WooId = mtl_product.woo_id;
+						edit_sanpham.Link = mtl_product.link;
+					}
+					else
+					{
+						reurn_product = await SaveWoocommerce(isUpdate);
+						edit_sanpham.WooId = int.Parse(reurn_product.id);
+						edit_sanpham.Link = reurn_product.permalink;
+					}
+				}
+				edit_sanpham = await hangHoaService.CreateProductAsync(edit_sanpham);//.SaveAsync("Product/CreateProduct", edit_sanpham);
+				bool result = await hangHoaService.SaveHangHoaThanhPhanAsync(ListHangHoaThanhPhan, edit_sanpham.Id);
+				this.ShowToastMessagebox(1, "Hàng hóa", edit_sanpham.Tensp);
+			}
+			else
+			{
+				isUpdate = true;
+				edit_sanpham = this.convertMTL(mtl_edit_sanpham, e.IsNew);
+				if (userSession.company.IsActiveApi)
+				{
+					reurn_product = await SaveWoocommerce(isUpdate);
+					if (reurn_product.id != null)
+					{
+						edit_sanpham.WooId = int.Parse(reurn_product.id);
+						edit_sanpham.Link = reurn_product.permalink;
+						if (reurn_product.images.Count > 0)
+							edit_sanpham.Hinhanh1 = reurn_product.images[0].src.ToString();
+					}
+				}
+				int id = edit_sanpham.Id;
+				edit_sanpham = await hangHoaService.UpdateProductAsync(edit_sanpham);
+				bool result = await hangHoaService.SaveHangHoaThanhPhanAsync(ListHangHoaThanhPhan, edit_sanpham.Id);
+				this.ShowToastMessagebox(3, "Hàng hóa", edit_sanpham.Tensp);
+			}
+			await FilterDataList();
+			IsLoadingSave = false;
+		}
+		catch (Exception)
+		{
+			IsLoadingSave = false;
+		}
+	}
+
+	void ShowToastMessagebox(int ThaoTac, string Category, string CategoryName)
+	{
+		// 1:Them - 2:Xoa - 3: Sưa
+		string NameMenthod = "";
+		if (ThaoTac == 1) NameMenthod = "Thêm mới " + Category;
+		else if (ThaoTac == 2) NameMenthod = "Xóa " + Category;
+		else if (ThaoTac == 3) NameMenthod = "Cập nhật " + Category;
+		_toastParameters = new ToastParameters();
+		_toastParameters.Add(nameof(MyToastComponent.Title), string.Format("{0} \"{1}\" thành công !", NameMenthod, CategoryName));
+		toastService.ShowToast<MyToastComponent>
+		(_toastParameters, settings => { settings.Timeout = 5; settings.ShowProgressBar = false; });
+	}
+	async Task ValueChangedHandler_SoDong(int newValue)
+	{
+		_filter.v_sodong = newValue;
+	}
+
+	async Task ValueChangedHandler_EditLoaiHH(int newValue)
+	{
+		mtl_product.idloaihanghoadichvu = newValue;
+		//_filter.v_loaihh = newValue;
+		//NhomHangParentList = await nhomHangService.MTL_GetAllNhomHangAsync(_filter.v_loaihh);
+		//await FilterDataList();
+	}
+
+	async Task Grid_CustomizeEditModel(GridCustomizeEditModelEventArgs e)
+	{
+		if (e.IsNew)
+		{
+			mtl_product = (MTL_GetAllProductsResult)e.EditModel;
+			mtl_product.idloaihanghoadichvu = _filter.v_loaihh;// Chọn Hàng hóa từ Main
+			mtl_product.giaban = 0;
+			mtl_product.giathuong = 0;
+			mtl_product.giavon = 0;
+		}
+	}
+
+	async Task GetProductAPI(string page)
+	{
+		try
+		{
+			string searchSP = _filterAPI.v_timhanghoa;
+			string stock_status = "";
+			if (_filterAPI.v_tonkho.ToUpper() == "CÒN HÀNG")
+				stock_status = "instock";
+			else if (_filterAPI.v_tonkho.ToUpper() == "HẾT HÀNG")
+				stock_status = "outofstock";
+			else if (_filterAPI.v_tonkho.ToUpper() == "CHỜ HÀNG")
+				stock_status = "onbackorder";
+			else stock_status = "";
+			productlist_API = await wooAPIService.GetListProductsAsync(page, searchSP, stock_status, userSession.company.Wookey, userSession.company.Woosecret, userSession.company.Woourl);
+
+			//   (page, searchSP, stock_status
+			// , userSession.company.Wookey
+			// , userSession.company.Woosecret
+			// , userSession.company.Woourl);
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine(ex.Message);
+		}
+	}
+
+	async Task<MTL.APP.WooRestAPI.Product> SaveWoocommerce(bool isUpdate)
+	{
+		MTL.APP.WooRestAPI.Product product_return = new APP.WooRestAPI.Product();
+		int? wooid = mtl_product.woo_id;
+		List<string> url_image = new List<string>();
+		List<string> WooidCategory = new List<string>();
+		double sale_price = (double)mtl_product.giaban;
+		string stock_status = "";
+		double regular_price = (double)mtl_product.giathuong;
+		if ((bool)mtl_product.hethang) stock_status = "outofstock";
+		else stock_status = "instock";
+		//int idNhomhang = Convert.ToInt32(cbNhomHang.SelectedValue);
+		MTL.APP.WooRestAPI.Product new_pr = new MTL.APP.WooRestAPI.Product();
+		new_pr.name = mtl_product.tensp;
+		new_pr.sale_price = sale_price.ToString();
+		new_pr.stock_status = stock_status;
+		new_pr.regular_price = regular_price.ToString();
+		//new_pr.short_description = html_motangan.Document.InvokeScript("getValue").ToString();
+		//new_pr.description = html_motachitiet.Document.InvokeScript("getValue").ToString();
+		new_pr.slug = _HandleCommon.RemoveIllegalCharacters(mtl_product.tensp);
+		new_pr.categories = this.GetWooIdCategory(_filterAPI.v_wooid_all);
+
+		// List<API.WooRestAPI.image> List_Image = WooProduct_Return.images;
+		// API.WooRestAPI.image im = new API.WooRestAPI.image();
+		// im.src = image_product;
+		// im.name="mytholaptop";
+		// im.position = 0;
+		// im.id = 678;
+		// List_Image[0] = im;
+		// new_pr.images = List_Image;
+
+		// new_pr.date_modified = DateTime.Now;
+		// new_pr.date_modified_gmt = DateTime.Now;
+		// new_pr.date_created = _filterAPI.date_created;
+		// new_pr.date_created_gmt = _filterAPI.date_created;
+
+		if (isUpdate == true)
+		{
+			if (wooid != null && wooid != 0)
+			{
+				new_pr.id = wooid.ToString();
+				product_return = await wooAPIService.UpdateProductAsync(new_pr, Wookey, Woosecret, Woourl);
+				mtl_product.link = product_return.permalink;
+				if (product_return.images.Count > 0)
+					mtl_product.hinhanh1 = product_return.images[0].src.ToString();
+			}
+		}
+		else
+		{
+			if (product_woo_id == 0)
+			{
+				// tạo mới , chưa có lần nào
+				// new_pr.date_created = DateTime.Now;
+				// new_pr.date_created_gmt = DateTime.Now;
+				product_return = await wooAPIService.CreateProductAsync(new_pr, Wookey, Woosecret, Woourl);
+			}
+			else
+			{
+				// cập nhật,
+				product_return = await wooAPIService.UpdateProductAsync(new_pr, Wookey, Woosecret, Woourl);
+			}
+			mtl_product.link = product_return.permalink;
+			if (product_return.images.Count > 0)
+				mtl_product.hinhanh1 = product_return.images[0].src.ToString();
+		}
+		return product_return;
+	}
+
+	List<MTL.APP.WooRestAPI.Category> GetWooIdCategory(string wooid_all)
+	{
+		List<string> WooidCategory = new List<string>();
+		string[] arrayStr = wooid_all.Split(new string[] { "-" }, StringSplitOptions.RemoveEmptyEntries);
+		for (int i = 0; i < arrayStr.Length; i++)
+		{
+			WooidCategory.Add(arrayStr[i]);
+		}
+
+		List<MTL.APP.WooRestAPI.Category> ct = new List<MTL.APP.WooRestAPI.Category> { };
+		foreach (string phantu in WooidCategory)
+		{
+			ct.Add(new MTL.APP.WooRestAPI.Category { id = phantu });
+		}
+
+		return ct;
+	}
+
+	void OnSearchAPITextChanged(string newValue)
+	{
+		_filterAPI.v_timhanghoa = newValue;
+	}
+	async Task btMoLinkWeb()
+	{
+		string link = mtl_product.link;
+		await JSRuntime.InvokeVoidAsync("open", link, "_blank");
+	}
+	void OnPrintButtonClick(GridCommandColumnCellDisplayTemplateContext context)
+	{
+		mtl_product.id = (context.DataItem as MTL_GetAllProductsResult).id;
+		PopupVisible_KieuIn = true;
+	}
+
+	async Task Print_TemDan()
+	{
+		string url = string.Format("/ReportInTem/{0}", mtl_product.id);
+		await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+		PopupVisible_KieuIn = false;
+	}
+
+	void GridAPI_CustomizeElement(GridCustomizeElementEventArgs e)
+	{
+		if (e.ElementType == GridElementType.SearchBoxContainer)
+		{
+			e.Style = "Width: 100%";
+		}
+		//HOVER
+		if (e.ElementType == GridElementType.DataRow)
+			e.CssClass = " highlighted-item rowheight";
+		if (e.ElementType == GridElementType.DataRow && e.VisibleIndex % 2 == 1)
+		{
+			e.CssClass += " alt-item";
+		}
+		if (e.ElementType == GridElementType.HeaderCell)
+		{
+			e.CssClass += " header-bold";
+		}
+
+		if (e.ElementType == GridElementType.DataCell
+			&& ((DevExpress.Blazor.DxGridDataColumn)e.Column).FieldName == "regular_price")
+		{
+			e.CssClass += " item-tongtien";
+		}
+		if (e.ElementType == GridElementType.DataCell
+					&& ((DevExpress.Blazor.DxGridDataColumn)e.Column).FieldName == "sale_price")
+		{
+			e.CssClass += " item-tongtien";
+		}
+	}
+
+	async Task Trang(string page)
+	{
+		IsLoadingAPI = true;
+		await Task.Delay(50);
+		await GetProductAPI(page);
+		IsLoadingAPI = false;
+	}
+
+	async Task Trang1()
+	{
+		await Trang("1");
+	}
+	async Task Trang2()
+	{
+		await Trang("2");
+	}
+	async Task Trang3()
+	{
+		await Trang("3");
+	}
+	async Task Trang4()
+	{
+		await Trang("4");
+	}
+	async Task Trang5()
+	{
+		await Trang("5");
+	}
+	async Task Trang6()
+	{
+		await Trang("6");
+	}
+	async Task Trang7()
+	{
+		await Trang("7");
+	}
+	async Task Trang8()
+	{
+		await Trang("8");
+	}
+
+	async Task OnSelectWooButtonClick(GridCommandColumnCellDisplayTemplateContext context)
+	{
+		product_woo = ((APP.WooRestAPI.Product)context.DataItem);
+		if (product_woo.sale_price == "") product_woo.sale_price = "0";
+		if (product_woo.regular_price == "") product_woo.regular_price = "0";
+		PopupVisible_DongBo = true;
+	}
+
+	async Task OnConfirm_DongBoWoo()
+	{
+		product_woo_id = int.Parse(product_woo.id);
+		mtl_product.woo_id = int.Parse(product_woo.id);
+		mtl_product.tensp = product_woo.name;
+		mtl_product.giaban = double.Parse(product_woo.sale_price);
+		mtl_product.giathuong = double.Parse(product_woo.regular_price);
+		mtl_product.link = product_woo.permalink;
+		if (product_woo.images.Count != 0)
+			image_product = product_woo.images[0].src.ToString();
+		if (product_woo.stock_status == "outofstock")
+			mtl_product.hethang = true;
+		else if (product_woo.stock_status == "instock")
+			mtl_product.hethang = false;
+		editorOptions_motangan.InitialText = product_woo.short_description;
+		editorOptions_motachitiet.InitialText = product_woo.description;
+		PopupVisible_DongBo = false;
+	}
+	void OnCancel_DongBoWoo()
+	{
+		product_woo_id = 0;
+		PopupVisible_DongBo = false;
+	}
+
+	async Task SelectedItemHangHoaChanged(MTL_GetAllProductsResult hanghoa)
+	{
+		if (hanghoa != null)
+		{
+			_filter.v_dongia = (double)hanghoa.giaban;
+			_filter.v_baohanh = (int)hanghoa.idBaoHanh;
+			_filter.v_tenspEdit = hanghoa.tensp;
+			_filter.v_masp = hanghoa.masp;
+			_filter.v_idhanghoathanhphan_edittmp = hanghoa.id;
+			_filter.v_idhanghoathanhphan = hanghoa.id;
+		}
+	}
+
+	async Task LoadLoaiHangHoaThanhPhanAsync()//(TblLoaihanghoadichvu loaiHHDV)
+	{
+		//reset data
+		this.ClearDataAfterProcess_HangHoaThanhPhan();
+		int v_loaihh = 1; // là hàng hóa;
+		ListProduct_ThanhPhan = await hangHoaService.GetAllProductAsync(idcompany, MTLEnum.TonKho.ConHang
+					, v_loaihh //_filter.v_loaihh
+					, _filter.v_theongay);
+	}
+	void isSPAo_CheckedChanged(bool value)
+	{
+		_filter.v_SPAo = value;
+		spAo_enable = !_filter.v_SPAo;
+	}
+	async Task btThemThanhPhan_Click()
+	{
+		await this.AddRowSPThanhPhan();
+		MyGrid_ThanhPhan.RefreshSummary();
+		this.ClearDataAfterProcess_HangHoaThanhPhan();
+	}
+	void ClearDataAfterProcess_HangHoaThanhPhan()
+	{
+		_filter.v_tensp = 0;
+		_filter.v_tenspEdit = "";
+		_filter.v_SPAo = false;
+		_filter.v_sl = 1;
+		_filter.v_dongia = 0;
+		_filter.v_baohanh = 0;
+		_filter.v_loaiHHDVNullText = "Chọn hàng hóa thành phần cần thêm.";
+
+	}
+	int VisibleIndex_HHTP = 0;
+	void Delete_HangHoaThanhPhan(GridCommandColumnCellDisplayTemplateContext context)
+	{
+		id_sptp_xoa = (context.DataItem as MTL_GetSanPhamThanhPhanResult).id;
+		ten_sp_xoa = (context.DataItem as MTL_GetSanPhamThanhPhanResult).tensp;
+		VisibleIndex_HHTP = context.VisibleIndex;
+		PopupVisible_sptp = true;
+	}
+
+	async Task XoaSPTP_OnConfirmButtonClick()
+	{
+		ListHangHoaThanhPhan.RemoveAt(VisibleIndex_HHTP);
+		MyGrid_ThanhPhan.RefreshSummary();
+		PopupVisible_sptp = false;
+	}
+	void XoaSPTP_OnCancelButtonClick()
+	{
+		PopupVisible_sptp = false;
+	}
+
+	async Task OnEditModelSaving_HangHoaThanhPhan(GridEditModelSavingEventArgs e)
+	{
+		MTL_GetSanPhamThanhPhanResult thanhphan = (MTL_GetSanPhamThanhPhanResult)e.EditModel;
+		int index = ListHangHoaThanhPhan.FindIndex(c => c.idhanghoathanhphan == filter_detail.v_idhanghoathanhphan);
+		thanhphan.sl = filter_detail.v_sl;
+		thanhphan.giaban = filter_detail.v_dongia;
+		thanhphan.idbaohanh = filter_detail.v_baohanh;
+		thanhphan.tensp = filter_detail.v_tenspEdit;
+		//  thanhphan.idhanghoathanhphan = filter_detail.v_tensp;
+		thanhphan.masp = filter_detail.v_masp;
+		thanhphan.idhanghoathanhphan = filter_detail.v_idhanghoathanhphan_edittmp;
+		thanhphan.thanhtien = thanhphan.sl * thanhphan.giaban;
+		thanhphan.beginupdate = DateTime.Now;
+		thanhphan.lastupdate = DateTime.Now;
+		thanhphan.chietkhau = 0;
+		ListHangHoaThanhPhan[index] = thanhphan;
+		MyGrid_ThanhPhan.RefreshSummary();
+	}
+
+	async Task ShowEditForm_HangHoaThanhPhan(GridCommandColumnCellDisplayTemplateContext context)
+	{
+		MyGrid_ThanhPhan.BeginUpdate();
+		MTL_GetSanPhamThanhPhanResult thanhphan = (context.DataItem as MTL_GetSanPhamThanhPhanResult);
+		filter_detail.v_sl = (int)thanhphan.sl;
+		filter_detail.v_dongia = (double)thanhphan.giaban;
+		filter_detail.v_baohanh = (int)thanhphan.idbaohanh;
+		filter_detail.v_tenspEdit = thanhphan.tensp;
+		filter_detail.v_tensp = (int)thanhphan.idhanghoathanhphan;
+		filter_detail.v_masp = thanhphan.masp;
+		filter_detail.v_idhanghoathanhphan = (int)thanhphan.idhanghoathanhphan;
+		MyGrid_ThanhPhan.PopupEditFormHeaderText = string.Format("CHỈNH SỬA: {0}", thanhphan.tensp);
+		MyGrid_ThanhPhan.StartEditRowAsync(context.VisibleIndex);
+		MyGrid_ThanhPhan.EndUpdate();
+	}
+
+	void GridThanhPhan_CustomizeCellDisplayText(GridCustomizeCellDisplayTextEventArgs e)
+	{
+		try
+		{
+			if (e.FieldName == "idbaohanh")
+			{
+				if (e.Value != null)
+				{
+					if (BaoHanhList != null)
+						e.DisplayText = BaoHanhList.Where(p => p.Id == (int)e.Value).FirstOrDefault().Baohanh;
+				}
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	async Task AddRowSPThanhPhan()
+	{
+		MTL_GetSanPhamThanhPhanResult thanhphan = new MTL_GetSanPhamThanhPhanResult();
+		thanhphan.tensp = _filter.v_tenspEdit;
+		thanhphan.idhanghoathanhphan = _filter.v_tensp;
+		thanhphan.masp = _filter.v_masp;
+		thanhphan.sl = _filter.v_sl;
+		thanhphan.giaban = _filter.v_dongia;
+		thanhphan.thanhtien = _filter.v_sl * _filter.v_dongia;
+		thanhphan.idbaohanh = _filter.v_baohanh;
+		thanhphan.beginupdate = DateTime.Now;
+		thanhphan.lastupdate = DateTime.Now;
+		thanhphan.chietkhau = 0;
+
+		ListHangHoaThanhPhan.Add(thanhphan);
+	}
+
+	void isSPAo_HHTP_CheckedChanged(bool value)
+	{
+		filter_detail.v_SPAo = value;
+		spAo_HHTP_enable = !filter_detail.v_SPAo;
+	}
+
+	async Task SelectedItemHangHoa_HHTP_Changed(MTL_GetAllProductsResult hanghoa)
+	{
+		if (hanghoa != null)
+		{
+			filter_detail.v_dongia = (double)hanghoa.giaban;
+			filter_detail.v_baohanh = (int)hanghoa.idBaoHanh;
+			filter_detail.v_tenspEdit = hanghoa.tensp;
+			filter_detail.v_masp = hanghoa.masp;
+			//filter_detail.v_idhanghoathanhphan = hanghoa.id;
+			filter_detail.v_idhanghoathanhphan_edittmp = hanghoa.id;
+		}
+	}
+
+	void GridThanhPhan_CustomizeSummaryDisplayText(GridCustomizeSummaryDisplayTextEventArgs e)
+	{
+		if (e.Item.FieldName == "thanhtien")
+		{
+			e.DisplayText = string.Format("Tổng tiền: {0:c}", e.Value);
+			mtl_product.giaban = (double)e.Value;
+		}
+	}
+
+	async Task PopupThuongHieuClosed(PopupClosedEventArgs args)
+	{
+		ThuongHieuList = await hangHoaService.GetThuongHieuAllAsync(idcompany);
+		if (mtl_thuonghieu != null)
+		{
+			if (mtl_thuonghieu.id != 0)
+			{
+				mtl_product.idthuonghieu = mtl_thuonghieu.id;
+			}
+		}
+	}
+
+	private async Task ShowThuongHieuPopup()
+	{
+		// mtl_thuonghieu = new MTL_GetAllThuongHieuResult();
+		// isNew = true;
+		popupThuongHieuVisible = true;
+	}
+
+	async Task OnPageProductListIndexChanged(int newPageIndex)
+	{
+		// GridPageIndex = newPageIndex;
+		// PageIndexInfo = "You switched to page " + (newPageIndex + 1);
+	}
+	void ProductListCustomUnboundColumnData(GridUnboundColumnDataEventArgs e)
+	{
+		if (e.FieldName == "Summary")
+		{
+			// int temperature = Convert.ToInt32(e.GetRowValue("TemperatureC"));
+			// e.Value = GetTemperatureString(temperature);
+		}
+	}
+
+	public class ImageFile
+	{
+		public string base64data { get; set; }
+		public string contentType { get; set; }
+		public string fileName { get; set; }
+	}
+
+	private async Task OpenLinkThemHangHoa()
+	{
+		string Link = "/ThemHangHoa/";
+		await JSRuntime.InvokeVoidAsync("open", Link, "_self");
+	}
+
+	string GetImageFileName(MTL_GetAllProductsResult product)
+	{
+		string url_anhdaidien = userSession.company.Logourl;
+		if (product.hinhanh1 != null)
+		{
+			url_anhdaidien = product.hinhanh1;
+		}
+		return url_anhdaidien;
+	}
+}

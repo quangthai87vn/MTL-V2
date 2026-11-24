@@ -1,0 +1,266 @@
+@page "/NhomHang"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+
+@inject IJSRuntime JSRuntime
+@inject HangHoaService hangHoaService
+@inject UserService userService
+@inject IToastService toastService
+@inject APIWooService _WooAPIService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<AuthorizeView>
+
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.Category" Title="NHÓM HÀNG">
+			<Actions>
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					<MudSelect T="int" Value="idLoaiHinhKinhDoanh" ValueChanged="ValueChangedHandler_LoaiHH"
+							   Label="Loại hình kinh doanh" Margin="Margin.Dense" Variant="Variant.Outlined"
+							   Style="min-width:200px" ReadOnly=IsLoading>
+						@foreach (var item in MTLEnum.GetListLoaiHinhKD()) { <MudSelectItem T="int" Value="@item.Id">@item.Loaihinhkinhdoanh</MudSelectItem> }
+					</MudSelect>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Class="mtl-header-action-btn"
+							   Disabled=IsLoading OnClick=ThemNhomHangDialog Color="Color.Primary">THÊM NHÓM HÀNG</MudButton>
+				</MudStack>
+			</Actions>
+			<ChildContent>
+				<MudTextField @bind-Value="searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+							  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+							  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search" />
+			</ChildContent>
+		</PageStandardHeader>
+
+		<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+			@if (IsLoading)
+			{
+				<Loading IsFullPage="false" PageName="NHÓM HÀNG" />
+			}
+			else
+			{
+				<MudDivider Class="mud-width-full" />
+				<MudTable Items="@ListNhomHang"
+					  Hover="true"
+					  Striped="true"
+					  Bordered="true"
+					  Dense="true"
+					  RowsPerPage="50"
+					  Class="mudtable-center-header mtl-standard-grid"
+					  Filter="new Func<MTL_GetAllNhomHangResult,bool>(FilterFunc1)"
+					  Loading="IsLoading"
+					  LoadingProgressColor="Color.Primary">
+				<ToolBarContent>
+					<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+						<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+						<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+						<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+						<MudSpacer />
+					</MudStack>
+				</ToolBarContent>
+				<HeaderContent>
+					<MudTh Style="width:100px; text-align:center;">THAO TÁC</MudTh>
+					<MudTh Style="width:180px;">NHÓM HÀNG</MudTh>
+					<MudTh Style="width:100px;">SP LIÊN QUAN</MudTh>
+					<MudTh Style="width:80px;">THỨ TỰ</MudTh>
+					<MudTh Style="width:80px;">WOO</MudTh>
+					<MudTh Style="width:100px;">VIẾT TẮT</MudTh>
+					<MudTh>URL</MudTh>
+					<MudTh Style="width:150px;">DANH MỤC CHA</MudTh>
+					<MudTh Style="width:150px;">NGÀY TẠO</MudTh>
+					<MudTh Style="width:150px;">NGÀY UPDATE</MudTh>
+				</HeaderContent>
+				<RowTemplate Context="contextNhomHang">
+					<MudTd DataLabel="THAO TÁC" Style="text-align:center;">
+						<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+							<MudIconButton @onclick="@(() => SuaNhomHangDialog(contextNhomHang))"
+										   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+										   Color="Color.Primary" Size="Size.Small" Title="Sửa" />
+							<MudIconButton @onclick="@(() => XoaNhomHangDialog(contextNhomHang))"
+										   Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled"
+										   Color="Color.Error" Size="Size.Small" Title="Xóa" />
+						</MudButtonGroup>
+					</MudTd>
+					<MudTd DataLabel="NHÓM HÀNG">@contextNhomHang.nhomhang</MudTd>
+					<MudTd DataLabel="SP LIÊN QUAN">
+						<MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">
+							@contextNhomHang.soluongsanphamlienquan
+						</MudChip>
+					</MudTd>
+					<MudTd DataLabel="THỨ TỰ">@contextNhomHang.order</MudTd>
+					<MudTd DataLabel="WOO">@contextNhomHang.woo_id</MudTd>
+					<MudTd DataLabel="VIẾT TẮT">@contextNhomHang.viettat</MudTd>
+					<MudTd DataLabel="URL">@contextNhomHang.link</MudTd>
+					<MudTd DataLabel="DANH MỤC CHA">
+						@if (@contextNhomHang.parent != null && @contextNhomHang.parent != 0)
+						{
+							@ListNhomHang.Where(p => p.id == (int)@contextNhomHang.parent).FirstOrDefault().nhomhang
+						}
+					</MudTd>
+					<MudTd DataLabel="NGÀY TẠO">@contextNhomHang.beginupdate</MudTd>
+					<MudTd DataLabel="NGÀY UPDATE">@contextNhomHang.lastupdate</MudTd>
+				</RowTemplate>
+				<NoRecordsContent>
+					<MudText>Không tìm thấy dữ liệu.</MudText>
+				</NoRecordsContent>
+				<LoadingContent>
+					<MudText>Đang tải dữ liệu...</MudText>
+				</LoadingContent>
+				<PagerContent>
+					<MudTablePager PageSizeOptions="new int[] { 10, 20, 50, 100 }" />
+				</PagerContent>
+				</MudTable>
+			}
+		</MudPaper>
+	</Authorized>
+</AuthorizeView>
+@code
+{
+	DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.Large,
+			MaximizeButton = true,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+			 
+		};
+
+	bool IsLoading = true;
+	UserSession userSession { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	IEnumerable<TblLoaihanghoadichvu>? ListLoaiHinhKD { get; set; }
+	public List<MTL_GetAllNhomHangResult>? ListNhomHang { get; set; }
+	IEnumerable<TblNhomhang>? NhomHangParentList { get; set; }
+	List<MTL_GetAllUserCompanyResult>? UserList { get; set; }	
+	MTL_GetAllNhomHangResult? v_nhomhang;	
+	TblNhomhang? _nhomhang = new TblNhomhang();	
+	int idLoaiHinhKinhDoanh = MTLEnum.LoaiHinhKinhDoanh.HangHoa;
+	private string searchString = "";
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			userSession = await configs.LoadAllConfig();
+			ListLoaiHinhKD = await hangHoaService.GetLoaiHHDVAllAsync();
+			ListNhomHang = await hangHoaService.MTL_GetAllNhomHangAsync(idLoaiHinhKinhDoanh, userSession.idcompany);
+			NhomHangParentList = await hangHoaService.GetNhomHangAsync();
+			UserList = await userService.GetAllUserCompanyAsync(userSession.company.Id);
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task ValueChangedHandler_LoaiHH(int newValue)
+	{
+		idLoaiHinhKinhDoanh = newValue;
+		ListNhomHang = await hangHoaService.MTL_GetAllNhomHangAsync(idLoaiHinhKinhDoanh, userSession.company.Id);
+	}	
+
+	async Task XoaNhomHangDialog(MTL_GetAllNhomHangResult context)
+	{
+		int id = context.id;
+		string tennhomhang = context.v_nhomhang;		
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, string.Format("{0}", tennhomhang));
+		var dialog = await DialogService.ShowEx<DeleteDialog>("XÓA NHÓM HÀNG", parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await hangHoaService.DeleteNhomHangAsync(id);
+			string mess = $"Xóa thành công [{tennhomhang}]";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			ListNhomHang = await hangHoaService.MTL_GetAllNhomHangAsync(idLoaiHinhKinhDoanh, userSession.company.Id);
+
+		}
+	}
+
+	TblNhomhang ToNhomHang(MTL_GetAllNhomHangResult nhomhang, bool isNew)
+	{
+		_nhomhang.Idcompany = userSession.company.Id;
+		if (isNew)//new
+		{
+			_nhomhang.Iduserlastcreate = _nhomhang.Iduserlastupdate = userSession.user.UserId;
+			_nhomhang.Beginupdate = _nhomhang.Lastupdate = DateTime.Now;
+			_nhomhang.Idcompany = nhomhang.idcompany;
+		}
+		else //update
+		{
+			_nhomhang.Lastupdate = DateTime.Now;
+			_nhomhang.Iduserlastupdate = userSession.user.UserId;
+			_nhomhang.Id = nhomhang.id;
+			_nhomhang.Nhomhang = nhomhang.nhomhang;
+			_nhomhang.Viettat = nhomhang.viettat;
+			_nhomhang.Tendanhmucrutgon = nhomhang.tendanhmucrutgon;
+			_nhomhang.Link = nhomhang.link;
+			_nhomhang.Active = nhomhang.active;
+			_nhomhang.Order = nhomhang.order;
+			if (nhomhang.woo_id != null)
+				_nhomhang.WooId = int.Parse(nhomhang.woo_id);
+			_nhomhang.Parent = nhomhang.parent;
+			_nhomhang.Idloaihanghoadichvu = nhomhang.idloaihanghoadichvu;
+			_nhomhang.Idcompany = nhomhang.idcompany;
+		}
+		return _nhomhang;
+	}
+	async Task ThemNhomHangDialog()
+	{
+		TblNhomhang nhomhang = new TblNhomhang();
+		var parameters = new DialogParameters<DialogAddNhomHang>();
+		parameters.Add(x => x.IdLoaiHinhKinhDoanh, idLoaiHinhKinhDoanh);
+		parameters.Add(x => x.nhomhang, nhomhang);
+		parameters.Add(x => x.ListNhomHang, ListNhomHang);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.isNew, true);		
+		string headerText = "THÊM NHÓM HÀNG";
+		var dialog = await DialogService.ShowEx<DialogAddNhomHang>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			ListNhomHang = await hangHoaService.MTL_GetAllNhomHangAsync(idLoaiHinhKinhDoanh, userSession.idcompany);
+		}
+	}
+
+	async Task SuaNhomHangDialog(MTL_GetAllNhomHangResult context)
+	{
+		MTL_GetAllNhomHangResult nhomhang =context;		
+		var parameters = new DialogParameters<DialogAddNhomHang>();
+		parameters.Add(x => x.IdLoaiHinhKinhDoanh, idLoaiHinhKinhDoanh);
+		parameters.Add(x => x.nhomhang, this.ToNhomHang(nhomhang, false));
+		parameters.Add(x => x.ListNhomHang, ListNhomHang);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.isNew, false);
+		string headerText = "SỬA NHÓM HÀNG";
+		var dialog = await DialogService.ShowEx<DialogAddNhomHang>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			ListNhomHang = await hangHoaService.MTL_GetAllNhomHangAsync(idLoaiHinhKinhDoanh, userSession.idcompany);
+		}
+	}
+
+	private bool FilterFunc1(MTL_GetAllNhomHangResult element) => FilterFunc(element, searchString);
+	private bool FilterFunc(MTL_GetAllNhomHangResult element, string searchString)
+	{
+		if (string.IsNullOrWhiteSpace(searchString))
+			return true;
+		if (element.nhomhang.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			return true;
+		
+		return false;
+	}
+
+
+
+}
+

@@ -1,0 +1,44 @@
+appsettings.json
+appsettings.Development.json
+appsettings.Production.json
+
+# Build outputs
+bin/
+obj/
+
+# Image cache - downloaded from WordPress/WooCommerce
+wwwroot/images/woo-cache/
+
+# Published output
+publish/
+
+# User-specific files
+*.user
+*.userosscache
+*.sln.docstates
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp

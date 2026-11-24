@@ -1,0 +1,22 @@
+services:
+  mytholaptop_app:
+    image: mytholaptop_app:latest
+    container_name: mytholaptop_app
+    restart: unless-stopped
+    ports:
+      - "5000:8080"
+    environment:
+      - ConnectionStrings__MTLDB=${MTL_DB_CONNECTION_STRING}
+      - ASPNETCORE_ENVIRONMENT=Production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - mtl_network
+
+networks:
+  mtl_network:
+    driver: bridge

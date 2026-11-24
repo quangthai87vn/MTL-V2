@@ -1,0 +1,89 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<TargetFramework>net9.0</TargetFramework>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Compile Remove="Data\**" />
+		<Compile Remove="Pages\ChoVietJP\**" />
+		<Compile Remove="wwwroot\Themes\responsive-dropdown-menu-2-main\**" />
+		<Content Remove="Data\**" />
+		<Content Remove="Pages\ChoVietJP\**" />
+		<Content Remove="wwwroot\Themes\responsive-dropdown-menu-2-main\**" />
+		<Content Remove="publish\**" />
+		<Content Remove="publish-fast\**" />
+		<EmbeddedResource Remove="Data\**" />
+		<EmbeddedResource Remove="Pages\ChoVietJP\**" />
+		<EmbeddedResource Remove="wwwroot\Themes\responsive-dropdown-menu-2-main\**" />
+		<None Remove="Data\**" />
+		<None Remove="Pages\ChoVietJP\**" />
+		<None Remove="wwwroot\Themes\responsive-dropdown-menu-2-main\**" />
+		<None Remove="publish\**" />
+		<None Remove="publish-fast\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Remove="Pages\BanHang\Invoice1.razor" />
+	  <Content Remove="Pages\BanHang\POS1.razor" />
+	  <Content Remove="Pages\Config\PhanQuyen.razor" />
+	  <Content Remove="Pages\GymSystem\GymCheckInOut.razor" />
+	  <Content Remove="Pages\HangHoa\HangHoa.razor" />
+	  <Content Remove="Pages\HangHoa\Product1.razor" />
+	  <Content Remove="Pages\NhomHang\AddNhomHang.razor" />
+	  <Content Remove="Pages\NhomHang\ComponentNhomHang.razor" />
+	  <Content Remove="Pages\NhomHang\NhomHang2.razor" />
+	  <Content Remove="Pages\WebApp\Home_VietNhat.razor" />
+	  <Content Remove="wwwroot\scripts\fullscreen.js" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Remove="Pages\BanHang\ORMDataModel1.xpo" />
+		<None Remove="Pages\BanHang\ORMDataModel1.xpo.diagram" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
+		<PackageReference Include="Blazored.Toast" Version="4.2.1" />
+		<PackageReference Include="BlazorPro.Spinkit" Version="1.2.0" />
+		<PackageReference Include="ClosedXML" Version="0.105.0" />
+		<PackageReference Include="CodeBeam.MudBlazor.Extensions" Version="7.0.1" />
+		<PackageReference Include="FFMpegCore" Version="5.4.0" />
+		<PackageReference Include="FluentValidation" Version="12.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Components" Version="8.0.8" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.8" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.8" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.8" />
+		<PackageReference Include="MudBlazor" Version="7.15.0" />
+		<PackageReference Include="MudBlazor.Extensions" Version="2.0.5" />
+		<PackageReference Include="MudExRichTextEditor" Version="1.0.9" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="QRCoder" Version="1.6.0" />
+		<PackageReference Include="SkiaSharp" Version="3.119.0" />
+		<PackageReference Include="WordPressPCL" Version="2.1.0" />
+		<PackageReference Include="ZXingBlazor" Version="1.1.5" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Folder Include="Pages\GymSystem\" />
+		<Folder Include="Uploads\" />
+		<Folder Include="wwwroot\Uploads\ChoVietJapan\products\" />
+		<Folder Include="wwwroot\Uploads\mytholaptop\customer\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="wwwroot\scripts\fullscreen.js" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Update="Pages\KhachHang\DialogXemNhatKyKhachHang.razor">
+		  <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+		<Content Update="Pages\KhachHang\KhachHangPrintDialog.razor">
+		  <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		</Content>
+	</ItemGroup>
+
+</Project>

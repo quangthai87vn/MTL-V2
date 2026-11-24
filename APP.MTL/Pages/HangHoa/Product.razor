@@ -1,0 +1,1256 @@
+@page "/Product"
+@using System.Data;
+@using System.Globalization;
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MTL.APP.Models;
+@using MudBlazor.Extensions.Options
+@using static MTL.APP.MTLEnum
+@using static System.Net.WebRequestMethods;
+@inject IJSRuntime JSRuntime
+@inject HangHoaService hangHoaService
+@inject UserService userService
+@inject IToastService toastService
+@inject APIWooService wooAPIService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<style>
+	/* ── Card grid: 6 cột desktop → 5 → 4 → 3 → 2 → 1 ── */
+	.mtl-prod-grid {
+		display: grid;
+		grid-template-columns: repeat(6, 1fr);
+		gap: 12px;
+		padding: 4px;
+	}
+
+	/* ── Card View Styles ── */
+	.mtl-prod-card {
+		background: var(--mtl-body-bg, #fff);
+		border-radius: 10px;
+		overflow: hidden;
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		transition: transform 0.18s ease, box-shadow 0.18s ease;
+		cursor: pointer;
+		position: relative;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.mtl-prod-card:hover {
+		transform: translateY(-3px);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13);
+	}
+
+	.mtl-prod-card__img-wrap {
+		width: 100%;
+		aspect-ratio: 1 / 1;
+		overflow: hidden;
+		background: var(--mtl-body-bg, #f0f0f0);
+		position: relative;
+	}
+
+	.mtl-prod-card__img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		transition: transform 0.3s ease, filter 0.3s ease;
+	}
+
+	.mtl-prod-card:hover .mtl-prod-card__img {
+		transform: scale(1.04);
+	}
+
+	/* ── Grayscale khi hết hàng ── */
+	.mtl-prod-card__img.grayscale {
+		filter: grayscale(100%);
+		opacity: 0.75;
+	}
+
+	.mtl-prod-card__img-placeholder {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--mud-palette-text-disabled);
+	}
+
+	/* ── Link ảnh mở trang web ── */
+	.mtl-prod-card__img-link {
+		display: block;
+		cursor: pointer;
+	}
+
+	.mtl-prod-card__img-link:hover .mtl-prod-card__img {
+		transform: scale(1.04);
+	}
+
+	.mtl-prod-badge {
+		position: absolute;
+		top: 6px;
+		left: 6px;
+		border-radius: 4px;
+		padding: 2px 7px;
+		font-size: 0.62rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+	}
+
+	.mtl-prod-badge--active {
+		background: rgba(46, 125, 50, 0.88);
+		color: #fff;
+	}
+
+	.mtl-prod-badge--inactive {
+		background: rgba(0, 0, 0, 0.55);
+		color: #ccc;
+	}
+
+	.mtl-prod-badge--lowstock {
+		background: rgba(255, 152, 0, 0.9);
+		color: #fff;
+	}
+
+	.mtl-prod-badge--outofstock {
+		background: rgba(211, 47, 47, 0.88);
+		color: #fff;
+	}
+
+	.mtl-prod-card__actions {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		display: flex;
+		gap: 4px;
+		opacity: 0;
+		transition: opacity 0.18s ease;
+	}
+
+	.mtl-prod-card:hover .mtl-prod-card__actions {
+		opacity: 1;
+	}
+
+	.mtl-prod-card__action-btn {
+		width: 30px;
+		height: 30px;
+		border-radius: 6px;
+		border: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		font-size: 0.7rem;
+		transition: background 0.15s;
+	}
+
+	.mtl-prod-card__action-btn--edit {
+		background: var(--mud-palette-primary);
+		color: #fff;
+	}
+
+	.mtl-prod-card__action-btn--edit:hover { background: var(--mud-palette-primary-darken); }
+
+	.mtl-prod-card__action-btn--del {
+		background: rgba(211, 47, 47, 0.88);
+		color: #fff;
+	}
+
+	.mtl-prod-card__action-btn--del:hover { background: #d32f2f; }
+
+	.mtl-prod-card__action-btn--print {
+		background: rgba(56, 142, 60, 0.88);
+		color: #fff;
+	}
+
+	.mtl-prod-card__action-btn--print:hover { background: #388e3c; }
+
+	.mtl-prod-card__body {
+		padding: 8px 10px 10px;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.mtl-prod-card__cat {
+		font-size: 0.6rem;
+		color: var(--mud-palette-primary, #d32f2f);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.mtl-prod-card__name {
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--mud-palette-text-primary);
+		line-height: 1.3;
+		overflow: hidden;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		min-height: 2.6em;
+	}
+
+	.mtl-prod-card__price-wrap {
+		display: flex;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: center;
+		gap: 6px 10px;
+		margin-top: auto;
+		padding-top: 4px;
+		min-width: 0;
+	}
+
+	.mtl-prod-card__price {
+		font-size: 1.12rem;
+		font-weight: 800;
+		color: var(--mud-palette-error);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 100%;
+	}
+
+	.mtl-prod-card__price-original {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--mud-palette-text-secondary);
+		text-decoration: line-through;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 100%;
+	}
+
+	.mtl-prod-card__price-label {
+		font-size: 0.58rem;
+		color: var(--mud-palette-text-secondary);
+		font-weight: 400;
+	}
+
+	.mtl-prod-card__stock {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 0.68rem;
+		font-weight: 600;
+	}
+
+	.mtl-prod-card__stock--in {
+		color: #2e7d32;
+	}
+
+	.mtl-prod-card__stock--low {
+		color: #ed6c02;
+	}
+
+	.mtl-prod-card__stock--out {
+		color: #d32f2f;
+	}
+
+	.mtl-prod-card__toggle {
+		margin-top: auto;
+		padding-top: 4px;
+	}
+
+	/* ── View Toggle Buttons ── */
+	.mtl-view-toggle {
+		display: flex;
+		gap: 4px;
+		background: rgba(0, 0, 0, 0.04);
+		border-radius: 8px;
+		padding: 3px;
+	}
+
+	.mtl-view-toggle__btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		background: transparent;
+		color: var(--mud-palette-text-secondary);
+	}
+
+	.mtl-view-toggle__btn:hover {
+		background: rgba(0, 0, 0, 0.06);
+	}
+
+	.mtl-view-toggle__btn--active {
+		background: var(--mud-palette-primary);
+		color: #fff;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+	}
+
+	.mtl-view-toggle__btn--active:hover {
+		background: var(--mud-palette-primary-darken);
+	}
+
+	/* ── Product Summary Stats ── */
+	.mtl-prod-stats {
+		display: flex;
+		gap: 16px;
+		flex-wrap: wrap;
+	}
+
+	.mtl-prod-stat {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 4px 10px;
+		background: rgba(0, 0, 0, 0.04);
+		border-radius: 6px;
+		font-size: 0.75rem;
+	}
+
+	.mtl-prod-stat__label {
+		color: var(--mud-palette-text-secondary);
+		font-weight: 500;
+	}
+
+	.mtl-prod-stat__value {
+		font-weight: 700;
+		color: var(--mud-palette-primary);
+	}
+
+	.mtl-prod-stat__value--success {
+		color: #2e7d32;
+	}
+
+	.mtl-prod-stat__value--warning {
+		color: #ed6c02;
+	}
+
+	.mtl-prod-stat__value--error {
+		color: #d32f2f;
+	}
+
+	/* ── Card Layout Variant ── */
+	.mtl-prod-card--wide {
+		flex-direction: row;
+		min-height: 140px;
+	}
+
+	.mtl-prod-card--wide .mtl-prod-card__img-wrap {
+		width: 140px;
+		min-width: 140px;
+		aspect-ratio: 1 / 1;
+	}
+
+	.mtl-prod-card--wide .mtl-prod-card__body {
+		padding: 12px 14px;
+		justify-content: center;
+	}
+
+	.mtl-prod-card--wide .mtl-prod-card__name {
+		-webkit-line-clamp: 3;
+		font-size: 0.85rem;
+	}
+
+	.mtl-prod-card--wide .mtl-prod-card__price {
+		font-size: 1.22rem;
+	}
+
+	.mtl-prod-card--wide .mtl-prod-card__price-original {
+		font-size: 1.06rem;
+	}
+
+	.mtl-prod-card--wide .mtl-prod-badge {
+		top: 8px;
+		left: 8px;
+	}
+
+	.mtl-prod-card--wide .mtl-prod-card__actions {
+		top: 8px;
+		right: 8px;
+	}
+
+	@@media (max-width: 1600px) { .mtl-prod-grid { grid-template-columns: repeat(5, 1fr); } }
+	@@media (max-width: 1300px) { .mtl-prod-grid { grid-template-columns: repeat(4, 1fr); } }
+	@@media (max-width: 960px)  { .mtl-prod-grid { grid-template-columns: repeat(3, 1fr); } }
+	@@media (max-width: 640px)  { .mtl-prod-grid { grid-template-columns: repeat(2, 1fr); } }
+	@@media (max-width: 420px)  { .mtl-prod-grid { grid-template-columns: 1fr; } }
+
+	.product-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+	.product-table-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; min-height: 48px; }
+	.product-search-field { flex: 1 1 220px; min-width: 0; }
+	.product-mtl-table :is(.mud-table-cell, .mud-table-head) { vertical-align: middle; }
+	.product-cell-tensp { max-width: min(420px, 42vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	@@media (max-width: 600px) {
+		.product-cell-tensp { max-width: 200px; white-space: normal; }
+	}
+
+</style>
+
+<AuthorizeView>
+	<Authorized>
+		<MudDrawerContainer Class="mud-height-full">
+			<MudDrawer Width="300px" @bind-Open="@open" Fixed="true" Elevation="24"
+					   Style="background-color:var(--mud-palette-surface);position:fixed;top:64px;"
+					   Variant="@DrawerVariant.Temporary" DisableOverlay="true"
+					   Anchor="Anchor.End">
+				<MudDrawerHeader Class="d-flex justify-center ">
+					<MudPaper Elevation="1">
+						<MudStack Row="true" Spacing="1">
+							<MudExGradientText Typo="Typo.h6" Class="pa-2 mx-2 ">LỌC HÀNG HÓA</MudExGradientText>
+							<MudIconButton OnClick="@ToggleDrawer" Class="pa-2 mx-2 mud-theme-error"
+										   Icon="@Icons.Material.Filled.Close" Variant="Variant.Filled"
+										   Color="Color.Error" Size="Size.Medium" />
+						</MudStack>
+					</MudPaper>
+				</MudDrawerHeader>
+				<MudPaper>
+					<MudGrid Spacing=1>
+						<MudItem xs="12" sm="12" md="12">
+							<MudSelect Label="Tồn kho" T="string"
+									   Value=@_filter.v_tonkho Disabled=IsLoading
+									   ValueChanged="ValueChangedHandler_TonKho"
+									   AnchorOrigin="Origin.BottomCenter" Required="true">
+								@foreach (var item in @MTLEnum.TonKho.data)
+								{
+									<MudSelectItem T="string" Value="@item">@item</MudSelectItem>
+								}
+							</MudSelect>
+						</MudItem>
+						<MudItem xs="12" sm="12" md="12">
+							<MudSelect Label="Theo ngày" T="string"
+									   Value="@_filter.v_theongay" Disabled=IsLoading
+									   ValueChanged="ValueChangedHandler_Day"
+									   AnchorOrigin="Origin.BottomCenter" Required="true">
+								@foreach (var item in @MTLEnum.SapXepTheoNgay.data)
+								{
+									<MudSelectItem T="string" Value="@item">@item</MudSelectItem>
+								}
+							</MudSelect>
+						</MudItem>
+						<MudItem xs="12" sm="12" md="12">
+							<MudSelect Label="Số dòng" T="int"
+									   Value="_filter.v_sodong" Disabled=IsLoading
+									   ValueChanged="ValueChangedHandler_SoDong"
+									   AnchorOrigin="Origin.BottomCenter" Required="true">
+								@foreach (var item in MTLEnum.SoDongHienThi.data)
+								{
+									<MudSelectItem T="int" Value="@item">@item</MudSelectItem>
+								}
+							</MudSelect>
+						</MudItem>
+					</MudGrid>
+				</MudPaper>
+			</MudDrawer>
+		</MudDrawerContainer>
+
+		<div class="card-body">
+			<PageStandardHeader Icon="@Icons.Material.Filled.Inventory" Title="HÀNG HÓA">
+				<Actions>
+					<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+						<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add"
+								   Class="mtl-header-action-btn" Disabled="IsLoading" OnClick="ThemHangHoaDialog" Color="Color.Primary">THÊM HÀNG</MudButton>
+						<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FileDownload"
+								   Class="mtl-header-action-btn" Disabled="IsLoading" OnClick="ExportData" Color="Color.Tertiary">EXCEL</MudButton>
+						<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterList"
+								   Class="mtl-header-action-btn" Disabled="IsLoading" OnClick="@ToggleDrawer" Color="Color.Success">BỘ LỌC</MudButton>
+					</MudStack>
+				</Actions>
+				<ChildContent>
+					<MudTextField @bind-Value="searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+								  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+								  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search" />
+				</ChildContent>
+			</PageStandardHeader>
+
+			<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+				@if (IsLoading)
+				{
+					<Loading IsFullPage="false" PageName="HÀNG HÓA" />
+				}
+				else if (ListProduct == null || !ListProduct.Any())
+				{
+					<MudDivider Class="mud-width-full" />
+					<MudPaper Elevation="0" Class="pa-8">
+						<MudStack AlignItems="AlignItems.Center" Spacing="2">
+							<MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Style="opacity:0.3" />
+							<MudText Typo="Typo.body1" Class="mud-text-secondary">Không tìm thấy sản phẩm nào.</MudText>
+						</MudStack>
+					</MudPaper>
+				}
+				else
+				{
+					<MudDivider Class="mud-width-full" />
+					<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Stretch" Justify="Justify.Center"
+							  Class="pa-2 mtl-invoice-tab-bar"
+							  Style="flex-wrap:wrap; gap:8px; border-bottom:1px solid var(--mud-palette-lines-default);">
+						@for (var i = 0; i < ProductLoaiTabList.Count; i++)
+						{
+							var idx = i;
+							var loaiHH = ProductLoaiTabList[idx];
+							var cnt = GetItemsByLoaiHH(loaiHH.Id).Count;
+							<MudButton Variant="@(ProductLoaiTabClampedIndex == idx ? Variant.Filled : Variant.Outlined)"
+									   Color="@ProductLoaiTabButtonColor(idx)"
+									   StartIcon="@ProductLoaiTabButtonIcon(loaiHH.Id)"
+									   OnClick="@(() => SetProductLoaiTab(idx))">
+								@($"{loaiHH.Loaihinhkinhdoanh} ({cnt})")
+							</MudButton>
+						}
+					</MudStack>
+					@if (_viewAsCards)
+					{
+						<div class="pa-2">
+							<div class="mtl-prod-grid">
+										@foreach (var product in ActiveProductTabItems)
+										{
+											var isActive = !(product.active == null || product.active == false);
+											var hasLink = !string.IsNullOrWhiteSpace(product.link);
+											<div class="mtl-prod-card" @ondblclick="() => SuaHangHoaDialog(product)"
+												 @onmouseover="() => { _ = PreloadImageAsync(product.pic00); }">
+												<div class="mtl-prod-card__img-wrap">
+													@if (hasLink)
+													{
+														<a class="mtl-prod-card__img-link" href="@product.link" target="_blank"
+														   title="Mở trang web: @product.tensp">
+															<img src="@GetImageUrl(product)" alt="@product.tensp"
+																 class="mtl-prod-card__img @(isActive ? "" : "grayscale")"
+																 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+															<div class="mtl-prod-card__img-placeholder" style="display:none">
+																<MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" />
+															</div>
+														</a>
+													}
+													else
+													{
+														<img src="@GetImageUrl(product)" alt="@product.tensp"
+															 class="mtl-prod-card__img @(isActive ? "" : "grayscale")"
+															 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+														<div class="mtl-prod-card__img-placeholder" style="display:none">
+															<MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" />
+														</div>
+													}
+
+											<span class="mtl-prod-badge @(isActive ? "mtl-prod-badge--active" : "mtl-prod-badge--inactive")">
+														@(isActive ? "CÒN HÀNG" : "HẾT HÀNG")
+													</span>
+
+													<div class="mtl-prod-card__actions">
+														<button class="mtl-prod-card__action-btn mtl-prod-card__action-btn--edit"
+																title="Sửa" @onclick="() => SuaHangHoaDialog(product)" @onclick:stopPropagation="true">
+															<i class="fas fa-pen"></i>
+														</button>
+														<button class="mtl-prod-card__action-btn mtl-prod-card__action-btn--del"
+																title="Xóa" @onclick="() => XoaHangHoaDialog(product)" @onclick:stopPropagation="true">
+															<i class="fas fa-trash"></i>
+														</button>
+														<button class="mtl-prod-card__action-btn mtl-prod-card__action-btn--print"
+																title="In tem" @onclick="() => OnPrintButtonClick(product)" @onclick:stopPropagation="true">
+															<i class="fas fa-print"></i>
+														</button>
+													</div>
+												</div>
+
+												<div class="mtl-prod-card__body">
+													<span class="mtl-prod-card__cat">@GetNhomHangName(product.idnhomhang)</span>
+													<span class="mtl-prod-card__name" title="@product.tensp">@product.tensp</span>
+													<div class="mtl-prod-card__price-wrap">
+														@if (ProductShowDualCardPrices(product))
+														{
+															<span class="mtl-prod-card__price">@product.giaban?.ToString("N0") đ</span>
+															<span class="mtl-prod-card__price-original">@product.giathuong?.ToString("N0") đ</span>
+														}
+														else
+														{
+															<span class="mtl-prod-card__price">@((product.giaban ?? product.giathuong)?.ToString("N0") ?? "—") đ</span>
+														}
+													</div>
+													<div class="mtl-prod-card__toggle">
+														<MudSwitch Checked=@(!(product.active ?? false)) ReadOnly=true T="bool" Color="Color.Primary" Dense="true" Size="Size.Small" />
+													</div>
+												</div>
+											</div>
+										}
+									</div>
+						</div>
+					}
+					else
+					{
+						<div class="product-table-wrap">
+										<MudTable Items="@ActiveProductTabItems"
+												  Hover="true" Striped="true" Bordered="true"
+												  Dense="true" RowsPerPage=_filter.v_sodong
+												  Loading=@IsLoading
+												  Class="MTLGrid product-mtl-table">
+											<ToolBarContent>
+												<div class="product-table-toolbar px-2 py-1">
+													<MudIcon Icon="@Icons.Material.Filled.TableRows" Size="Size.Small" Style="opacity:0.85" />
+													<MudText Typo="Typo.subtitle2" Style="font-weight:600; white-space:nowrap">Bảng dữ liệu</MudText>
+													<MudSpacer />
+												</div>
+											</ToolBarContent>
+											<HeaderContent>
+												<MudTh Style="width:132px; text-align:center;">THAO TÁC</MudTh>
+												<MudTh Style="width:64px; text-align:center;">H.HÀNG</MudTh>
+												<MudTh Style="width:56px;">ẢNH</MudTh>
+												<MudTh Style="min-width:200px;">SẢN PHẨM</MudTh>
+												<MudTh Style="width:130px; text-align:right;">NHÓM HÀNG</MudTh>
+												<MudTh Style="width:96px; text-align:right;">GIÁ BÁN</MudTh>
+												<MudTh Style="width:72px; text-align:right;">ĐVT</MudTh>
+												<MudTh Style="width:108px; text-align:right;">MÃ HÀNG</MudTh>
+												<MudTh Style="width:120px; text-align:right;">MODEL</MudTh>
+												<MudTh Style="width:96px; text-align:right;">T.HIỆU</MudTh>
+												<MudTh Style="width:56px; text-align:right;">WOO</MudTh>
+												<MudTh Style="width:88px; text-align:right;">B.HÀNH</MudTh>
+												<MudTh Style="width:96px; text-align:right;">G.THƯỜNG</MudTh>
+												<MudTh Style="width:96px; text-align:right;">GÍA NHẬP</MudTh>
+												<MudTh Style="min-width:120px; text-align:right;">NGƯỜI UPDATE</MudTh>
+												<MudTh Style="width:108px; text-align:right;">NGÀY TẠO</MudTh>
+												<MudTh Style="min-width:120px; text-align:right;">NGƯỜI TẠO</MudTh>
+											</HeaderContent>
+											<RowTemplate Context="product">
+												<MudTd DataLabel="THAO TÁC" Style="text-align:center;">
+													<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+														<MudIconButton OnClick="@(() => SuaHangHoaDialog(product))" Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" />
+														<MudIconButton OnClick="@(() => XoaHangHoaDialog(product))" Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" />
+														<MudIconButton OnClick="@(() => OnPrintButtonClick(product))" Icon="@Icons.Material.Filled.Print" Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" />
+													</MudButtonGroup>
+												</MudTd>
+												<MudTd DataLabel="H.HÀNG" Style="text-align:center;">
+													<MudSwitch Checked=!(product.active ?? false) ReadOnly=true T="bool" Color="Color.Primary" />
+												</MudTd>
+												<MudTd DataLabel="ẢNH">
+													<img src="@GetImageUrl(product)" alt="" width="44" height="44" style="object-fit:cover; border-radius:4px;" />
+												</MudTd>
+												<MudTd DataLabel="SẢN PHẨM" Class="product-cell-tensp" title="@product.tensp">@product.tensp</MudTd>
+												<MudTd DataLabel="NHÓM HÀNG" Style="text-align:right;">@GetNhomHangName(product.idnhomhang)</MudTd>
+												<MudTd DataLabel="GIÁ BÁN" Style="text-align:right;">@product.giaban?.ToString("C0")</MudTd>
+												<MudTd DataLabel="ĐVT" Style="text-align:right;">@GetDVTName(product.iddonvitinh)</MudTd>
+												<MudTd DataLabel="MÃ HÀNG" Style="text-align:right;">@product.masp</MudTd>
+												<MudTd DataLabel="MODEL" Style="text-align:right;">
+													@{ var mLink = product.link; var mText = product.model; }
+													@if (!string.IsNullOrWhiteSpace(mLink))
+													{
+														<a target="_blank" href="@mLink" style="color:var(--mud-palette-error)">@mText</a>
+													}
+													else
+													{
+														<span>@mText</span>
+													}
+												</MudTd>
+												<MudTd DataLabel="T.HIỆU" Style="text-align:right;">@GetThuongHieuName(product.idthuonghieu)</MudTd>
+												<MudTd DataLabel="WOO" Style="text-align:right;">
+													@{ var wLink = product.link; var wId = product.woo_id; }
+													@if (!string.IsNullOrWhiteSpace(wLink))
+													{
+														<a target="_blank" href="@wLink" style="color:var(--mud-palette-error)">@wId</a>
+													}
+													else
+													{
+														<span>@wId</span>
+													}
+												</MudTd>
+												<MudTd DataLabel="B.HÀNH" Style="text-align:right;">@GetBaoHanhName(product.idBaoHanh)</MudTd>
+												<MudTd DataLabel="G.THƯỜNG" Style="text-align:right;">@product.giathuong?.ToString("C0")</MudTd>
+												<MudTd DataLabel="GÍA NHẬP" Style="text-align:right;">@product.giavon?.ToString("C0")</MudTd>
+												<MudTd DataLabel="NGƯỜI UPDATE" Style="text-align:right;">@GetUserName(product.iduserlastupdate)</MudTd>
+												<MudTd DataLabel="NGÀY TẠO" Style="text-align:right;">@product.beginupdate?.ToString("dd/MM/yyyy HH:mm:ss")</MudTd>
+												<MudTd DataLabel="NGƯỜI TẠO" Style="text-align:right;">@GetUserName(product.iduserlastcreate)</MudTd>
+											</RowTemplate>
+											<NoRecordsContent><MudText>Không tìm thấy dữ liệu.</MudText></NoRecordsContent>
+											<LoadingContent><MudText>Đang tải dữ liệu...</MudText></LoadingContent>
+											<PagerContent><MudTablePager PageSizeOptions="new int[] { 50, 100 }" /></PagerContent>
+											</MudTable>
+						</div>
+					}
+				}
+			</MudPaper>
+		</div>
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+	DialogOptionsEx options = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.Medium,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	DialogOptionsEx options_FullScreen = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.ExtraExtraLarge,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.TopCenter,
+		FullWidth = true,
+		FullHeight = true,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	UserSession userSession { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+	MTL_GetAllThuongHieuResult mtl_thuonghieu = new MTL_GetAllThuongHieuResult();
+	MTL_GetAllNhomHangResult mtl_nhomhang = new MTL_GetAllNhomHangResult();
+
+	string image_product = "/images/logo.png";
+
+	string tensp { get; set; }
+	bool IsLoading = false;
+
+	bool isHetHang { get; set; }
+
+	public List<MTL_GetAllProductsInCompanyResult>? ListProduct { get; set; }
+	List<MTL_GetAllNhomHangResult>? NhomHangParentList { get; set; }
+	List<MTL_GetAllThuongHieuResult>? ThuongHieuList { get; set; }
+	List<TblBaoHanh>? BaoHanhList { get; set; }
+	List<TblVitri>? ViTriList { get; set; }
+	List<TblDonvitinh>? DVTList { get; set; }
+	List<LoaiHinhKinhDoanh>? LoaiHHDVList { get; set; }
+	public TblSanpham _sanpham = new TblSanpham();
+	private ToastParameters _toastParameters;
+	List<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+	FilterCondition _filter = new FilterCondition();
+	FilterConditionAPI _filterAPI = new FilterConditionAPI();
+	List<APP.WooRestAPI.Product>? productlist_API { get; set; }
+	APP.WooRestAPI.Product? product_woo { get; set; }
+	int product_woo_id = 0;
+	bool LoadingPanel_Visible = true;
+	bool IsLoadingAPI = false;
+	bool IsLoadingSave = false;
+	int idcompany = 0;
+	bool spAo_enable { get; set; } = true;
+	List<MTL_GetSanPhamThanhPhanResult>? ListHangHoaThanhPhan { get; set; }
+	List<MTL_GetAllProductsResult>? ListProduct_ThanhPhan { get; set; }
+	string Wookey { get; set; }
+	string Woosecret { get; set; }
+	string Woourl { get; set; }
+	MTL.APP.WooRestAPI.Product WooProduct_Return { get; set; }
+	string LinkAnhXoa { get; set; }
+	string NoiDungXoa { get; set; }
+	MTL_GetAllProductsInCompanyResult curent_product_select = new MTL_GetAllProductsInCompanyResult();
+	FilterCondition filter_detail = new FilterCondition();
+
+	private string searchString = "";
+
+	// View mode: true = Card, false = Table
+	bool _viewAsCards = true;
+	/// <summary>Tab loại HHDV (0=Hàng hoá, 1=Dịch vụ, 2=Combo) — UI giống trang Hóa đơn.</summary>
+	int _productLoaiTabIndex;
+
+	/// <summary>Cache ảnh theo URL gốc: url → base64 data URI</summary>
+	static readonly Dictionary<string, string> _urlImageCache = new();
+
+	/// <summary>URLs đang trong quá trình cache (tránh duplicate requests)</summary>
+	static readonly HashSet<string> _pendingUrls = new();
+
+	/// <summary>Preload ảnh: gọi khi user hover hoặc scroll vào viewport.</summary>
+	async Task PreloadImageAsync(string? url)
+	{
+		if (string.IsNullOrWhiteSpace(url) || _urlImageCache.ContainsKey(url) || _pendingUrls.Contains(url))
+			return;
+		_pendingUrls.Add(url);
+		try
+		{
+			var jsResult = await JSRuntime.InvokeAsync<ImageCacheResult>("MTLImageCache.cacheImage", url, "");
+			if (jsResult.data != null)
+			{
+				_urlImageCache[url] = jsResult.data;
+				StateHasChanged();
+			}
+		}
+		catch { }
+		finally
+		{
+			_pendingUrls.Remove(url);
+		}
+	}
+
+	class ImageCacheResult
+	{
+		public string? data { get; set; }
+		public bool fromCache { get; set; }
+		public int size { get; set; }
+	}
+
+	void SetProductLoaiTab(int index)
+	{
+		_productLoaiTabIndex = index;
+		_ = PreloadTabImagesAsync();
+	}
+
+	IReadOnlyList<LoaiHinhKinhDoanh> ProductLoaiTabList => LoaiHHDVList ?? new List<LoaiHinhKinhDoanh>();
+
+	int ProductLoaiTabClampedIndex
+	{
+		get
+		{
+			var n = ProductLoaiTabList.Count;
+			return n == 0 ? 0 : Math.Clamp(_productLoaiTabIndex, 0, n - 1);
+		}
+	}
+
+	IReadOnlyList<MTL_GetAllProductsInCompanyResult> ActiveProductTabItems =>
+		ActiveProductLoai is null ? [] : GetItemsByLoaiHH(ActiveProductLoai.Id);
+
+	LoaiHinhKinhDoanh? ActiveProductLoai =>
+		ProductLoaiTabList.Count > 0 ? ProductLoaiTabList[ProductLoaiTabClampedIndex] : null;
+
+	static Color ProductLoaiTabButtonColor(int index) => index switch
+	{
+		0 => Color.Info,
+		1 => Color.Warning,
+		2 => Color.Success,
+		_ => Color.Primary,
+	};
+
+	static string ProductLoaiTabButtonIcon(int loaiId) => loaiId switch
+	{
+		LoaiHinhKinhDoanh.HangHoa => Icons.Material.Filled.List,
+		LoaiHinhKinhDoanh.DichVu => Icons.Material.Filled.Build,
+		LoaiHinhKinhDoanh.Combo => Icons.Material.Filled.GridView,
+		_ => Icons.Material.Filled.Category,
+	};
+	// Product stats
+	int TotalProducts => ListProduct?.Count ?? 0;
+	int ActiveProducts => ListProduct?.Count(p => p.active == true || p.active == null) ?? 0;
+	int InStockProducts => ListProduct?.Count(p => p.tonkho > 0) ?? 0;
+	int OutOfStockProducts => ListProduct?.Count(p => p.tonkho <= 0 || p.tonkho == null) ?? 0;
+
+	// Cột tùy chọn — mặc định ẩn: ĐVT, mã hàng, model, thương hiệu, Woo, kho hàng, cập nhật
+	bool ShowColDvt { get; set; }
+	bool ShowColMaHang { get; set; }
+	bool ShowColModel { get; set; }
+	bool ShowColThuongHieu { get; set; }
+	bool ShowColWoo { get; set; }
+	bool ShowColKhoHang { get; set; }
+	bool ShowColCapNhat { get; set; }
+
+	void ApplyDefaultProductColumns()
+	{
+		ShowColDvt = ShowColMaHang = ShowColModel = ShowColThuongHieu = ShowColWoo = ShowColKhoHang = ShowColCapNhat = false;
+	}
+
+	class FilterCondition
+	{
+		public string v_tonkho { get; set; } = MTLEnum.TonKho.TatCa;
+		public string v_theongay { get; set; } = MTLEnum.SapXepTheoNgay.NgayTao;
+		public int v_loaihh { get; set; } = 1;
+		public int v_sl { get; set; } = 1;
+		public double v_dongia { get; set; } = 0;
+		public int v_baohanh { get; set; } = 3;
+		public int v_tensp { get; set; } = 1;
+		public string v_loaiHHDVNullText { get; set; } = "Chọn Hàng hóa";
+		public string v_tenspEdit { get; set; } = "";
+		public bool v_SPAo { get; set; } = false;
+		public bool v_HDVAT { get; set; } = false;
+		public int v_NhomKhachHang { get; set; } = 1;
+		public int v_loaiphieu { get; set; } = 1;
+		public string v_dichvuxuly { get; set; } = "Tất cả";
+		public int v_sodong { get; set; } = 10;
+		public string v_model { get; set; } = "";
+		public string v_masp { get; set; } = "";
+		public int v_idhanghoathanhphan { get; set; } = 0;
+		public int v_idhanghoathanhphan_edittmp { get; set; } = 0;
+	}
+
+	class FilterConditionAPI
+	{
+		public string v_tonkho { get; set; } = MTLEnum.TonKhoAPI.TatCa;
+		public string v_timhanghoa { get; set; } = "";
+		public string v_wooid { get; set; } = "";
+		public string v_wooid_all { get; set; } = "";
+		public DateTime date_created { get; set; } = DateTime.Now;
+		public DateTime date_modified { get; set; } = DateTime.Now;
+		public List<MTL.APP.WooRestAPI.tag> woo_tags_data { get; set; }
+	}
+
+	private bool FilterFunc(MTL_GetAllProductsInCompanyResult element)
+	{
+		if (string.IsNullOrWhiteSpace(searchString))
+			return true;
+		if (element.tensp != null && element.tensp.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			return true;
+		if (element.masp != null && element.masp.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			return true;
+		if (element.model != null && element.model.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			return true;
+		return false;
+	}
+
+	/// <summary>Lọc sản phẩm theo loại HHDV (tab) — không gọi API lại.</summary>
+	IReadOnlyList<MTL_GetAllProductsInCompanyResult> GetItemsByLoaiHH(int loaiId)
+	{
+		if (ListProduct == null) return [];
+		var search = searchString?.Trim().ToLowerInvariant() ?? "";
+		// null idloaihanghoadichvu → coi là Hàng hóa (1) để vẫn hiện trong tab
+		var query = ListProduct.Where(p => (p.idloaihanghoadichvu ?? LoaiHinhKinhDoanh.HangHoa) == loaiId);
+		if (!string.IsNullOrEmpty(search))
+		{
+			query = query.Where(p =>
+				(p.tensp?.ToLowerInvariant().Contains(search) ?? false) ||
+				(p.masp?.ToLowerInvariant().Contains(search) ?? false) ||
+				(p.model?.ToLowerInvariant().Contains(search) ?? false));
+		}
+		return query.ToList();
+	}
+
+	string GetNhomHangName(int? id)
+	{
+		if (id == null) return "";
+		return NhomHangParentList?.FirstOrDefault(p => p.id == id)?.v_nhomhang ?? "";
+	}
+
+	/// <summary>Thẻ sản phẩm: hiển thị giá bán + giá thường (niêm yết) cùng một dòng khi khác nhau.</summary>
+	static bool ProductShowDualCardPrices(MTL_GetAllProductsInCompanyResult p)
+	{
+		if (p is null) return false;
+		if (p.giaban is null) return false;
+		if (p.giathuong is null || p.giathuong <= 0) return false;
+		return Math.Abs(p.giathuong.Value - p.giaban.Value) > 0.01;
+	}
+
+	string GetThuongHieuName(int? id)
+	{
+		if (id == null) return "";
+		return ThuongHieuList?.FirstOrDefault(p => p.id == id)?.thuonghieu ?? "";
+	}
+
+	string GetBaoHanhName(int? id)
+	{
+		if (id == null) return "";
+		return BaoHanhList?.FirstOrDefault(p => p.Id == id)?.Baohanh ?? "";
+	}
+
+	string GetViTriName(int? id)
+	{
+		if (id == null) return "";
+		return ViTriList?.FirstOrDefault(p => p.Id == id)?.Vitri ?? "";
+	}
+
+	string GetDVTName(int? id)
+	{
+		if (id == null) return "";
+		return DVTList?.FirstOrDefault(p => p.Id == id)?.Donvitinh ?? "";
+	}
+
+	string GetUserName(int? id)
+	{
+		if (id == null || id == 0) return "";
+		return UserList?.FirstOrDefault(p => p.userid == id)?.Fullname ?? "";
+	}
+
+	/// <summary>Lấy URL ảnh: ưu tiên cache localStorage → server file cache → URL gốc.</summary>
+	string GetImageUrl(MTL_GetAllProductsInCompanyResult product)
+	{
+		var rawUrl = product.pic00;
+		if (string.IsNullOrWhiteSpace(rawUrl))
+			return "/images/logo.png";
+		if (_urlImageCache.TryGetValue(rawUrl, out var cached))
+			return cached;
+		return rawUrl;
+	}
+
+	/// <summary>Background preload tất cả ảnh của tab hiện tại sau khi render xong.</summary>
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await PreloadTabImagesAsync();
+		}
+	}
+
+	/// <summary>Preload ảnh khi tab thay đổi.</summary>
+	async Task PreloadTabImagesAsync()
+	{
+		var urls = ActiveProductTabItems
+			.Select(p => p.pic00)
+			.Where(u => !string.IsNullOrWhiteSpace(u))
+			.Distinct()
+			.Cast<string>()
+			.ToList();
+
+		if (!urls.Any()) return;
+
+		var batchResult = await JSRuntime.InvokeAsync<Dictionary<string, ImageCacheResult>>(
+			"MTLImageCache.cacheImagesBatch", urls!, "", 6);
+
+		foreach (var kv in batchResult)
+		{
+			if (kv.Value.data != null && !_urlImageCache.ContainsKey(kv.Key))
+				_urlImageCache[kv.Key] = kv.Value.data;
+		}
+		StateHasChanged();
+	}
+
+	async Task ValueChangedHandler_TonKho(string newValue)
+	{
+		IsLoading = true;
+		_filter.v_tonkho = newValue;
+		await FilterDataList();
+		IsLoading = false;
+	}
+
+	async Task ValueChangedHandler_Day(string newValue)
+	{
+		_filter.v_theongay = newValue;
+		await FilterDataList();
+	}
+
+	async Task ValueChangedHandler_SoDong(int newValue)
+	{
+		_filter.v_sodong = newValue;
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadProductPageDataAsync();
+	}
+
+	async Task LoadConfigFromCompany()
+	{
+		userSession = await configs.LoadAllConfig();
+		idcompany = userSession?.company?.Id ?? 0;
+		if (userSession?.company != null)
+		{
+			Wookey = userSession.company.Wookey;
+			Woosecret = userSession.company.Woosecret;
+			Woourl = userSession.company.Woourl;
+			_filter.v_sodong = userSession.company.Sodonghienthi;
+		}
+	}
+
+	/// <summary>Tải toàn bộ dữ liệu trang — gọi từ OnInitializedAsync (Blazor Server, có circuit + JS).</summary>
+	async Task LoadProductPageDataAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			await LoadConfigFromCompany();
+			if (idcompany <= 0)
+			{
+				ListProduct = new List<MTL_GetAllProductsInCompanyResult>();
+				SnackbarService.Add("Không lấy được mã công ty. Vui lòng đăng nhập lại.", Severity.Error);
+				return;
+			}
+
+			await FilterDataList();
+			NhomHangParentList = await hangHoaService.MTL_GetAllNhomHangAsync(_filter.v_loaihh, idcompany);
+			ThuongHieuList = await hangHoaService.GetThuongHieuAllAsync(idcompany);
+			BaoHanhList = await hangHoaService.GetBaoHanhAsync();
+			ViTriList = await hangHoaService.GetViTriAsync(idcompany);
+			DVTList = await hangHoaService.GetDonViTinhAsync();
+			LoaiHHDVList = MTLEnum.GetListLoaiHinhKD();
+			UserList = await userService.GetAllUserCompanyAsync(idcompany);
+		}
+		catch (Exception ex)
+		{
+			ListProduct = new List<MTL_GetAllProductsInCompanyResult>();
+			SnackbarService.Add($"Lỗi tải hàng hóa: {ex.Message}", Severity.Error);
+			Console.WriteLine($"[Product.razor] {ex}");
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task FilterDataList()
+	{
+		if (idcompany <= 0)
+		{
+			ListProduct = new List<MTL_GetAllProductsInCompanyResult>();
+			return;
+		}
+		IsLoading = true;
+		try
+		{
+			var rows = await hangHoaService.GetAllProductCompanyAsync(idcompany, _filter.v_tonkho, 0, _filter.v_theongay);
+			ListProduct = rows ?? new List<MTL_GetAllProductsInCompanyResult>();
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task ExportData()
+	{
+		await JSRuntime.InvokeVoidAsync("exportToCsv", "DanhSachSanPham.csv", ListProduct);
+	}
+
+	async Task OnPrintButtonClick(MTL_GetAllProductsInCompanyResult product)
+	{
+		var p = new MTL_GetAllProductsInCompanyResult
+		{
+			id = product.id,
+			tensp = product.tensp
+		};
+		string noidung = string.Format("{0}", product.tensp);
+		var parameters = new DialogParameters<HangHoaPrintDialog>();
+		parameters.Add(x => x.NoiDung, noidung);
+		parameters.Add(x => x.product, p);
+		string headerText = "IN THÔNG TIN HÀNG HÓA";
+		var dialog = await DialogService.ShowEx<HangHoaPrintDialog>(headerText, parameters, options);
+		var result = await dialog.Result;
+	}
+
+	async Task XoaHangHoaDialog(MTL_GetAllProductsInCompanyResult product)
+	{
+		string noidungXoa = string.Format("{0}", product.tensp);
+		string linkAnhXoa = userSession.company.Logourl;
+		if (product.hinhanh1 != null)
+			linkAnhXoa = string.Format("{0}", product.hinhanh1);
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, noidungXoa);
+		parameters.Add(x => x.LinkAnh, linkAnhXoa);
+		parameters.Add(x => x.OnDeleteCallback, EventCallback.Factory.Create<string>(this, async _ =>
+		{
+			await hangHoaService.DeleteProductAsync(product.id);
+			await FilterDataList();
+			string mess = $"Xóa thành công hàng hóa [{product.tensp}]";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+		}));
+		var dialog = await DialogService.ShowEx<DeleteDialog>("XÓA HÀNG HÓA", parameters, options);
+		var result = await dialog.Result;
+	}
+
+	TblSanpham ToProduct(MTL_GetAllProductsInCompanyResult mtl_sanpham, bool isNew)
+	{
+		_sanpham.Idcompany = userSession.company.Id;
+		if (isNew)
+		{
+			_sanpham.Iduserlastcreate = _sanpham.Iduserlastupdate = userSession.user.UserId;
+			_sanpham.Beginupdate = _sanpham.Lastupdate = DateTime.Now;
+		}
+		else
+		{
+			_sanpham.Lastupdate = DateTime.Now;
+			_sanpham.Iduserlastupdate = userSession.user.UserId;
+			_sanpham.Id = mtl_sanpham.id;
+			_sanpham.Idloaihanghoadichvu = mtl_sanpham.idloaihanghoadichvu;
+			_sanpham.Masp = mtl_sanpham.masp;
+			_sanpham.Model = mtl_sanpham.model;
+			_sanpham.Tensp = mtl_sanpham.tensp;
+			_sanpham.Link = mtl_sanpham.link;
+			_sanpham.Idnhomhang = mtl_sanpham.idnhomhang;
+			_sanpham.Idthuonghieu = mtl_sanpham.idthuonghieu;
+			_sanpham.Idvitri = mtl_sanpham.idvitri;
+			_sanpham.IdBaoHanh = mtl_sanpham.idBaoHanh;
+			_sanpham.Iddonvitinh = mtl_sanpham.iddonvitinh;
+			_sanpham.Giaban = mtl_sanpham.giaban;
+			_sanpham.Giathuong = mtl_sanpham.giathuong;
+			_sanpham.Giavon = mtl_sanpham.giavon;
+			_sanpham.Mota = mtl_sanpham.mota;
+			_sanpham.Motachitiet = mtl_sanpham.motachitiet;
+			_sanpham.Ssd = mtl_sanpham.ssd;
+			_sanpham.Ram = mtl_sanpham.ram;
+			_sanpham.Cpu = mtl_sanpham.cpu;
+			_sanpham.Vga = mtl_sanpham.vga;
+			_sanpham.Active = !mtl_sanpham.hethang;
+			_sanpham.Beginupdate = mtl_sanpham.beginupdate;
+			_sanpham.Lastupdate = DateTime.Now;
+			_sanpham.Iduserlastcreate = mtl_sanpham.iduserlastcreate;
+			_sanpham.Iduserlastupdate = userSession.user.UserId;
+			_sanpham.Isdelete = false;
+			_sanpham.Hinhanh1 = mtl_sanpham.hinhanh1;
+			_sanpham.Hinhanh2 = mtl_sanpham.hinhanh2;
+			_sanpham.Hinhanh3 = mtl_sanpham.hinhanh3;
+			_sanpham.Hinhanh4 = mtl_sanpham.hinhanh4;
+			_sanpham.Hinhanh5 = mtl_sanpham.hinhanh5;
+			_sanpham.Pic00 = mtl_sanpham.pic00;
+			_sanpham.Video = mtl_sanpham.video;
+			_sanpham.Mavach = mtl_sanpham.mavach;
+			_sanpham.WooId = mtl_sanpham.woo_id;
+		}
+		return _sanpham;
+	}
+
+	DialogOptionsEx Options { get; set; } = new()
+	{
+		MaximizeButton = true,
+		CloseButton = true,
+		FullHeight = true,
+		CloseOnEscapeKey = true,
+		MaxWidth = MaxWidth.ExtraExtraLarge,
+		MaxHeight = MaxHeight.False,
+		FullWidth = true,
+		DragMode = MudDialogDragMode.Simple,
+		Animations = new[] { AnimationType.Scale },
+		Position = DialogPosition.Center,
+		DisableSizeMarginY = true,
+		DisablePositionMargin = true
+	};
+
+	async Task ThemHangHoaDialog()
+	{
+		MTL_GetAllProductsInCompanyResult product = new MTL_GetAllProductsInCompanyResult();
+		var parameters = new DialogParameters<DialogAddHangHoa>();
+		parameters.Add(x => x.isNew, true);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.NhomHangParentList, NhomHangParentList);
+		parameters.Add(x => x.BaoHanhList, BaoHanhList);
+		parameters.Add(x => x.ThuongHieuList, ThuongHieuList);
+		parameters.Add(x => x.ViTriList, ViTriList);
+		parameters.Add(x => x.DVTList, DVTList);
+		parameters.Add(x => x.LoaiHHDVList, LoaiHHDVList);
+		parameters.Add(x => x.UserList, UserList);
+		parameters.Add(x => x.idLoaiHHDV, _filter.v_loaihh);
+		parameters.Add(x => x.HangHoa, this.ToProduct(product, true));
+		string headerText = "THÊM HÀNG HÓA";
+		var dialog = await DialogService.ShowEx<DialogAddHangHoa>(headerText, parameters, options_FullScreen);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await FilterDataList();
+		}
+	}
+
+	async Task SuaHangHoaDialog(MTL_GetAllProductsInCompanyResult product)
+	{
+		var parameters = new DialogParameters<DialogAddHangHoa>();
+		parameters.Add(x => x.isNew, false);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.NhomHangParentList, NhomHangParentList);
+		parameters.Add(x => x.BaoHanhList, BaoHanhList);
+		parameters.Add(x => x.ThuongHieuList, ThuongHieuList);
+		parameters.Add(x => x.ViTriList, ViTriList);
+		parameters.Add(x => x.DVTList, DVTList);
+		parameters.Add(x => x.LoaiHHDVList, LoaiHHDVList);
+		parameters.Add(x => x.UserList, UserList);
+		parameters.Add(x => x.idLoaiHHDV, _filter.v_loaihh);
+		parameters.Add(x => x.HangHoa, this.ToProduct(product, false));
+		parameters.Add(x => x.woo_id_nhomhang, product.woo_id_nhomhang);
+		string headerText = "SỬA HÀNG HÓA";
+		var dialog = await DialogService.ShowEx<DialogAddHangHoa>(headerText, parameters, options_FullScreen);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await FilterDataList();
+		}
+	}
+
+	bool open = false;
+	void ToggleDrawer()
+	{
+		open = !open;
+	}
+
+	void ToggleViewMode()
+	{
+		_viewAsCards = !_viewAsCards;
+	}
+}

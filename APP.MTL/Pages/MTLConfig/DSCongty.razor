@@ -1,0 +1,299 @@
+@page "/dscongty"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+
+@inject IJSRuntime JSRuntime
+@inject UserService userService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<AuthorizeView Context="auth">
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.Business" Title="DANH SÁCH CÔNG TY">
+			<Actions>
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Class="mtl-header-action-btn" Disabled=IsLoading
+							   OnClick="OnCreateCongTyClick" Color="Color.Primary">THÊM CÔNG TY</MudButton>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FileDownload" Class="mtl-header-action-btn" Disabled=IsLoading
+							   OnClick="ExportXlsx" Color="Color.Error">XUẤT EXCEL</MudButton>
+				</MudStack>
+			</Actions>
+			<ChildContent>
+				<MudTextField @bind-Value="_searchString" Placeholder="Gõ nội dung cần tìm..."
+							  Adornment="Adornment.Start" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+							  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" FullWidth="true" Class="mtl-page-header-search" />
+			</ChildContent>
+		</PageStandardHeader>
+
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="true" />
+		}
+		else
+		{
+			<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mtl-dscongty-grid">
+				<MudDataGrid T="Company"
+							 Items="@ListCompany"
+							 Filterable="true"
+							 FilterMode="@DataGridFilterMode.Simple"
+							 QuickFilterFilter="@_quickFilter"
+							 Sortable="true"
+							 Hover="true"
+							 Striped="true"
+							 Bordered="true"
+							 Dense="true"
+							 RowsPerPage="13"
+							 ShowMenuIcon="false"
+							 Hideable="true"
+							 ShowColumnOptions="true"
+							 HorizontalScrollbar="true"
+							 ColumnResizeMode="ResizeMode.Column"
+							 Loading="IsLoading"
+							 Class="MTLGrid mtl-standard-grid">
+							<NoRecordsContent>
+								<MudText Typo="Typo.body1">Không có dữ liệu công ty.</MudText>
+							</NoRecordsContent>
+							<LoadingContent>
+								<MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText>
+							</LoadingContent>
+							<ToolBarContent>
+								<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+									<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+									<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+									<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+									<MudSpacer />
+								</MudStack>
+							</ToolBarContent>
+							<Columns>
+								<TemplateColumn T="Company" Title="THAO TÁC" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+									<CellTemplate>
+										<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+											<MudIconButton @onclick="@(() => OnEditCongTyClick(context.Item))"
+														   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+														   Color="Color.Primary" Size="Size.Medium" Title="Sửa" />
+											<MudIconButton @onclick="@(() => OnDeleteCongTyDialog(context.Item))"
+														   Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled"
+														   Color="Color.Error" Size="Size.Medium" Title="Xóa" />
+										</MudButtonGroup>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="Company" Title="KHÓA" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+									<CellTemplate>
+										<MudSwitch Value="context.Item.Islock ?? false" ReadOnly="true" T="bool" Color="Color.Primary" />
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="Company" Title="ẢNH" HeaderStyle="width:60px;" Filterable="false" Sortable="false">
+									<CellTemplate>
+										@{ var logoUrl = context.Item.Logourl ?? "/images/logo.png"; }
+										<img src="@logoUrl" alt="" width="50" height="50" style="object-fit:cover;" />
+									</CellTemplate>
+								</TemplateColumn>
+
+								<PropertyColumn Property="x => x.Name" Title="KHÁCH HÀNG" HeaderStyle="width:200px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Email" Title="EMAIL" HeaderStyle="width:180px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Diachi" Title="ĐỊA CHỈ" HeaderStyle="width:450px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Masothue" Title="MÃ SỐ THUẾ" HeaderStyle="width:160px; min-width:140px; white-space:nowrap;" Filterable="true" />
+								<PropertyColumn Property="x => x.Sodienthoai" Title="SỐ ĐIỆN THOẠI" HeaderStyle="width:450px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Sotaikhoan" Title="SỐ TÀI KHOẢN" HeaderStyle="width:180px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Chutaikhoan" Title="CHỦ TÀI KHOẢN" HeaderStyle="width:150px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Website" Title="WEBSITE" HeaderStyle="width:170px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Wookey" Title="WOOKEY" HeaderStyle="width:250px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Woosecret" Title="WOOSECRET" HeaderStyle="width:150px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Woourl" Title="WOOURL" HeaderStyle="width:150px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Watermark" Title="WATERMARK" HeaderStyle="width:150px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Autocode" Title="AUTOCODE" HeaderStyle="width:150px;" Filterable="true" />
+								<TemplateColumn T="Company" Title="ACTIVE API" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+									<CellTemplate>
+										<MudSwitch Value="context.Item.IsActiveApi" ReadOnly="true" T="bool" Color="Color.Primary" />
+									</CellTemplate>
+								</TemplateColumn>
+							</Columns>
+							<NoRecordsContent>
+								<MudText Typo="Typo.body1">Không tìm thấy dữ liệu phù hợp.</MudText>
+							</NoRecordsContent>
+							<PagerContent>
+								<MudText Typo="Typo.body2" Class="pa-2">
+									Tổng số: <strong>@(ListCompany?.Count ?? 0)</strong> công ty
+								</MudText>
+								<MudDataGridPager T="Company" PageSizeOptions="new int[] { 13, 25, 50, 100 }" />
+							</PagerContent>
+				</MudDataGrid>
+			</MudPaper>
+		}
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+	UserSession userSession { get; set; }
+	private string? image_logo = "/images/logo.png";
+	bool IsLoading = true;
+	List<Company> ListCompany { get; set; }
+	public List<MTL_GetAllUserCompanyResult>? ListUser { get; set; }
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	private ToastParameters _toastParameters;
+
+	public bool PopupVisible { get; set; }
+	public string HeaderTextPopup = "";
+	Company _Company { get; set; }
+
+	string _searchString = "";
+	private Func<Company, bool> _quickFilter => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchString))
+			return true;
+		if (x.Name?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Email?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Diachi?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Masothue?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Sodienthoai?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		return false;
+	};
+
+	DialogOptionsEx options = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.Large,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	DialogOptionsEx options_FullScreen = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.ExtraExtraLarge,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+		FullScreen = true,
+	};
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		try
+		{
+			if (firstRender)
+			{
+				userSession = await configs.LoadAllConfig();
+				ListCompany = await userService.GetAllCompanyAsync();
+				IsLoading = false;
+				StateHasChanged();
+			}
+			await base.OnAfterRenderAsync(firstRender);
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	async Task ExportXlsx()
+	{
+		if (ListCompany == null || !ListCompany.Any())
+		{
+			SnackbarService.Add("Không có dữ liệu để xuất.", Severity.Warning);
+			return;
+		}
+		var exportData = ListCompany.Select(c => new
+		{
+			c.Id,
+			IsLock = c.Islock == true ? "Có" : "Không",
+			c.Name,
+			c.Email,
+			c.Diachi,
+			c.Masothue,
+			c.Sodienthoai,
+			c.Sotaikhoan,
+			c.Chutaikhoan,
+			c.Website,
+			c.Wookey,
+			c.Woosecret,
+			c.Woourl,
+			c.Watermark,
+			c.Autocode,
+			IsActiveApi = c.IsActiveApi ? "Có" : "Không"
+		}).ToList();
+		await JSRuntime.InvokeVoidAsync("exportToExcel",
+			"DSCongTy",
+			new[] { "ID", "Khóa", "Tên công ty", "Email", "Địa chỉ", "Mã số thuế", "SĐT", "Số TK", "Chủ TK", "Website", "WooKey", "WooSecret", "WooUrl", "Watermark", "Autocode", "Active API" },
+			exportData.Select(e => new object[] { e.Id, e.IsLock, e.Name, e.Email, e.Diachi, e.Masothue, e.Sodienthoai, e.Sotaikhoan, e.Chutaikhoan, e.Website, e.Wookey, e.Woosecret, e.Woourl, e.Watermark, e.Autocode, e.IsActiveApi }).ToList()
+		);
+	}
+
+	async Task SaveCompanyAsync(Company EditCompany, bool isNew)
+	{
+		await userService.SaveCompanyAsync(EditCompany, isNew);
+		string noidung = string.Format("{0}", EditCompany.Name);
+		string mess = $"Lưu thành công [{noidung}] ";
+		_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+	}
+
+	async Task OnEditCongTyClick(Company company)
+	{
+		_Company = company;
+		ListUser = await userService.GetAllUserCompanyAsync(_Company.Id);
+
+		var parameters = new DialogParameters<ConfigLayout>();
+		parameters.Add(x => x._Company, _Company);
+		parameters.Add(x => x.isAdmin, true);
+		parameters.Add(x => x.isAdminConfig, true);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.ListUser, ListUser);
+		parameters.Add(x => x.isNew, false);
+		string headerText = string.Format("SỬA CẤU HÌNH CHO CÔNG TY: {0}", _Company.Name);
+		var dialog = await DialogService.ShowEx<ConfigLayout>(headerText, parameters, options_FullScreen);
+		var result = await dialog.Result;
+	}
+
+	async Task OnCreateCongTyClick()
+	{
+		_Company = new Company();
+		ListUser = await userService.GetAllUserCompanyAsync(_Company.Id);
+
+		var parameters = new DialogParameters<ConfigLayout>();
+		parameters.Add(x => x._Company, _Company);
+		parameters.Add(x => x.isAdmin, true);
+		parameters.Add(x => x.isAdminConfig, true);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.ListUser, ListUser);
+		parameters.Add(x => x.isNew, true);
+		string headerText = string.Format("THÊM CÔNG TY MỚI");
+		var dialog = await DialogService.ShowEx<ConfigLayout>(headerText, parameters, options_FullScreen);
+		var result = await dialog.Result;
+	}
+
+	async Task OnDeleteCongTyDialog(Company company)
+	{
+		_Company = company;
+		string noidung = $"{_Company.Name}";
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, noidung);
+		string headerText = "XÓA CÔNG TY";
+		var dialog = await DialogService.ShowEx<DeleteDialog>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			_Company = await userService.DeleteCompanyAsync(_Company);
+			string mess = $"Xóa công ty [{_Company.Name}] thành công";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			ListCompany = await userService.GetAllCompanyAsync();
+		}
+	}
+}

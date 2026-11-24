@@ -1,0 +1,96 @@
+@namespace MTL.APP.Shared
+@* Biểu đồ Pie Chart doanh thu - thiết kế theo mẫu *@
+
+<MudPaper Elevation="4" Class="revenue-pie-chart-card rounded-lg overflow-hidden">
+    @* Header Banner *@
+    <div class="revenue-pie-header">
+        <div class="revenue-pie-header__left">
+            <div class="revenue-pie-logo">
+                <span class="revenue-pie-logo__text">MTL</span>
+            </div>
+            <span class="revenue-pie-header__title">@Title</span>
+        </div>
+        <div class="revenue-pie-header__right">
+            <span class="revenue-pie-header__period">@PeriodText</span>
+            <span class="revenue-pie-header__total">Tổng: @TotalFormatted</span>
+        </div>
+    </div>
+
+    @* Pie Chart Container *@
+    <div class="revenue-pie-body">
+        <div class="revenue-pie-chart-wrapper">
+            @* Pie Chart SVG *@
+            <svg class="revenue-pie-svg" viewBox="0 0 200 200">
+                @{
+                    var cumulativePercent = 0.0;
+                }
+                @foreach (var segment in Segments)
+                {
+                    var startX = 100 + 80 * Math.Cos(2 * Math.PI * cumulativePercent / 100 - Math.PI / 2);
+                    var startY = 100 + 80 * Math.Sin(2 * Math.PI * cumulativePercent / 100 - Math.PI / 2);
+                    cumulativePercent += segment.Percent;
+                    var endX = 100 + 80 * Math.Cos(2 * Math.PI * cumulativePercent / 100 - Math.PI / 2);
+                    var endY = 100 + 80 * Math.Sin(2 * Math.PI * cumulativePercent / 100 - Math.PI / 2);
+                    var largeArcFlag = segment.Percent > 50 ? 1 : 0;
+
+                    if (segment.Percent > 0)
+                    {
+                        <path d="M 100 100 L @startX.ToString("F2") @startY.ToString("F2") A 80 80 0 @largeArcFlag 1 @endX.ToString("F2") @endY.ToString("F2") Z"
+                              fill="@segment.Color"
+                              stroke="white"
+                              stroke-width="2" />
+                    }
+                }
+                @* Inner circle for donut effect *@
+                <circle cx="100" cy="100" r="45" fill="white" />
+            </svg>
+
+            @* Center text *@
+            <div class="revenue-pie-center">
+                <span class="revenue-pie-center__value">@CenterValue</span>
+                <span class="revenue-pie-center__label">@CenterLabel</span>
+            </div>
+        </div>
+
+        @* Legend - Grid 3 cột x 4 hàng cho 12 tháng *@
+        <div class="revenue-pie-legend-grid">
+            @for (int col = 0; col < 3; col++)
+            {
+                <div class="revenue-pie-legend-col">
+                    @for (int row = 0; row < 4; row++)
+                    {
+                        int monthIndex = col * 4 + row + 1;
+                        var segment = GetSegmentForMonth(monthIndex);
+                        <div class="revenue-pie-legend__item @(segment == null ? "revenue-pie-legend__item--empty" : "")">
+                            <div class="revenue-pie-legend__color" style="background: @(segment?.Color ?? "#e0e0e0")"></div>
+                            <div class="revenue-pie-legend__info">
+                                <span class="revenue-pie-legend__name">@(segment?.Name ?? $"Tháng {monthIndex}")</span>
+                                <span class="revenue-pie-legend__value">@(segment?.ValueFormatted ?? "0đ")</span>
+                            </div>
+                            @if (segment != null)
+                            {
+                                <span class="revenue-pie-legend__percent">@segment.Percent.ToString("F1")%</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter] public string Title { get; set; } = "DOANH THU";
+    [Parameter] public string PeriodText { get; set; } = "Tháng 1 - Tháng 4";
+    [Parameter] public decimal TotalAmount { get; set; } = 537750000;
+    [Parameter] public List<PieSegment> Segments { get; set; } = new();
+    [Parameter] public string CenterValue { get; set; } = "537.75M";
+    [Parameter] public string CenterLabel { get; set; } = "TỔNG DOANH THU";
+
+    private string TotalFormatted => TotalAmount.ToString("N0", new System.Globalization.CultureInfo("vi-VN")) + "đ";
+
+    PieSegment? GetSegmentForMonth(int month)
+    {
+        return Segments.FirstOrDefault(s => s.Month == month);
+    }
+}

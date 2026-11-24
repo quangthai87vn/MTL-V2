@@ -1,0 +1,270 @@
+@inherits LayoutComponentBase
+@using MTL.APP.Authentication
+@using System.Security.Claims
+@using MTL.APP.IServices
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@inject NavigationManager navigationManager
+@inject AuthenticationStateProvider authStateProvider
+@inject IJSRuntime jsRuntime
+@inject ProtectedLocalStorage ProtectedLocalStorage
+@inject UserService userService
+@inject HangHoaService hangHoaService
+@inject IWindowSizeInterop WindowSizeInterop
+@inject IMenuService menuService
+
+@inject IConfiguration configuration
+<style>
+
+
+	.mud-expand-panel, .muudstrap-navbar-expand {
+		color: var(--mud-palette-appbar-text);
+		background-color: var(--mud-palette-appbar-background);
+	}
+
+	.muudstrap-navbar .mud-button {
+		text-transform: none;
+	}
+
+	.muudstrap-navbar .mud-expand-panel-header {
+		padding: 0px;
+		width: 100%;
+		height: 100%;
+		flex: none;
+		/* position: fixed;
+																		top: 0;
+																		z-index: 1000;  */ /* Đảm bảo thanh menu hiển thị trên tất cả các phần khác trên trang */
+	}
+</style>
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudThemeProvider  />
+<MudPopoverProvider />
+<CascadingValue Value="this">	
+	<MudAppBar Color="Color.Primary" Elevation="4">
+		<MudIconButton Color="Color.Error" Icon="@Icons.Material.Filled.Menu" Edge="Edge.End" OnClick="@((e) => DrawerToggle())" />
+		<MudText Typo="Typo.h6" Class="ml-4 mr-12 pt-1 pb-2">@TenCongTy</MudText>
+		<MudButton StartIcon="@Icons.Material.Filled.Home" Class="hide-on-mobile" Color="Color.Inherit" Href="/">TRANG CHỦ</MudButton>
+		<MudMenu StartIcon="@Icons.Material.Filled.List" Class="hide-on-mobile" Color="Color.Inherit" Label="DANH MỤC" EndIcon="@Icons.Material.Filled.ArrowDropDown" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+			@if (ListNhomHang != null)
+			{
+				foreach (MTL_GetAllNhomHangResult nhomhang in ListNhomHang)
+				{
+					<MudMenuItem Href="@LinkUrlNhomHang(nhomhang)">@nhomhang.nhomhang</MudMenuItem>
+				}
+			}
+		</MudMenu>
+		<MudButton StartIcon="@Icons.Material.Filled.AdminPanelSettings" Class="hide-on-mobile" Color="Color.Inherit" Href="/index">QUẢN TRỊ</MudButton>
+		<MudSpacer />
+		<MudMenu Class="hide-on-mobile">
+			<ActivatorContent>
+				<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.VerifiedUser" Color="Color.Error">@TenUser</MudButton>
+				</ActivatorContent>
+				<ChildContent>
+					@if(isLogin)
+					{
+						<MudMenuItem Icon="@Icons.Material.Filled.AccountBox" Href="/profile">TÀI KHOẢN</MudMenuItem>
+						<MudMenuItem Icon="@Icons.Material.Filled.Logout" OnTouch=@Logout OnClick=@Logout>ĐĂNG XUẤT</MudMenuItem>
+					}
+					else
+					{
+						<MudMenuItem Icon="@Icons.Material.Filled.Login" Href="/login">ĐĂNG NHẬP</MudMenuItem>
+					}
+			</ChildContent>
+			</MudMenu>
+
+		</MudAppBar>
+	<MudLayout>
+		<MudDrawer Elevation="4" @bind-Open="_drawerOpen">
+				<MudDrawerHeader>
+					<MudText Typo="Typo.h6">@TenCongTy</MudText>
+				</MudDrawerHeader>
+				<MudNavLink Icon="@Icons.Material.Filled.Home" OnClick="@(()=>navigationManager.NavigateTo("/",true))"
+							IconColor="Color.Error">TRANG CHỦ</MudNavLink>
+
+				<MudNavMenu Class="mud-width-full">
+					<MudNavGroup Icon="@Icons.Material.Filled.List" IconColor="Color.Success" Title="DANH MỤC" Expanded="true">
+						@if (ListNhomHang != null)
+					{
+						foreach (MTL_GetAllNhomHangResult nhomhang in ListNhomHang)
+						{
+							<MudNavLink Href="@LinkUrlNhomHang(nhomhang)"
+										IconColor="Color.Error">@nhomhang.nhomhang</MudNavLink>
+
+						}
+					}
+
+				</MudNavGroup>
+			</MudNavMenu>
+
+		</MudDrawer>
+		<MudMainContent>
+			@if (layoutRendered)
+			{
+				@Body
+			}
+			@* else
+			{
+				<p>Đang xác thực dữ liệu...</p>
+			} *@
+		</MudMainContent>
+	</MudLayout>
+	@* <MudAppBar Color="Color.Primary" Elevation="1" Style="top: auto; bottom: 0" Dense="true" Fixed="true">
+		<MudGrid Justify="Justify.Center">
+			<MudText Style="font-size:small">DESIGN BY: MTL TECHNOLOGY - EMAIL: ADMIN@MTL.VN</MudText>
+
+		</MudGrid>
+	</MudAppBar> *@
+</CascadingValue>
+
+@code {
+	[CascadingParameter]
+	public Task<AuthenticationState> authenticationState { get; set; }
+
+	[CascadingParameter]
+	public List<MTL_GetAllNhomHangResult>? ListNhomHang { get; set; }
+
+	[CascadingParameter]
+	public UserSession userSession { get; set; }
+
+	Company company { get; set; }
+	public bool layoutRendered { get; set; }
+
+	private bool IsDesktop { get; set; }
+	bool _drawerOpen = false;
+
+	private string TenUser = "KHÁCH";
+	string _searchChonHang = "";
+
+	MudTheme MuudstrapTheme = new MudTheme()
+		{
+			// Palette = new Palette()
+			// {
+			// 	AppbarBackground = "#f8f9fa",//"#ff0000"
+			// 	AppbarText = "#181819"//"#ffffff"
+			// },
+			Typography = new Typography()
+			{
+				H6 = new H6()
+				{
+					FontFamily = new[] { "system-ui", "-apple-system", "Segoe UI", "Roboto ", "Helvetica Neue", "Arial", "Noto Sans", "Liberation Sans", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" },
+					FontSize = "1.25rem",
+					FontWeight = 400,
+					LineHeight = 1.7,
+					LetterSpacing = "normal"
+				},
+				Button = new Button()
+				{
+					FontFamily = new[] { "system-ui", "-apple-system", "Segoe UI", "Roboto ", "Helvetica Neue", "Arial", "Noto Sans", "Liberation Sans", "sans-serif", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" },
+					FontSize = "1rem",
+					FontWeight = 400,
+					LineHeight = 1.5,
+					LetterSpacing = "normal"
+				}
+			}
+		};
+	private MTLSettings mtlsettings = new();
+	int idcompany =0; //config.GetValue["idcompany"];// ChoVietJapan
+	int idLoaiHinhKinhDoanh = MTLEnum.LoaiHinhKinhDoanh.HangHoa;
+
+	bool IsLoading = true;
+	bool isLogin = false;
+	string TenCongTy = "MTL TECHNOLOGY";
+	protected override async Task OnInitializedAsync()
+	{
+		// var windowSize = await WindowSizeInterop.GetWindowSize();
+		// IsDesktop = windowSize.Width >= 1024;
+		// await jsRuntime.InvokeVoidAsync("showMenu", "nav-toggle", "nav-menu");
+		mtlsettings = configuration.GetSection("MTLSettings").Get<MTLSettings>();
+		idcompany = mtlsettings.idcompany;
+		if (authenticationState is not null)
+		{
+			var authState = await authenticationState;
+			var user = authState?.User;
+			if (user?.Identity is not null && user.Identity.IsAuthenticated)
+			{
+				isLogin = true;
+				// await LoadAllConfig();
+				// //Welcome = $"{company.Name} ";
+				// idcompany = userSession.company.Id;
+				// TenUser = $"{userSession.user.Fullname} ";
+			}
+			else
+			{
+				
+
+				userSession = new UserSession();
+				userSession.company = new Company();
+				userSession.company.Id = mtlsettings.idcompany;
+				userSession.company.Name = mtlsettings.companyname;
+				userSession.user = new User();
+				userSession.user.Fullname = "KHÁCH";
+
+				isLogin = false;
+			}
+		}
+		else
+		{
+			userSession = new UserSession();
+			userSession.company.Id = idcompany;
+		}
+		StateHasChanged();
+	}
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			await LoadAllConfig();
+			idcompany = userSession.company.Id;
+			TenCongTy = userSession.company.Name.ToUpper();
+			ListNhomHang = await menuService.GetMenuItemsAsync(idLoaiHinhKinhDoanh, idcompany);
+			IsLoading = false;
+			layoutRendered = true;
+			StateHasChanged();
+		}
+	}
+
+	async Task LoadAllConfig()
+	{
+		try
+		{
+			var CompanyStorageResult = await ProtectedLocalStorage.GetAsync<Company>("Company");
+			var _Company = CompanyStorageResult.Success ? CompanyStorageResult.Value : null;
+			if (_Company != null)
+				company = (Company)_Company;
+			var UserSessionStorageResult = await ProtectedLocalStorage.GetAsync<UserSession>("UserSession");
+			var _UserSession = UserSessionStorageResult.Success ? UserSessionStorageResult.Value : null;
+			if (_UserSession != null)
+			{
+				userSession = (UserSession)_UserSession;
+			}
+		}
+		catch (Exception)
+		{
+			
+		}
+
+		
+	}
+	void DrawerToggle()
+	{
+		_drawerOpen = !_drawerOpen;
+	}
+
+	private async Task Logout()
+	{
+		var customAuthStateProvider = (CustomAuthenticationStateProvider)authStateProvider;
+		await customAuthStateProvider.UpdateAuthenticationState(null);
+		navigationManager.NavigateTo("/login", true);
+	}
+	string LinkUrlNhomHang(MTL_GetAllNhomHangResult nhomhang)
+	{
+		string rt = "";
+		rt = string.Format("/danh-muc/{0}", nhomhang.id, nhomhang.link);
+
+		return rt;
+	}
+
+}

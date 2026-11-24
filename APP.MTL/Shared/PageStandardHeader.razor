@@ -1,0 +1,29 @@
+@* Header trang chuẩn (theo OverviewReport): gradient, icon + tiêu đề, Actions / ChildContent tùy chọn *@
+
+<MudPaper Elevation="4" Class="mtl-page-header mb-3">
+	<MudStack Spacing="2" Class="pa-4">
+		<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+			<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+				<MudIcon Icon="@Icon" Size="Size.Large" />
+				<MudText Typo="Typo.h5" Class="mtl-page-header__title">@Title</MudText>
+			</MudStack>
+			@if (Actions != null)
+			{
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					@Actions
+				</MudStack>
+			}
+		</MudStack>
+		@if (ChildContent != null)
+		{
+			@ChildContent
+		}
+	</MudStack>
+</MudPaper>
+
+@code {
+	[Parameter] public string Icon { get; set; } = Icons.Material.Filled.Description;
+	[Parameter] public string Title { get; set; } = "";
+	[Parameter] public RenderFragment? Actions { get; set; }
+	[Parameter] public RenderFragment? ChildContent { get; set; }
+}

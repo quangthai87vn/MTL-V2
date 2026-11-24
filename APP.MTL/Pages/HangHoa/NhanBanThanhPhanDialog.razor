@@ -1,0 +1,159 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using System.ComponentModel.DataAnnotations
+@using FluentValidation;
+@using static MTL.APP.Pages.BanHang.ThemHoaDon
+@inject KhachHangService khachHangService
+@inject HangHoaService hangHoaService
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		<SpinLoader IsLoading="IsLoading" Spinner="SpinnerType.Chase">
+			<LoadingTemplate>
+				<Loading />
+			</LoadingTemplate>
+			<ContentTemplate>
+				<MudForm @ref="form">
+					<MudGrid Spacing=2>
+						<MudItem xs="12" sm="12" md="12">
+							<MudItem xs="12" sm="12" md="12">
+								<MudAutocomplete T="MTL_GetAllProductsInCompanyResult"
+												 Label="Chọn hàng hóa thành phần cần nhân bản"
+												 Clearable="true"
+												 SearchFunc=@SearchHangHoaAsync
+												 @bind-Value =@product_mtl
+												 @ref="_HangHoaAutoComplete"												
+												 MaxItems="100"
+												 ResetValueOnEmptyText=true
+												 ToStringFunc="@(e=> e==null?null : $"{e.tensp} ({e.giaban})")">
+									<ItemTemplate Context="pd">
+										<div class="combobox-item-template">
+											<img src=@GetImageFileName(pd) width="120px" height="120px" />
+											<div class="combobox-item-template-text">
+												<span class="combobox-item-tensp">@pd.tensp</span>
+												<span>Nhóm hàng: @pd.nhomhang</span>
+												<span>Bảo hành: @pd.baohanh</span>
+												<span class="combobox-item-price">Giá bán: @String.Format("{0:n0}", @pd.giaban) </span>
+												<span class="combobox-item-price" style=" text-decoration: line-through;">Giá thường: @String.Format("{0:n0}", @pd.giathuong) </span>
+											</div>
+										</div>
+									</ItemTemplate>
+								</MudAutocomplete>
+
+
+							</MudItem>
+						</MudItem>
+					</MudGrid>
+				</MudForm>
+			</ContentTemplate>
+		</SpinLoader>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="SaveAsync" Color="Color.Success">TIẾN HÀNH NHÂN BẢN</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	[Parameter]
+	public int idsanpham { get; set; }
+	// [Parameter]
+	// public MTL_GetSanPhamThanhPhanResult thanhphan { get; set; }
+
+	[Parameter]
+	public MTL.APP.Models.Company company { get; set; }
+	[Parameter]
+	public EventCallback<MTL_GetAllProductsInCompanyResult> OnDialogCallback { get; set; }
+	[Parameter]
+	public List<MTL_GetAllProductsInCompanyResult> ListProduct { get; set; }
+
+	[Parameter]
+	public MTL_GetAllProductsInCompanyResult product_mtl { get; set; }
+	[Parameter]
+	public List<MTL_GetSanPhamThanhPhanResult>? ListHangHoaThanhPhan { get; set; }
+
+
+	MudForm form;
+	public MudAutocomplete<MTL_GetAllProductsInCompanyResult> _HangHoaAutoComplete { get; set; }
+	string v_tonkho = "Còn hàng";
+	string v_theongay = "Ngày cập nhật";
+	public int id_baohanh = 1;
+	bool IsLoading = true;
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			ListProduct = ListProduct.Where(p => p.idloaihanghoadichvu == 3).ToList();
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+	async Task SaveAsync()
+	{
+		MTL_GetAllProductsInCompanyResult hanghoanhanban = product_mtl;
+		await OnDialogCallback.InvokeAsync(hanghoanhanban);
+		MudDialog.Close(DialogResult.Ok(true));
+	}
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+
+
+	async Task<IEnumerable<MTL_GetAllProductsInCompanyResult>> SearchHangHoaAsync(string searchTerm, CancellationToken token)
+	{
+		// In real life use an asynchronous function for fetching data from an api.
+		await Task.Delay(5, token);
+		if (string.IsNullOrEmpty(searchTerm))
+		{
+			return ListProduct;
+		}
+		var products = ListProduct?
+			.Where(product => product.tensp.Contains(searchTerm, StringComparison.InvariantCultureIgnoreCase))
+			?? Enumerable.Empty<MTL_GetAllProductsInCompanyResult>();
+		return products;
+	}
+	string GetImageFileName(MTL_GetAllProductsInCompanyResult product)
+	{
+		string url_anhdaidien = company.Logourl;
+		if (product.pic00 != null)
+		{
+			url_anhdaidien = product.pic00;
+		}
+		return url_anhdaidien;
+	}
+	async Task HangHoaValueChanged(MTL_GetAllProductsInCompanyResult hanghoa)
+	{
+		 product_mtl = hanghoa;
+		// if (hanghoa != null)
+		// {
+		// 	thanhphan.idsanpham = idsanpham;
+		// 	thanhphan.tensp = hanghoa.tensp;
+
+		// 	thanhphan.linksanpham = hanghoa.link;
+		// 	thanhphan.hinhanh1 = hanghoa.hinhanh1;
+		// 	thanhphan.sl = 1; //ép về 1
+		// 	thanhphan.giaban = (int?)hanghoa.giaban;
+		// 	thanhphan.idbaohanh = (int?)hanghoa.idBaoHanh;
+		// 	thanhphan.idhanghoathanhphan = hanghoa.id;
+		// }
+		// StateHasChanged();
+	}
+}

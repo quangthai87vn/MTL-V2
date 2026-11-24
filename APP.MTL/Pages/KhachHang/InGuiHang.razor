@@ -1,0 +1,171 @@
+@page "/KhachHang/InGuiHang/{Id:int}"
+@page "/InGuiHang/{Id:int}"
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@layout NoMenuLayout
+@attribute [Authorize]
+@inject KhachHangService KhachHangService
+@inject UserService UserService
+@inject Configs configs
+@inject IJSRuntime JSRuntime
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mtl-ish-root pa-4">
+	@if (_loadError)
+	{
+		<MudPaper Elevation="3" Class="pa-8">
+			<MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-4">
+				Không tải được dữ liệu. Vui lòng thử lại hoặc kiểm tra quyền truy cập.
+			</MudAlert>
+			<MudButton Variant="Variant.Filled" Href="/invoice" Color="Color.Primary">Về trang hóa đơn</MudButton>
+		</MudPaper>
+	}
+	else if (_kh == null || _company == null)
+	{
+		<Loading IsFullPage="false" HideText="true" />
+	}
+	else
+	{
+		<MudStack Spacing="3" AlignItems="AlignItems.Center">
+
+			@* ── Toolbar ── *@
+			<MudStack Row="true" Spacing="2" Justify="Justify.Center" Wrap="Wrap.Wrap" Class="mtl-ish-toolbar">
+				<MudButton Variant="Variant.Filled" Color="Color.Primary"
+						   StartIcon="@Icons.Material.Filled.Print"
+						   OnClick="PrintPage" Size="Size.Small">
+					IN / LƯU PDF
+				</MudButton>
+				<MudButton Variant="Variant.Outlined" Href="/NhaCungCap"
+						   StartIcon="@Icons.Material.Filled.Close" Size="Size.Small">
+					Đóng
+				</MudButton>
+			</MudStack>
+
+			@* ══════════════════════════════════════════════
+			   PHIẾU GỬI HÀNG — in A5 / A6 ready
+			═════════════════════════════════════════════ *@
+			<MudPaper Elevation="3" Class="mtl-ish-label pa-0">
+
+				@* ── Header: logo + công ty ── *@
+				<div class="mtl-ish-header">
+					@if (!string.IsNullOrWhiteSpace(_company.Logourl))
+					{
+						<img src="@_company.Logourl" alt="logo" class="mtl-ish-logo" />
+					}
+					<div class="mtl-ish-company">
+						<div class="mtl-ish-company-name">@(_company.Name ?? "CÔNG TY")</div>
+						<div class="mtl-ish-company-info">
+							@if (!string.IsNullOrWhiteSpace(_company.Diachi))
+							{
+								<span>📍 @_company.Diachi</span>
+							}
+							@if (!string.IsNullOrWhiteSpace(_company.Sodienthoai))
+							{
+								<span> 📞 @_company.Sodienthoai</span>
+							}
+						
+						</div>
+					</div>
+				</div>
+
+				<div class="mtl-ish-doc-title">PHIẾU GỬI HÀNG</div>
+
+				@* ── Body: chỉ người nhận (người gửi đã ở header) ── *@
+				<div class="mtl-ish-body">
+					<div class="mtl-ish-col mtl-ish-col--receiver">
+						<div class="mtl-ish-col-title mtl-ish-col-title--recv">
+							<MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" Class="mr-1" />
+							NGƯỜI NHẬN
+						</div>
+						<div class="mtl-ish-field">
+							<span class="mtl-ish-k">Họ tên:</span>
+							<span class="mtl-ish-v">@(_kh.Fullname ?? "—")</span>
+						</div>
+						<div class="mtl-ish-field">
+							<span class="mtl-ish-k">Điện thoại:</span>
+							<span class="mtl-ish-v mtl-ish-v--highlight">@(_kh.Dienthoai ?? "—")</span>
+						</div>
+						<div class="mtl-ish-field">
+							<span class="mtl-ish-k">Địa chỉ:</span>
+							<span class="mtl-ish-v">@(_kh.Diachi ?? "—")</span>
+						</div>
+						@if (!string.IsNullOrWhiteSpace(_kh.Mabuudien))
+						{
+							<div class="mtl-ish-field">
+								<span class="mtl-ish-k">Mã bưu điện:</span>
+								<span class="mtl-ish-v">@_kh.Mabuudien</span>
+							</div>
+						}
+						@if (!string.IsNullOrWhiteSpace(_kh.Email))
+						{
+							<div class="mtl-ish-field">
+								<span class="mtl-ish-k">Email:</span>
+								<span class="mtl-ish-v">@_kh.Email</span>
+							</div>
+						}
+						@if (!string.IsNullOrWhiteSpace(_kh.Masothue))
+						{
+							<div class="mtl-ish-field">
+								<span class="mtl-ish-k">MST:</span>
+								<span class="mtl-ish-v">@_kh.Masothue</span>
+							</div>
+						}
+					</div>
+				</div>
+
+				@* ── Ghi chú ── *@
+				@if (!string.IsNullOrWhiteSpace(_kh.Ghichu))
+				{
+					<div class="mtl-ish-note">
+						<div class="mtl-ish-note-title">Ghi chú:</div>
+						<div class="mtl-ish-note-text">@_kh.Ghichu</div>
+					</div>
+				}
+
+			</MudPaper>
+
+			<MudText Typo="Typo.caption" Class="mud-text-secondary mtl-ish-hint">
+				Nhấn <strong>IN / LƯU PDF</strong> hoặc <kbd>Ctrl+P</kbd> để in.
+			</MudText>
+		</MudStack>
+	}
+</MudContainer>
+
+@code {
+	[Parameter] public int Id { get; set; }
+
+	TblUser? _kh;
+	Company? _company;
+	bool _loadError;
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			_kh = await KhachHangService.GetKhachHangAsync(Id);
+			if (_kh == null)
+			{
+				_loadError = true;
+				return;
+			}
+			var userSession = await configs.LoadAllConfig();
+			if (userSession?.company != null)
+			{
+				_company = userSession.company;
+			}
+			else if (userSession?.company?.Id > 0)
+			{
+				_company = await UserService.GetCompanyAsync(userSession.company.Id);
+			}
+		}
+		catch
+		{
+			_loadError = true;
+		}
+	}
+
+	async Task PrintPage()
+	{
+		await JSRuntime.InvokeVoidAsync("print");
+	}
+}

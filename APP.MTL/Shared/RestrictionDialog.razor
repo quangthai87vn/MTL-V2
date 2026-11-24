@@ -1,0 +1,39 @@
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		<MudGrid Spacing=1>
+			<MudItem xs="12" sm="12" md="12">
+				<MudExGradientText Typo="Typo.h5" style="font-weight: bold; text-align:center">BẠN KHÔNG CÓ QUYỀN THỰC HIỆN LỆNH NÀY ?</MudExGradientText>
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudText Typo="Typo.h6" style="font-style: italic; text-align:center">@NoiDung</MudText>
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<img class="mx-auto d-block" src="/images/icons/restriction.webp" width="128" />
+			</MudItem>
+		</MudGrid>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CheckCircle"
+					   OnClick="OnCancelDeleteClick" Color="Color.Primary">ĐỒNG Ý</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[Parameter]
+	public string NoiDung { get; set; }
+	[Parameter]
+	public bool Visible { get; set; }
+
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	void OnCancelDeleteClick()
+	{
+		Visible = false;
+		MudDialog.Cancel();
+	}
+}

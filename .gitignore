@@ -1,0 +1,53 @@
+# Local configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+**/appsettings.json
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.Docker.json
+**/*.pfx
+**/*.p12
+**/*.pem
+**/*.key
+
+# Build outputs and dependencies
+**/bin/
+**/obj/
+**/publish/
+**/node_modules/
+**/dist/
+**/.vite/
+**/TestResults/
+**/coverage/
+
+# Runtime data, backups and migration artifacts
+**/artifacts/
+**/data/
+**/backups/
+**/*.dump
+**/*.bak
+**/*.log
+**/logs/
+APP.MTL/wwwroot/images/woo-cache/
+APP.MTL/wwwroot/Uploads/
+APP.MTL/docker-compose.yml
+
+# Local editor state and generated history
+**/.vs/
+**/.vscode/
+**/.idea/
+**/.cursor/
+**/.history/
+**/.git-legacy-backup/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Operating system files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+

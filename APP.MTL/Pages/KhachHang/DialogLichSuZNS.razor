@@ -1,0 +1,171 @@
+@using MTL.APP.Models
+@using MTL.APP.Services
+@inject ZnsVeSinhCampaignService ZnsCampaignService
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface mtl-themdon-dialog-actions">
+	<DialogContent>
+		@if (_loading)
+		{
+			<Loading IsFullPage="false" HideText="true" />
+		}
+		else
+		{
+			<MudStack Spacing="2">
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					<MudText Typo="Typo.body2" Class="mud-text-secondary">
+						Tổng: <strong>@_allItems.Count</strong> bản ghi · Hiển thị: <strong>@FilteredItems.Count()</strong>
+					</MudText>
+					<MudSpacer />
+					<MudSelect T="string" Label="Trạng thái" Dense="true" Style="min-width:160px;"
+							   @bind-Value="_filterStatus" AnchorOrigin="Origin.BottomCenter">
+						<MudSelectItem T="string" Value="@("all")">Tất cả</MudSelectItem>
+						<MudSelectItem T="string" Value="@("ok")">Thành công</MudSelectItem>
+						<MudSelectItem T="string" Value="@("fail")">Thất bại</MudSelectItem>
+					</MudSelect>
+					<MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Refresh"
+							   OnClick="ReloadAsync" Disabled="_loading">Tải lại</MudButton>
+				</MudStack>
+				<MudTextField @bind-Value="_search" Placeholder="Tìm mã HĐ, SĐT, tên khách, mẫu…"
+							  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+							  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
+
+				<MudTable Items="@FilteredItems" Hover="true" Striped="true" Dense="true" Bordered="true"
+						  RowsPerPage="25" Class="mudtable-center-header mtl-standard-grid" FixedHeader="true" Height="55vh"
+						  HorizontalScrollbar="true">
+					<HeaderContent>
+						<MudTh Style="width:130px; min-width:130px; text-align:center;">NGÀY GỬI</MudTh>
+						<MudTh Style="width:90px; min-width:90px; text-align:center;">KẾT QUẢ</MudTh>
+						<MudTh Style="width:60px; min-width:60px; text-align:center;">HTTP</MudTh>
+						<MudTh Style="width:110px; min-width:100px;">MÃ HĐ</MudTh>
+						<MudTh Style="width:160px; min-width:140px;">KHÁCH / SĐT</MudTh>
+						<MudTh Style="min-width:120px;">MẪU ZNS</MudTh>
+						<MudTh>NỘI DUNG</MudTh>
+						<MudTh Style="max-width:200px;">GHI CHÚ / PHẢN HỒI</MudTh>
+					</HeaderContent>
+					<RowTemplate Context="row">
+						<MudTd DataLabel="NGÀY GỬI" Style="text-align:center;">@FormatNgayGui(row.Ngaygui)</MudTd>
+						<MudTd DataLabel="KẾT QUẢ" Style="text-align:center;">
+							@if (row.Thanhcong)
+							{
+								<MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Thành công</MudChip>
+							}
+							else
+							{
+								<MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">Thất bại</MudChip>
+							}
+						</MudTd>
+						<MudTd DataLabel="HTTP" Style="text-align:center;">@(row.HttpStatus?.ToString() ?? "—")</MudTd>
+						<MudTd DataLabel="MÃ HĐ" Style="font-weight:600;">@(row.Mahd ?? "—")</MudTd>
+						<MudTd DataLabel="KHÁCH">
+							<MudText Typo="Typo.body2" Style="font-weight:600;">@(row.Tenkhachhang ?? "—")</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">@(row.Sodienthoai ?? "")</MudText>
+						</MudTd>
+						<MudTd DataLabel="MẪU">
+							<MudText Typo="Typo.caption" Style="font-weight:600;">@(row.Tenmau ?? "—")</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">ID @(row.Idtemplate?.ToString() ?? "—")</MudText>
+						</MudTd>
+						<MudTd DataLabel="NỘI DUNG">
+							<MudText Typo="Typo.caption" Style="white-space:pre-wrap; line-height:1.4; max-height:60px; overflow:hidden;">
+								@(Truncate(row.Noidungxemtruoc, 300))
+							</MudText>
+						</MudTd>
+						<MudTd DataLabel="GHI CHÚ" Style="max-width:200px; word-break:break-word;">
+							<MudText Typo="Typo.caption">@Truncate(FirstNote(row), 200)</MudText>
+						</MudTd>
+					</RowTemplate>
+					<NoRecordsContent>
+						<MudText>Chưa có nhật ký gửi ZNS hoặc không khớp bộ lọc.</MudText>
+					</NoRecordsContent>
+					<PagerContent>
+						<MudTablePager PageSizeOptions="new int[] { 25, 50, 100 }" />
+					</PagerContent>
+				</MudTable>
+			</MudStack>
+		}
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="Close">ĐÓNG</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; } = default!;
+
+	[Parameter] public int Idcompany { get; set; }
+
+	bool _loading = true;
+	List<TblZnsGuiNhatKy> _allItems = new();
+	string _search = "";
+	string _filterStatus = "all";
+
+	protected override async Task OnInitializedAsync()
+	{
+		await ReloadAsync();
+	}
+
+	async Task ReloadAsync()
+	{
+		_loading = true;
+		StateHasChanged();
+		try
+		{
+			_allItems = await ZnsCampaignService.GetZnsGuiNhatKyHistoryAsync(Idcompany, 2000);
+		}
+		catch (Exception ex)
+		{
+			SnackbarService.Add($"Không tải được lịch sử ZNS: {ex.Message}", Severity.Error);
+			_allItems = new();
+		}
+		finally
+		{
+			_loading = false;
+		}
+	}
+
+	IEnumerable<TblZnsGuiNhatKy> FilteredItems =>
+		_allItems.Where(MatchesFilter);
+
+	bool MatchesFilter(TblZnsGuiNhatKy z)
+	{
+		if (_filterStatus == "ok" && !z.Thanhcong) return false;
+		if (_filterStatus == "fail" && z.Thanhcong) return false;
+
+		if (string.IsNullOrWhiteSpace(_search)) return true;
+		var q = _search.Trim();
+		var lower = q.ToLowerInvariant();
+		bool Contains(string? s) => !string.IsNullOrEmpty(s) && s.ToLowerInvariant().Contains(lower);
+
+		return Contains(z.Mahd) || Contains(z.Sodienthoai) || Contains(z.Tenkhachhang)
+			|| Contains(z.Tenmau) || Contains(z.Loaidichvu) || Contains(z.Ghichu)
+			|| Contains(z.ResponseBody) || Contains(z.Noidungxemtruoc);
+	}
+
+	static string FirstNote(TblZnsGuiNhatKy z)
+	{
+		if (!string.IsNullOrWhiteSpace(z.Ghichu)) return z.Ghichu!;
+		if (!string.IsNullOrWhiteSpace(z.ResponseBody)) return z.ResponseBody!;
+		return "";
+	}
+
+	static string Truncate(string? s, int max)
+	{
+		if (string.IsNullOrEmpty(s)) return "";
+		var t = s.Trim();
+		return t.Length <= max ? t : t[..max] + "…";
+	}
+
+	/// <summary>Bản ghi cũ lưu Ngaygui = DateTime.MinValue do EF gửi 0001-01-01.</summary>
+	static string FormatNgayGui(DateTime ngaygui) =>
+		ngaygui.Year >= 1900 ? ngaygui.ToString("dd/MM/yyyy HH:mm:ss") : "— (chưa ghi đúng ngày)";
+
+	void Close() => MudDialog.Close();
+}

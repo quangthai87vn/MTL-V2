@@ -1,0 +1,322 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using System.ComponentModel.DataAnnotations
+@using FluentValidation;
+@using MTL.APP.Utils
+@inject ISnackbar SnackbarService
+@inject APIWooService _WooAPIService
+@inject HangHoaService hangHoaService
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface mtl-themdon-dialog-actions">
+	<DialogContent>
+		<MudForm @ref="form" Model="@model" Validation=@(Validator.ValidateValue)>
+			<MudGrid Spacing=1>
+				<MudItem xs="12" sm="12" md="@grid_md">				
+						<MudGrid Spacing=1>
+							<MudItem xs="12" sm="12" md="12">
+								<MudExGradientText Typo="Typo.h6" style="font-weight: bold; text-align:center">THÔNG TIN NHÓM HÀNG</MudExGradientText>
+							</MudItem>
+							<MudItem xs="12" sm="12" md="12">
+								<MudSwitch Value=model.Active
+										   Disabled=IsLoading Label="Kích hoạt nhóm hàng"
+									   ValueChanged="KichHoatCheckedChanged"
+										   T="bool?" Color="Color.Primary" />
+							</MudItem>
+							<MudItem xs="12" sm="12" md="12">
+								<MudSelect Label="Loại hình KD" T="int"
+										   @bind-Value=@IdLoaiHinhKinhDoanh ReadOnly=true
+										   AnchorOrigin="Origin.BottomCenter" Required="true">
+									@foreach (var item in MTLEnum.GetListLoaiHinhKD())
+									{
+										<MudSelectItem T="int" Value="@item.Id">@item.Loaihinhkinhdoanh</MudSelectItem>
+									}
+								</MudSelect>
+							</MudItem>
+							<MudItem xs="12" sm="12" md="12">
+								<MudTextField T="string" Label="Tên nhóm hàng"
+											  Immediate="true"
+											  For="@(() => model.Nhomhang)"
+											  TextChanged="OnNhomHangTextChanged"
+											  HelperTextOnFocus="true" Disabled=IsLoading
+											  Text=@model.Nhomhang />
+							</MudItem>
+					@* 		<MudItem xs="12" sm="12" md="12">
+								<MudTextField T="string" Label="Tên nhóm hàng viết gọn"
+											  Immediate="true"
+											  For="@(() => model.Tendanhmucrutgon)"
+											  HelperTextOnFocus="true" Disabled=IsLoading
+											  @bind-Text=@model.Tendanhmucrutgon />
+							</MudItem> *@
+							<MudItem xs="12" sm="12" md="12">
+								<MudTextField T="string" Label="Link nhóm hàng"
+											  Immediate="true"
+											  For="@(() => model.Link)"
+											  HelperTextOnFocus="true" Disabled=IsLoading
+											  @bind-Text=@model.Link />
+							</MudItem>
+							<MudItem xs="6" sm="6" md="6">
+								<MudTextField T="string" Label="Tên viết tắt"
+											  Immediate="true"
+											  For="@(() => model.Viettat)"
+											  HelperTextOnFocus="true" Disabled=IsLoading
+											  @bind-Text=@model.Viettat />
+							</MudItem>
+							<MudItem xs="6" sm="6" md="6">
+								<MudNumericField Margin="Margin.Dense" @bind-Value=model.Order Label="Thứ tự hiển thị" Variant="Variant.Outlined" Min="1" />
+							</MudItem>
+							<MudItem xs="6" sm="6" md="6">
+							<MudSwitch Value=isDanhMucCha
+										   Disabled=IsLoading Label="Danh mục cha"
+									   ValueChanged="DanhMucChaCheckedChanged"
+										   T="bool?" Color="Color.Primary" />
+							</MudItem>
+							<MudItem xs="6" sm="6" md="6">
+								<MudSelect @bind-Value=model.Parent Disabled=isDanhMucCha
+										   Label="Chọn danh mục cha" Margin="Margin.Dense" Variant="Variant.Outlined"
+										   AnchorOrigin="Origin.BottomCenter">
+									@foreach (var loai in ListNhomHang)
+									{
+										<MudSelectItem T=int? Value="@loai.id">@loai.nhomhang</MudSelectItem>
+									}
+								</MudSelect>
+							</MudItem>
+						</MudGrid>
+					
+					@if(IsActiveApi)
+					{
+						<br />
+						<MudPaper Class="pa-4" Elevation="4">
+							<MudNumericField Margin="Margin.Dense" @bind-Value=model.WooId Label="Liên kết ID WOO" Variant="Variant.Outlined" Min="1" />
+						</MudPaper>
+					}
+					
+				</MudItem>
+				@if(IsActiveApi)
+				{
+					<MudItem xs="12" sm="12" md="6">
+						<MudPaper Class="pa-4" Elevation="4">
+							<MudGrid Spacing=1>
+								<MudItem xs="12" sm="12" md="12">
+									<MudExGradientText Typo="Typo.h6" style="font-weight: bold; text-align:center">DANH SÁCH WOOCOMMERCE</MudExGradientText>
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<SpinLoader IsLoading="IsLoading" Spinner="SpinnerType.Chase">
+										<LoadingTemplate>
+											<Loading />
+										</LoadingTemplate>
+										<ContentTemplate>
+											@if (ListNhomHangAPI != null)
+											{
+												<MudDataGrid T="APP.WooRestAPI.Product"
+															 Data="@ListNhomHangAPI"
+															 Bordered="true"
+															 Dense="true"
+															 Hover="true"
+															 Striped="true"
+															 RowsPerPage="10"
+															 Class="MTLGrid">
+													<Columns>
+													<TemplateColumn Style="width: 50px" Title="" T="APP.WooRestAPI.Product">
+														<CellTemplate>
+															<MudIconButton @onclick="@(() => OnSelectWooButtonClick(context))"
+																		   Icon="@Icons.Material.Filled.Check" Variant="Variant.Filled"
+																		   Color="Color.Primary" Size="Size.Medium" />
+														</CellTemplate>
+													</TemplateColumn>
+														<PropertyColumn Property="x => x.id" T="APP.WooRestAPI.Product" TProperty="string" Title="WOO" HeaderAlignment="MudBlazor.Align.Right" ContentAlignment="MudBlazor.Align.Right" />
+														<PropertyColumn Property="x => x.name" T="APP.WooRestAPI.Product" TProperty="string" Title="NHÓM HÀNG" />
+													</Columns>
+													<NoRecordsContent>
+														<MudText>Không có dữ liệu</MudText>
+													</NoRecordsContent>
+													<LoadingContent>
+														<MudText>Đang tải ...</MudText>
+													</LoadingContent>
+													<PagerContent>
+														<MudDataGridPager T="APP.WooRestAPI.Product" />
+													</PagerContent>
+												</MudDataGrid>
+											}
+										</ContentTemplate>
+									</SpinLoader>
+								</MudItem>
+							</MudGrid>
+						</MudPaper>
+					</MudItem>
+				}				
+			</MudGrid>
+		</MudForm>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="SaveAsync" Disabled=IsLoading Color="Color.Success">LƯU THÔNG TIN</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   Disabled=IsLoading
+					   OnClick=ClosePopup
+					   Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public int IdLoaiHinhKinhDoanh { get; set; }
+	[Parameter]
+	public TblNhomhang nhomhang { get; set; } = new TblNhomhang();
+	[Parameter]
+	public List<MTL_GetAllNhomHangResult>? ListNhomHang { get; set; }
+	[Parameter]
+	public UserSession userSession { get; set; }
+	[Parameter]
+	public bool isNew { get; set; }
+	[Parameter]
+	public EventCallback<TblNhomhang> OnDialogCallback { get; set; }
+
+	public List<MTL.APP.WooRestAPI.Product> ListNhomHangAPI { get; set; }
+	MTL.APP.WooRestAPI.Product _NhomHangAPI { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	bool isDanhMucCha { get; set; } = true;
+	bool IsLoading = true;
+	TblNhomhang model = new TblNhomhang();
+	NhomHangValidator Validator = new NhomHangValidator();
+	MudForm form;
+	bool IsActiveApi = false;
+	int grid_md=12;
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			IsActiveApi = (bool)userSession.company.IsActiveApi;
+			if (IsActiveApi)
+			{
+				grid_md = 6;
+				await LoadNhomHangAPI();
+			}
+			if (isNew)
+			{
+				isDanhMucCha = true;
+				model = new TblNhomhang();
+				model.Id = 0;
+				model.Tendanhmucrutgon = "";
+				model.Active = true;
+				model.Order = 1;
+				model.Idcompany = userSession.company.Id;
+			}
+			else
+			{
+
+				model = nhomhang;
+				if (model.Parent != null || model.Parent != 0)
+				{
+					isDanhMucCha = false;
+				}
+			}
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+	async Task LoadNhomHangAPI()
+	{
+		try
+		{
+			ListNhomHangAPI = await _WooAPIService.GetListProductsCategorys(userSession.company.Wookey
+			, userSession.company.Woosecret,
+			userSession.company.Woourl, "1", "");
+		}
+		catch (Exception)
+		{
+
+			ListNhomHangAPI = null;
+		}
+	}
+
+
+
+	void DanhMucChaCheckedChanged(bool? value)
+	{
+		isDanhMucCha = (bool)value;
+		if ((bool)value) //  là Parent
+		{
+			model.Parent = 0;
+		}
+	}
+
+
+	void KichHoatCheckedChanged(bool? value)
+	{
+		model.Active = value;		
+	}
+
+
+	async Task OnSelectWooButtonClick(CellContext<APP.WooRestAPI.Product> context)
+	{
+		_NhomHangAPI = context.Item;
+		model.WooId = int.Parse(_NhomHangAPI.id);
+		model.Nhomhang = _NhomHangAPI.name;
+		string mess = $"Gán thành công Woo [{model.WooId}-{model.Nhomhang}]. Bấm [Lưu thông tin] để cập nhật !";
+		_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+	}
+
+	TblNhomhang ToNhomHang(TblNhomhang nhomhang)
+	{
+		model.Idloaihanghoadichvu = IdLoaiHinhKinhDoanh;
+		model.Lastupdate = DateTime.Now;
+		model.Iduserlastupdate = userSession.user.UserId;
+		if(isNew)
+		{
+			model.Beginupdate = DateTime.Now;
+			model.Iduserlastcreate = userSession.user.UserId;
+		}	
+		return model;
+	}
+
+	async Task SaveAsync()
+	{
+		await form.Validate();
+		if (form.IsValid)
+		{
+			model = this.ToNhomHang(model);
+			if (isNew)
+			{				
+				model= await hangHoaService.CreateNhomHangAsync(model);
+				string mess = $"Tạo thành công nhóm hàng [{model.Nhomhang}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			else
+			{				
+				model= await hangHoaService.UpdateNhomHangAsync(model);
+				string mess = $"Lưu thành công nhóm hàng [{model.Nhomhang}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+
+			await OnDialogCallback.InvokeAsync(model);
+			MudDialog.Close(DialogResult.Ok(true));
+		}
+		else
+		{
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Có lỗi xảy ra, vui lòng xem lại !");
+		}
+	}
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+	async Task OnNhomHangTextChanged(string newValue)
+	{
+		model.Nhomhang = newValue;
+		string slug = StringUtils.ConvertToSlug(newValue);
+		model.Link = slug;		
+	}
+	
+}

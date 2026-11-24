@@ -1,0 +1,308 @@
+@page "/NhanVien"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+@inject IJSRuntime JSRuntime
+@inject HangHoaService hangHoaService
+@inject UserService userService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject KhachHangService khachHangService
+@inject IToastService toastService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<AuthorizeView Context="auth">
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.Badge" Title="DANH SÁCH NHÂN VIÊN">
+			<Actions>
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Class="mtl-header-action-btn"
+							   OnClick="ThemKhachHangPopup" Color="Color.Primary">THÊM NHÂN VIÊN</MudButton>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FileDownload" Class="mtl-header-action-btn"
+							   OnClick="ExportXlsx" Color="Color.Error">XUẤT EXCEL</MudButton>
+				</MudStack>
+			</Actions>
+			<ChildContent>
+				<MudTextField @bind-Value="_searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+							  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+							  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search" />
+			</ChildContent>
+		</PageStandardHeader>
+
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="true" PageName="NHÂN VIÊN" />
+		}
+		else
+		{
+			<MudPaper Elevation="3" Class="rounded-lg overflow-hidden">
+				<MudDataGrid T="MTL_GetAllUserCompanyResult"
+							 Items="@ListUser"
+							 Filterable="true"
+							 FilterMode="@DataGridFilterMode.Simple"
+							 QuickFilterFilter="@_quickFilter"
+							 Sortable="true"
+							 Hover="true"
+							 Striped="true"
+							 Bordered="true"
+							 Dense="true"
+							 RowsPerPage="50"
+							 ShowMenuIcon="false"
+							 Hideable="true"
+							 ShowColumnOptions="true"
+							 HorizontalScrollbar="true"
+							 ColumnResizeMode="ResizeMode.Column"
+							 Loading="IsLoading"
+							 Class="MTLGrid mtl-standard-grid">
+					<NoRecordsContent><MudText Typo="Typo.body1">Không có dữ liệu nhân viên.</MudText></NoRecordsContent>
+					<LoadingContent><MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText></LoadingContent>
+					<ToolBarContent>
+						<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+							<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+							<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+							<MudSpacer />
+						</MudStack>
+					</ToolBarContent>
+							<Columns>
+								<TemplateColumn T="MTL_GetAllUserCompanyResult" Title="THAO TÁC" HeaderStyle="width:150px;" Filterable="false" Sortable="false">
+									<CellTemplate>
+										<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+											<MudIconButton @onclick="@(() => SuaKhachHangPopup(context.Item))"
+														   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+														   Color="Color.Primary" Size="Size.Medium" Title="Sửa" />
+											<MudIconButton @onclick="@(() => OnResetButtonClick(context.Item))"
+														   Icon="@Icons.Material.Filled.Lock" Variant="Variant.Filled"
+														   Color="Color.Warning" Size="Size.Medium" Title="Đặt mật khẩu" />
+										</MudButtonGroup>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<PropertyColumn Property="x => x.Fullname" Title="KHÁCH HÀNG" HeaderStyle="width:200px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Phone" Title="ĐIỆN THOẠI" HeaderStyle="width:120px;" Filterable="true" />
+								<PropertyColumn Property="x => x.Diachi" Title="ĐỊA CHỈ" Filterable="true" />
+								<PropertyColumn Property="x => x.Email" Title="EMAIL" HeaderStyle="width:200px;" Filterable="true" />
+
+								<TemplateColumn T="MTL_GetAllUserCompanyResult" Title="VAI TRÒ" HeaderStyle="width:200px;" Filterable="true" Sortable="true" SortBy="x => x.Roleid">
+									<FilterTemplate Context="filterItem">
+										<MudSelect T="int?" Value="@_filterRole" ValueChanged="v => FilterRoleChanged(v)" AnchorOrigin="Origin.BottomCenter" Dense="true" Margin="Margin.Dense">
+											<MudSelectItem T="int?" Value="0">Tất cả</MudSelectItem>
+											@if (RoleList != null)
+											{
+												@foreach (var ritem in RoleList)
+												{
+													<MudSelectItem T="int?" Value="ritem.RoleId">@ritem.RoleDesc</MudSelectItem>
+												}
+											}
+										</MudSelect>
+									</FilterTemplate>
+									<CellTemplate>
+										<MudText Typo="Typo.body2">@GetRoleText(context.Item.Roleid)</MudText>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="MTL_GetAllUserCompanyResult" Title="KÍCH HOẠT" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+									<CellTemplate>
+										<MudSwitch Value="context.Item.IsActive ?? false" ReadOnly="true" T="bool" Color="Color.Primary" />
+									</CellTemplate>
+								</TemplateColumn>
+							</Columns>
+							<NoRecordsContent>
+								<MudText Typo="Typo.body1">Không tìm thấy dữ liệu phù hợp.</MudText>
+							</NoRecordsContent>
+							<LoadingContent>
+								<MudText Typo="Typo.body2">Đang tải...</MudText>
+							</LoadingContent>
+							<PagerContent>
+								<MudText Typo="Typo.body2" Class="pa-2">
+									Tổng số: <strong>@(ListUser?.Count ?? 0)</strong> nhân viên
+								</MudText>
+								<MudDataGridPager T="MTL_GetAllUserCompanyResult" PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+							</PagerContent>
+						</MudDataGrid>
+			</MudPaper>
+		}
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+	UserPopupInfo userPopupInfo = new UserPopupInfo();
+	string newpass { get; set; }
+	string Header_ChangePass { get; set; }
+	bool IsLoading = true;
+	List<MTL_GetAllUserCompanyResult> ListUser { get; set; }
+	string _searchString = "";
+
+	private Func<MTL_GetAllUserCompanyResult, bool> _quickFilter => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchString))
+			return true;
+		if (x.Fullname?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Phone?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Email?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		return false;
+	};
+
+	int? _filterRole = 0;
+
+	DialogOptionsEx dialogOptions = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.Medium,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	bool PopupVisible_KieuIn { get; set; }
+	MTL_GetAllUserCompanyResult _KhachHang { get; set; }
+	bool PopupVisible { get; set; }
+
+	UserSession userSession { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	List<Role>? RoleList { get; set; }
+	private ToastParameters _toastParameters;
+	bool PopupVisible_ChangePass { get; set; }
+	User returnedUser { get; set; }
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		try
+		{
+			if (firstRender)
+			{
+				userSession = await configs.LoadAllConfig();
+				ListUser = await userService.GetAllUserSettingAsync(userSession.company.Id);
+				RoleList = await userService.GetAllRoleAsync();
+				IsLoading = false;
+				StateHasChanged();
+			}
+			await base.OnAfterRenderAsync(firstRender);
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	async Task ExportXlsx()
+	{
+		if (ListUser == null || !ListUser.Any())
+		{
+			SnackbarService.Add("Không có dữ liệu để xuất.", Severity.Warning);
+			return;
+		}
+		var exportData = ListUser.Select(u => new
+		{
+			u.Fullname,
+			u.Phone,
+			u.Diachi,
+			u.Email,
+			RoleDesc = GetRoleText(u.Roleid),
+			IsActive = u.IsActive == true ? "Có" : "Không"
+		}).ToList();
+		await JSRuntime.InvokeVoidAsync("exportToExcel",
+			"NhanVien",
+			new[] { "Họ tên", "Điện thoại", "Địa chỉ", "Email", "Vai trò", "Kích hoạt" },
+			exportData.Select(e => new object[] { e.Fullname, e.Phone, e.Diachi, e.Email, e.RoleDesc, e.IsActive }).ToList()
+		);
+	}
+
+	void FilterRoleChanged(int? value)
+	{
+		_filterRole = value;
+	}
+
+	string GetRoleText(int? roleId)
+	{
+		if (roleId == null || RoleList == null) return string.Empty;
+		return RoleList.Where(p => p.RoleId == roleId).FirstOrDefault()?.RoleDesc ?? string.Empty;
+	}
+
+	async Task PopupKhachHangClosed()
+	{
+		ListUser = await userService.GetAllUserSettingAsync(userSession.company.Id);
+	}
+
+	async Task ThemKhachHangPopup()
+	{
+		var parameters = new DialogParameters<AddUser>();
+		parameters.Add(x => x.isNew, true);
+		parameters.Add(x => x.RoleList, RoleList);
+		parameters.Add(x => x.Idcompany, userSession.company.Id);
+		string headerText = "THÊM NHÂN VIÊN MỚI";
+		var dialog = await DialogService.ShowEx<AddUser>(headerText, parameters, dialogOptions);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await PopupKhachHangClosed();
+		}
+	}
+
+	async Task SuaKhachHangPopup(MTL_GetAllUserCompanyResult item)
+	{
+		_KhachHang = item;
+		User UserInfo = new User();
+		UserInfo.UserId = _KhachHang.userid;
+		UserInfo.EmailAddress = _KhachHang.Email;
+		UserInfo.Fullname = _KhachHang.Fullname;
+		UserInfo.RoleId = _KhachHang.Roleid;
+		UserInfo.Phone = _KhachHang.Phone;
+		UserInfo.Diachi = _KhachHang.Diachi;
+		UserInfo.Isactive = _KhachHang.IsActive;
+		var parameters = new DialogParameters<AddUser>();
+		parameters.Add(x => x.isNew, false);
+		parameters.Add(x => x.RoleList, RoleList);
+		parameters.Add(x => x.Idcompany, userSession.company.Id);
+		parameters.Add(x => x.UserInfo, UserInfo);
+		string headerText = string.Format("SỬA NHÂN VIÊN: {0}", UserInfo.Fullname);
+		var dialog = await DialogService.ShowEx<AddUser>(headerText, parameters, dialogOptions);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await PopupKhachHangClosed();
+		}
+	}
+
+	void OnResetButtonClick(MTL_GetAllUserCompanyResult item)
+	{
+		_KhachHang = item;
+		Header_ChangePass = string.Format("Đặt mật khẩu cho tài khoản [{0}]", _KhachHang.Fullname);
+		PopupVisible_ChangePass = true;
+		StateHasChanged();
+	}
+
+	async Task OnConfirm_Reset()
+	{
+		try
+		{
+			returnedUser = new User();
+			returnedUser.UserId = _KhachHang.userid;
+			returnedUser.Password = newpass;
+			returnedUser = await userService.ChangePassTaiKhoanAsync(returnedUser);
+			if (returnedUser.UserId != 0)
+				_HandleCommon.ShowToastMessagebox(toastService, 0, string.Format("Đổi mật khẩu cho tài khoản [{0}] thành công", returnedUser.Fullname), "");
+			else
+				_HandleCommon.ShowToastMessagebox(toastService, 0, string.Format("Đổi mật khẩu cho tài khoản [{0}] không thành công", returnedUser.Fullname), "");
+			PopupVisible_ChangePass = false;
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	void OnCancel_Reset()
+	{
+		PopupVisible_ChangePass = false;
+	}
+}

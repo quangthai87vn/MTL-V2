@@ -1,0 +1,232 @@
+@page "/TraCuuKhachHang"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MTL.APP.Models;
+@using MudBlazor.Extensions.Options
+@inject IJSRuntime JSRuntime
+@inject UserService userService
+@inject KhachHangService khachHangService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<AuthorizeView>
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.Search" Title="TRA CỨU KHÁCH HÀNG">
+			<Actions>
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.History" Class="mtl-header-action-btn"
+							   Disabled=IsLoading OnClick="XemNhatKyKhachHangDialog" Color="Color.Primary">XEM NHẬT KÝ</MudButton>
+				</MudStack>
+			</Actions>
+			<ChildContent>
+				<MudTextField @bind-Value="searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+							  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+							  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search" />
+			</ChildContent>
+		</PageStandardHeader>
+
+		<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+			@if (IsLoading)
+			{
+				<Loading IsFullPage="false" />
+			}
+			else
+			{
+				<MudDivider Class="mud-width-full" />
+				<MudTable Items="@ListKhachHang"
+						  Hover="true"
+						  Striped="true"
+						  Bordered="false"
+						  RowsPerPage="50"
+						  Class="mudtable-center-header"
+						  Filter="new Func<TblUser,bool>(FilterFunc1)"
+						  Loading="IsLoading"
+						  LoadingProgressColor="Color.Primary">
+					<ToolBarContent>
+						<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+							<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+							<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+							<MudSpacer />
+						</MudStack>
+					</ToolBarContent>
+							<HeaderContent>
+								<MudTh>THAO TÁC</MudTh>
+								<MudTh>NHÂN VIÊN</MudTh>
+								<MudTh>MÃ NV</MudTh>
+								<MudTh>ĐIỆN THOẠI</MudTh>
+								<MudTh>ĐỊA CHỈ</MudTh>
+								<MudTh>EMAIL</MudTh>
+								<MudTh>FACEBOOK</MudTh>
+								<MudTh>NGƯỜI TẠO</MudTh>
+								<MudTh>NGÀY TẠO</MudTh>
+								<MudTh>NGƯỜI UPDATE</MudTh>
+								<MudTh>NGÀY UPDATE</MudTh>
+							</HeaderContent>
+							<RowTemplate Context="contextUser">
+								<MudTd DataLabel="THAO TÁC">
+									@* <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+										<MudIconButton @onclick="@(() => SuaKhachHangDialog(contextUser))"
+													   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+													   Color="Color.Primary" Size="Size.Medium" />
+									</MudButtonGroup> *@
+									<MudButton FullWidth=true Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.ViewModule" Disabled=IsLoading
+											   @onclick="@(() => SuaKhachHangDialog(contextUser))" Color="Color.Primary">XEM THÔNG TIN</MudButton>
+								</MudTd>
+								<MudTd DataLabel="NHÂN VIÊN">@contextUser.Fullname</MudTd>
+									<MudTd DataLabel="MÃ NV" Style="color: red;">@contextUser.Makh</MudTd>
+									<MudTd DataLabel="ĐIỆN THOẠI">@contextUser.Dienthoai</MudTd>
+									<MudTd DataLabel="ĐỊA CHỈ">@contextUser.Diachi</MudTd>
+									<MudTd DataLabel="EMAIL">@contextUser.Email</MudTd>
+									<MudTd DataLabel="FACEBOOK">
+									@if (@contextUser.Facebook != null)
+									{
+										if (@contextUser.Facebook != "")
+										{
+											<MudButton Variant="Variant.Filled" 												
+													   target="_blank" 
+													   Href="@contextUser.Facebook" Color="Color.Primary">FACEBOOK</MudButton>
+										}											
+									}
+									</MudTd>
+									<MudTd DataLabel="NGƯỜI TẠO">
+										@if (@contextUser.Idusercreate != null)
+										{
+											@UserList.Where(p => p.userid == (int)@contextUser.Idusercreate).FirstOrDefault().Fullname
+										}
+									</MudTd>
+									<MudTd DataLabel="NGÀY TẠO">@contextUser.Beginupdate</MudTd>
+									<MudTd DataLabel="NGƯỜI UPDATE">
+										@if (@contextUser.Iduserlastupdate != null)
+										{
+											@UserList.Where(p => p.userid == (int)@contextUser.Iduserlastupdate).FirstOrDefault().Fullname
+										}
+									</MudTd>
+									<MudTd DataLabel="NGÀY UPDATE">@contextUser.Lastupdate</MudTd>
+									</RowTemplate>
+									<PagerContent>
+										<MudTablePager PageSizeOptions="new int[] { 12 }" />
+									</PagerContent>
+				</MudTable>
+			}
+		</MudPaper>
+	</Authorized>
+</AuthorizeView>
+	@code
+	{
+	DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.ExtraExtraLarge,
+			MaximizeButton = true,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+			FullScreen=true
+		};
+
+	UserSession userSession { get; set; }
+	public TblUser _KhachHang { get; set; } = new TblUser();
+	public int Idnhomkhachhang = 1;// 1: Khách hàng, 2: nhân viên, 3: Nhà cung cấp
+	bool IsLoading = true;
+	List<TblUser>? ListKhachHang { get; set; }
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	IEnumerable<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+	private ToastParameters _toastParameters;
+	private string searchString = "";
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			userSession = await configs.LoadAllConfig();
+			ListKhachHang = await khachHangService.GetAllKhachHangAsync(userSession.company.Id, Idnhomkhachhang);
+			UserList = await userService.GetAllUserCompanyAsync(userSession.company.Id);
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task ThemKhachHangDialog()
+	{
+		var parameters = new DialogParameters<DialogAddKhachHang>();
+		parameters.Add(x => x.Idnhomkhachhang, Idnhomkhachhang);
+		parameters.Add(x => x.isNew, true);
+		parameters.Add(x => x.idcompany, userSession.company.Id);
+		parameters.Add(x => x.KhachHang, _KhachHang);
+		parameters.Add(x => x.userSession, userSession);
+		string headerText = "THÊM KHÁCH HÀNG MỚI";
+		var dialog = await DialogService.ShowEx<DialogAddKhachHang>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			ListKhachHang = await khachHangService.GetAllKhachHangAsync(userSession.company.Id, Idnhomkhachhang);
+		}
+	}
+	async Task SuaKhachHangDialog(TblUser context)
+	{
+		_KhachHang = context;
+		var parameters = new DialogParameters<DialogAddKhachHang>();
+		parameters.Add(x => x.Idnhomkhachhang, Idnhomkhachhang);
+		parameters.Add(x => x.isNew, false);
+		parameters.Add(x => x.idcompany, userSession.company.Id);
+		parameters.Add(x => x.KhachHang, _KhachHang);
+		parameters.Add(x => x.userSession, userSession);
+		string headerText = "SỬA KHÁCH HÀNG";
+		var dialog = await DialogService.ShowEx<DialogAddKhachHang>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			ListKhachHang = await khachHangService.GetAllKhachHangAsync(userSession.company.Id, Idnhomkhachhang);
+		}
+	}	
+	
+
+	private bool FilterFunc1(TblUser element) => FilterFunc(element, searchString);
+	private bool FilterFunc(TblUser element, string searchString)
+	{
+		if (string.IsNullOrWhiteSpace(searchString))
+			return true;
+		if (element.Fullname.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			return true;
+		if (element.Diachi != null)
+		{
+			if (element.Diachi.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+				return true;
+		}
+
+		if (element.Dienthoai.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+			return true;
+		@* if ($"{element.Ghichu} {element.Facebook} {element.Email}".Contains(searchString))
+			return true; *@
+		return false;
+	}
+		
+
+	async Task XemNhatKyKhachHangDialog()
+	{
+
+		@* TblUser KhachHang = ListKhachHang.Where(p => p.Id == model).FirstOrDefault(); *@
+		var parameters = new DialogParameters<MTL.APP.Pages.KhachHang.DialogXemNhatKyKhachHang>();
+		parameters.Add(x => x.ListKhachHang, ListKhachHang);
+		string headerText = $"NHẬT KÝ KHÁCH HÀNG";
+		var dialog = await DialogService.ShowEx<MTL.APP.Pages.KhachHang.DialogXemNhatKyKhachHang>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			//await LoadGhiChuKhachHang();
+		}
+	}
+
+
+
+
+
+}

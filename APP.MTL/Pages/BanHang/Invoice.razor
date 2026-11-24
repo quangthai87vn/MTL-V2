@@ -1,0 +1,1145 @@
+@page "/invoice"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using System.Collections;
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor.Extensions.Options
+@using MudBlazor.Services
+@inject IJSRuntime JSRuntime
+@inject InvoiceService invoiceService
+@inject NavigationManager NavigationManager
+@inject KhachHangService khachHangService
+@inject HangHoaService hangHoaService
+@inject UserService userService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<AuthorizeView>
+	<Authorized>
+		<MudDrawerContainer Class="mud-height-full">
+			<MudDrawer Width="320px" @bind-Open="@open" Fixed="true" Elevation="24"
+					   Style="background-color:var(--mud-palette-surface);position:fixed;top:64px;"
+					   Variant="@DrawerVariant.Temporary" DisableOverlay="true"
+					   Anchor="Anchor.End">
+				<MudDrawerHeader Class="px-4 py-3" Style="border-bottom:1px solid var(--mud-palette-lines-default);">
+					<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width:100%;">
+						<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+							<MudIcon Icon="@Icons.Material.Filled.FilterList" Color="Color.Primary" Size="Size.Medium" />
+							<MudText Typo="Typo.h6" Style="font-weight:700;" Class="ma-0">BỘ LỌC HÓA ĐƠN</MudText>
+						</MudStack>
+						<MudIconButton OnClick="@ToggleDrawer"
+									   Icon="@Icons.Material.Filled.Close" Variant="Variant.Filled"
+									   Color="Color.Default" Size="Size.Small" />
+					</MudStack>
+				</MudDrawerHeader>
+				<MudContainer MaxWidth="MaxWidth.False" Class="pa-3">
+					@* Nhóm 1: Thời gian *@
+					<MudPaper Elevation="0" Class="mb-3 rounded-lg" Style="border:1px solid var(--mud-palette-lines-default);">
+						<MudStack Spacing="1" Class="pa-3">
+							<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-2">
+								<MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Primary" />
+								<MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="ma-0">THỜI GIAN</MudText>
+							</MudStack>
+							<MudSelect FullWidth="true" Label="Lọc theo" T="string"
+									   Value="_filter.v_theongay" Disabled="IsLoading"
+									   ValueChanged="ValueChangedHandler_Day"
+									   AnchorOrigin="Origin.BottomCenter" Required="true">
+								@foreach (var item in s_theongay)
+								{
+									<MudSelectItem T="string" Value="@item">@item</MudSelectItem>
+								}
+							</MudSelect>
+							<MudSwitch Value="@isLocNgay" Disabled="IsLoading" Label="Chọn khoảng ngày"
+									   ValueChanged="LocNgay_CheckedChanged" T="bool" Color="Color.Primary" />
+							<MudGrid Spacing="1" Class="mt-1">
+								<MudItem xs="6">
+									<MudDatePicker Label="Từ ngày" Date="@_TuNgay" DateChanged="(e => OnDateChanged(e, true))" OpenTo="OpenTo.Year"
+												  ReadOnly="IsLoading" Disabled="!isLocNgay" />
+								</MudItem>
+								<MudItem xs="6">
+									<MudDatePicker Label="Đến ngày" Date="@_DenNgay" DateChanged="(e => OnDateChanged(e, false))" OpenTo="OpenTo.Year"
+												  ReadOnly="IsLoading" Disabled="!isLocNgay" />
+								</MudItem>
+							</MudGrid>
+						</MudStack>
+					</MudPaper>
+
+					@* Nhóm 2: Loại phiếu & Tình trạng *@
+					<MudPaper Elevation="0" Class="mb-3 rounded-lg" Style="border:1px solid var(--mud-palette-lines-default);">
+						<MudStack Spacing="1" Class="pa-3">
+							<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-2">
+								<MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" Color="Color.Warning" />
+								<MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="ma-0">LOẠI PHIẾU & TRẠNG THÁI</MudText>
+							</MudStack>
+							<MudSelect Label="Loại phiếu" T="int"
+									   Value="_filter.v_loaiphieu" Disabled="IsLoading"
+									   ValueChanged="ValueChangedHandler_LoaiPhieu"
+									   AnchorOrigin="Origin.BottomCenter" Required="true">
+								@foreach (var item in MTLEnum.GetListLoaiPhieu())
+								{
+									<MudSelectItem T="int" Value="@item.Id">@item.Loaiphieu</MudSelectItem>
+								}
+							</MudSelect>
+							<MudSelect Label="Tình trạng" T="string"
+									   Value="_filter.v_dichvuxuly" Disabled="IsLoading"
+									   ValueChanged="ValueChangedHandler_TinhTrangDichVu"
+									   AnchorOrigin="Origin.BottomCenter" Required="true">
+								@foreach (var item in s_dichvuxuly)
+								{
+									<MudSelectItem T="string" Value="@item">@item</MudSelectItem>
+								}
+							</MudSelect>
+							<MudSwitch Value="@isHienCongNo" Disabled="IsLoading" Label="Hiển thị công nợ"
+									   ValueChanged="HienCongNo_CheckedChanged" T="bool" Color="Color.Warning" />
+						</MudStack>
+					</MudPaper>
+
+					@* Nhóm 3: Tags & Hiển thị *@
+					<MudPaper Elevation="0" Class="mb-3 rounded-lg" Style="border:1px solid var(--mud-palette-lines-default);">
+						<MudStack Spacing="1" Class="pa-3">
+							<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-2">
+								<MudIcon Icon="@Icons.Material.Filled.LocalOffer" Size="Size.Small" Color="Color.Info" />
+								<MudText Typo="Typo.subtitle2" Style="font-weight:600;" Class="ma-0">TAGS & HIỂN THỊ</MudText>
+							</MudStack>
+							<MudExChipSelect Label="Lọc theo thẻ"
+											 ChipSize="Size.Medium"
+											 SearchBoxAutoFocus="true"
+											 AvailableItems="@ListTag" SelectedValues="SelectedTag"
+											 T="MTL.APP.Models.Tag"
+											 Adornment="Adornment.Start"
+											 AdornmentIcon="@Icons.Material.Filled.FilterList"
+											 SelectedValuesChanged="TagsValueChanged"
+											 ToStringFunc="@(e=> e==null?null : $"{e.Name}")" />
+							<MudSelect FullWidth="true" Label="Số dòng mỗi trang" T="int" Disabled="IsLoading"
+									   Value="_filter.v_sodong" ValueChanged="ValueChangedHandler_SoDong"
+									   AnchorOrigin="Origin.BottomCenter" Required="true">
+								@foreach (var item in s_sodong)
+								{
+									<MudSelectItem T="int" Value="@item">@item dòng</MudSelectItem>
+								}
+							</MudSelect>
+						</MudStack>
+					</MudPaper>
+
+					@* Nút đặt lại *@
+					<MudStack Row="true" Justify="Justify.Center" Spacing="2">
+						<MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.RestartAlt"
+								   OnClick="ResetFilters" Color="Color.Default" FullWidth="true">
+							ĐẶT LẠI
+						</MudButton>
+					</MudStack>
+				</MudContainer>
+			</MudDrawer>
+		</MudDrawerContainer>
+
+		<div class="card-body">
+			<PageStandardHeader Icon="@Icons.Material.Filled.ReceiptLong" Title="HÓA ĐƠN">
+				<Actions>
+					<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+						<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Class="mtl-header-action-btn"
+								   Disabled="IsLoading" OnClick="@(() => ThemHoaDonDialog(2))" Color="Color.Primary">HÓA ĐƠN</MudButton>
+						<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.ElectricalServices" Class="mtl-header-action-btn"
+								   Disabled="IsLoading" OnClick="@(() => ThemHoaDonDialog(3))" Color="Color.Primary">DỊCH VỤ</MudButton>
+						<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FilterList" Class="mtl-header-action-btn"
+								   Disabled="IsLoading" OnClick="@ToggleDrawer" Color="Color.Success">BỘ LỌC</MudButton>
+						<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.TableView" Class="mtl-header-action-btn"
+								   Disabled="IsLoading" OnClick="@ExportExcel" Color="Color.Tertiary">EXCEL</MudButton>
+					</MudStack>
+				</Actions>
+				<ChildContent>
+					<MudTextField Value="@searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+								  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+								  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search"
+								  ValueChanged="EventCallback.Factory.Create<string>(this, OnSearchChanged)" />
+				</ChildContent>
+			</PageStandardHeader>
+
+			<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+			@if (IsLoading)
+			{
+				<Loading IsFullPage="false" PageName="HÓA ĐƠN" />
+			}
+			else
+			{
+				<MudDivider Class="mud-width-full" />
+				<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Stretch" Justify="Justify.Center"
+							  Class="pa-2 mtl-invoice-tab-bar"
+							  Style="flex-wrap:wrap; gap:8px; border-bottom:1px solid var(--mud-palette-lines-default);">
+						<MudButton Variant="@(_invoiceTabIndex == 0 ? Variant.Filled : Variant.Outlined)"
+								   Color="Color.Info"
+								   StartIcon="@Icons.Material.Filled.Description"
+								   OnClick="@(() => SetInvoiceTab(0))">
+							BÁO GIÁ (@_baoGiaData.Count)
+						</MudButton>
+						<MudButton Variant="@(_invoiceTabIndex == 1 ? Variant.Filled : Variant.Outlined)"
+								   Color="Color.Warning"
+								   StartIcon="@Icons.Material.Filled.WarningAmber"
+								   OnClick="@(() => SetInvoiceTab(1))">
+							CHƯA XỬ LÝ (@_chuaXuLyData.Count)
+						</MudButton>
+						<MudButton Variant="@(_invoiceTabIndex == 2 ? Variant.Filled : Variant.Outlined)"
+								   Color="Color.Success"
+								   StartIcon="@Icons.Material.Filled.CheckCircle"
+								   OnClick="@(() => SetInvoiceTab(2))">
+							ĐÃ XỬ LÝ (@_daXuLyData.Count)
+						</MudButton>
+					</MudStack>
+					<MudTable Items="@ActiveInvoiceTabData"
+							  Hover="true"
+							  Striped="true"
+							  Bordered="true"
+							  Dense="true"
+							  RowsPerPage="50"
+							  HorizontalScrollbar="true"
+							  Loading="false"
+							  LoadingProgressColor="Color.Primary"
+							  RowClassFunc="@InvoiceRowClassFunc"
+							  Class="mudtable-center-header mtl-standard-grid mtl-invoice-table mtl-hide-table-toolbar-xs mtl-invoice-master-table">
+						<ToolBarContent>
+							<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+								<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+								<MudText Typo="Typo.subtitle2" Style="font-weight:600">@ActiveInvoiceTabTitle</MudText>
+								<MudText Typo="Typo.caption" Class="mud-text-secondary">(@ActiveInvoiceTabData.Count() hóa đơn) — bấm mũi tên để xem chi tiết và dòng hàng</MudText>
+								<MudSpacer />
+							</MudStack>
+						</ToolBarContent>
+						<HeaderContent>
+							<MudTh Style="width:44px; min-width:44px; text-align:center;" Class="mud-text-secondary">
+								<MudIcon Icon="@Icons.Material.Filled.UnfoldMore" Size="Size.Small" title="Mở chi tiết" />
+							</MudTh>
+							<MudTh Class="mtl-invoice-th-actions" Style="width:200px; min-width:160px; text-align:center;">THAO TÁC</MudTh>
+							<MudTh Style="width:220px; min-width:180px; text-align:center;">KHÁCH HÀNG</MudTh>
+							<MudTh Style="width:100px; min-width:100px; text-align:center;"><MudTableSortLabel SortBy="new Func<MTL_GetAllInvoiceResult, object>(x => x.ngaylapphieu)">N.LẬP</MudTableSortLabel></MudTh>
+							<MudTh Style="width:100px; min-width:100px; text-align:center;"><MudTableSortLabel SortBy="new Func<MTL_GetAllInvoiceResult, object>(x => x.ngaytraphieu)">N.HĐ</MudTableSortLabel></MudTh>
+							<MudTh Style="text-align:center;">ĐƠN HÀNG</MudTh>
+							<MudTh Style="width:160px; min-width:130px; text-align:right;"><MudTableSortLabel SortBy="new Func<MTL_GetAllInvoiceResult, object>(x => x.thanhtoan)">T.TOÁN</MudTableSortLabel></MudTh>
+						</HeaderContent>
+						<RowTemplate Context="inv">
+							@{
+								var rowStyle = GetRowStyle(inv);
+								var maHd = inv.mahd ?? "";
+							}
+							<MudTd DataLabel="MỞ RỘNG" Style="@rowStyle" Class="mtl-invoice-td-expand">
+								<MudIconButton Icon="@(IsInvoiceExpanded(maHd) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+											   Color="Color.Default"
+											   Size="Size.Small"
+											   title="@(IsInvoiceExpanded(maHd) ? "Thu gọn" : "Xem chi tiết")"
+											   OnClick="@(() => ToggleInvoiceExpand(maHd))" />
+							</MudTd>
+							<MudTd DataLabel="THAO TÁC" Style="@rowStyle" Class="mtl-invoice-td-actions">
+								<MudStack Row="true" Spacing="0" AlignItems="AlignItems.Center" Class="mtl-invoice-action-compact">
+									<MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false">
+										<MudIconButton Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" title="Sửa"
+													   OnClick="@(() => SuaHoaDonDialog(inv))" />
+										<MudIconButton Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" title="Xóa"
+													   OnClick="@(() => XoaHoaDonDialog(inv))" />
+										<MudIconButton Icon="@Icons.Material.Filled.CopyAll" Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" title="Sao chép"
+													   OnClick="@(() => SaoChepDonDialog(inv))" />
+									</MudButtonGroup>
+									<MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true">
+										<ActivatorContent>
+											<MudIconButton Icon="@Icons.Material.Filled.MoreVert" Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" title="In &amp; khác" />
+										</ActivatorContent>
+										<ChildContent>
+											<MudMenuItem Icon="@Icons.Material.Filled.Print" Href="@($"/HoaDon/A4/{maHd}")" Target="_blank">In A4</MudMenuItem>
+											<MudMenuItem Icon="@Icons.Material.Filled.Receipt" Href="@($"/HoaDon/BILL/{maHd}")" Target="_blank">In bill</MudMenuItem>
+											<MudMenuItem Icon="@Icons.Material.Filled.NoteAdd" OnClick="@(() => ThemNhatKyKhachHangDialog(inv))">Nhật ký (NOTE)</MudMenuItem>
+											<MudMenuItem Icon="@Icons.Material.Filled.Send" OnClick="@(() => AddZNSDialog(inv))">Gửi ZNS</MudMenuItem>
+										</ChildContent>
+									</MudMenu>
+								</MudStack>
+							</MudTd>
+							<MudTd DataLabel="KHÁCH HÀNG" Style="@rowStyle" Class="mtl-invoice-td-customer">
+								<div class="mtl-invoice-customer-row">
+									<div class="mtl-invoice-customer-main">
+										<MudText Typo="Typo.body2" Style="font-weight:600;">
+											@(inv.SoLanMuaHang?.ToString() ?? "0") - @(inv.tenkh ?? "")
+										</MudText>
+										<MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Dense="true"
+												   OnClick="@(() => UpdateSearchString(inv.sodienthoai ?? ""))"
+												   Style="font-weight:600; padding:0; height:auto; text-transform:none;">
+											@(inv.sodienthoai ?? "")
+										</MudButton>
+									</div>
+									<span class="mtl-invoice-loai-pill" style="@GetLoaiPhieuPillStyle(inv.idLoaiPhieu)" title="@GetLoaiPhieuTagLabel(inv.idLoaiPhieu)">
+										@GetLoaiPhieuTagLabel(inv.idLoaiPhieu)
+									</span>
+								</div>
+							</MudTd>
+							<MudTd DataLabel="N.LẬP" Style="@($"{rowStyle}text-align:center;")">@(inv.ngaylapphieu?.ToString("dd/MM/yyyy") ?? "")</MudTd>
+							<MudTd DataLabel="N.HĐ" Style="@($"{rowStyle}text-align:center;")">@(inv.ngaytraphieu?.ToString("dd/MM/yyyy") ?? "")</MudTd>
+							<MudTd DataLabel="ĐƠN HÀNG" Style="@rowStyle" Class="mtl-invoice-td-order">
+								<MudStack Spacing="1">
+									<MudText Typo="Typo.body2" Class="mtl-invoice-order-title">@(inv.ghichukohienbill ?? "")</MudText>
+									@if (HasInvoiceOrderMetaLine(inv))
+									{
+										<MudStack Row="true" Spacing="1" Class="flex-wrap mtl-invoice-order-meta" AlignItems="AlignItems.Center">
+											<MudText Typo="Typo.caption" Class="mud-text-secondary mtl-invoice-order-model-label">@InvoiceModelLabel(inv) :</MudText>
+											@if (!string.IsNullOrWhiteSpace(inv.ListIDTag))
+											{
+												@RenderTagChips(inv.ListIDTag)
+											}
+										</MudStack>
+									}
+								</MudStack>
+							</MudTd>
+							<MudTd DataLabel="T.TOÁN" Style="@($"{rowStyle}text-align:right;")">
+								<MudText Typo="Typo.body2" Style="font-weight:700; color:var(--mud-palette-error);">
+									@FormatCurrency(inv.thanhtoan)
+								</MudText>
+								<MudText Typo="Typo.caption" Class="mud-text-secondary" Style="line-height:1.25; display:block; max-width:200px; margin-left:auto;">
+									@FormatPaymentOneLine(inv)
+								</MudText>
+							</MudTd>
+						</RowTemplate>
+						<ChildRowContent Context="inv">
+							@if (IsInvoiceExpanded(inv.mahd))
+							{
+								<MudTr Class="mtl-invoice-detail-tr">
+									<MudTd ColSpan="7" Style="padding:0; vertical-align:top;">
+										<MudPaper Elevation="0" Class="pa-3 mx-2 mb-2 rounded-lg mtl-invoice-detail-paper">
+											<MudStack Spacing="2">
+												<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-wrap" Justify="Justify.SpaceBetween">
+													<MudText Typo="Typo.caption" Style="font-weight:600;">
+														@FormatInvoiceMetaCaption(inv)
+													</MudText>
+													<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Rounded.PointOfSale" Color="Color.Tertiary"
+															   OnClick="@(() => UpdateSearchString(inv.sodienthoai ?? ""))">
+														@(inv.SoLanMuaHang?.ToString() ?? "0") — @(inv.tenkh ?? "") — @(inv.sodienthoai ?? "")
+													</MudButton>
+												</MudStack>
+												<MudPaper Elevation="0" Class="pa-2 rounded-lg" Style="border:1px solid var(--mud-palette-lines-default); background:var(--mud-palette-surface);">
+													<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="flex-wrap">
+														<MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mud-text-secondary" />
+														<MudText Typo="Typo.caption" Style="font-weight:600;">Chi tiết thanh toán</MudText>
+													</MudStack>
+													<MudStack Row="true" Spacing="1" Class="flex-wrap mt-1" AlignItems="AlignItems.Center">
+														@foreach (var chip in GetPaymentDetailChips(inv))
+														{
+															<MudChip T="string" Size="Size.Small" Color="@chip.Color" Variant="Variant.Filled" Icon="@chip.Icon">
+																@chip.Text
+															</MudChip>
+														}
+													</MudStack>
+													@if ((inv.conlai ?? 0) >= 0.01)
+													{
+														<MudText Typo="Typo.caption" Class="mud-text-secondary mt-1">
+															Còn lại / công nợ: <strong style="color:var(--mud-palette-warning);">@FormatCurrency(inv.conlai)</strong>
+														</MudText>
+													}
+												</MudPaper>
+												@if (HasInvoiceOrderMetaLine(inv))
+												{
+													<MudStack Row="true" Spacing="1" Class="flex-wrap mtl-invoice-order-meta" AlignItems="AlignItems.Center">
+														<MudText Typo="Typo.caption" Class="mud-text-secondary mtl-invoice-order-model-label">@InvoiceModelLabel(inv) :</MudText>
+														@if (!string.IsNullOrWhiteSpace(inv.ListIDTag))
+														{
+															@RenderTagChips(inv.ListIDTag)
+														}
+													</MudStack>
+												}
+												<MudText Typo="Typo.caption" Class="mud-text-secondary">
+													Tạo: @GetUserName(inv.iduserlastcreate) @(inv.beginupdate?.ToString("dd/MM/yyyy HH:mm") ?? "") · Cập nhật: @GetUserName(inv.iduserlastupdate) @(inv.lastupdate?.ToString("dd/MM/yyyy HH:mm") ?? "")
+												</MudText>
+												@if (!string.IsNullOrWhiteSpace(inv.serial))
+												{
+													<MudText Typo="Typo.caption">Serial: <strong>@inv.serial</strong></MudText>
+												}
+												<MudDivider Class="my-1" />
+												<MudText Typo="Typo.subtitle2" Style="font-weight:600">Chi tiết dòng hàng</MudText>
+												<InvoiceChiTietPanel MaHD="@(inv.mahd ?? "")" @key="@($"ct-{inv.mahd}")" />
+											</MudStack>
+										</MudPaper>
+									</MudTd>
+								</MudTr>
+							}
+						</ChildRowContent>
+						<FooterContent>
+							<MudTd ColSpan="4" Style="text-align:right; font-weight:bold;">Số HĐ: @ActiveInvoiceTabData.Count()</MudTd>
+							<MudTd ColSpan="2" Style="text-align:right; font-weight:bold;">Tổng cộng:</MudTd>
+							<MudTd Style="text-align:right; font-weight:bold;" Class="mtl-cell-total">@FormatCurrency(ActiveInvoiceTabData.Sum(x => x.thanhtoan))</MudTd>
+						</FooterContent>
+						<NoRecordsContent>
+							<MudText>Không tìm thấy hóa đơn nào.</MudText>
+						</NoRecordsContent>
+						<LoadingContent>
+							<MudText>Đang tải dữ liệu...</MudText>
+						</LoadingContent>
+						<PagerContent>
+							<MudTablePager PageSizeOptions="new int[] { 50, 100 }" />
+						</PagerContent>
+					</MudTable>
+				}
+			</MudPaper>
+		</div>
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+	DialogOptionsEx options = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.ExtraExtraLarge,
+		MaximizeButton = false,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+		FullScreen = true
+	};
+
+	DialogOptionsEx options_dialog = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.ExtraLarge,
+		MaximizeButton = false,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+		FullScreen = false
+	};
+
+	UserSession userSession { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	MTL.APP.Models.Company company = new Company();
+
+	int Idnhomkhachhang = 1;
+	TblHoaDonBanHang hdbh_delete = new TblHoaDonBanHang();
+	TblHoaDonBanHang hdbh_copy = new TblHoaDonBanHang();
+	bool IsLoading = true;
+
+	public List<MTL_GetAllInvoiceResult> data { get; set; } = new();
+	List<TblUser> ListKhachHang { get; set; } = new();
+	List<MTL.APP.Models.MTL_GetAllUserCompanyResult> UserList { get; set; } = new();
+	List<TblLoaihanghoadichvu>? LoaiHHDVList { get; set; }
+	List<TblBaoHanh>? BaoHanhList { get; set; }
+	List<LoaiPhieu>? ListLoaiPhieu { get; set; }
+	List<TblBank> BankList { get; set; } = new();
+	public MTL_GetAllInvoiceResult mtl_invoice = new MTL_GetAllInvoiceResult();
+
+	List<string> s_theongay = new List<string> { "Ngày bán", "Ngày cập nhật" };
+	List<string> s_loaiphieu = new List<string> { "Hàng hóa", "Dịch vụ", "Tất cả" };
+	List<string> s_dichvuxuly = new List<string> { "Chưa xữ lý", "Đã xữ lý", "Tất cả" };
+	List<int> s_sodong = new List<int> { 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 5000, 10000 };
+	FilterCondition _filter = new FilterCondition();
+	FilterCondition filter_detail = new FilterCondition();
+	class FilterCondition
+	{
+		public string v_tonkho { get; set; } = "Còn hàng";
+		public string v_theongay { get; set; } = "Ngày cập nhật";
+		public int v_loaihh { get; set; } = 1;
+		public int v_sl { get; set; } = 1;
+		public double v_dongia { get; set; } = 0;
+		public int v_baohanh { get; set; } = 3;
+		public int v_tensp { get; set; } = 1;
+		public string v_loaiHHDVNullText { get; set; } = "Chọn Hàng hóa";
+		public string v_tenspEdit { get; set; } = "";
+		public bool v_SPAo { get; set; } = false;
+		public bool v_HDVAT { get; set; } = false;
+		public int v_NhomKhachHang { get; set; } = 1;
+		public int v_loaiphieu { get; set; } = MTLEnum.LoaiPhieu.TatCa;
+		public string v_dichvuxuly { get; set; } = "Tất cả";
+		public int v_sodong { get; set; } = 10;
+		public string v_model { get; set; } = "";
+	}
+
+	public bool isHienCongNo { get; set; } = false;
+	public bool isLocNgay { get; set; } = false;
+	public DateTime _TuNgay { get; set; } = DateTime.Now;
+	public DateTime _DenNgay { get; set; } = DateTime.Now;
+	int idcompany = 0;
+
+	public List<MTL.APP.Models.Tag> ListTag { get; set; } = new();
+	public IEnumerable<MTL.APP.Models.Tag> SelectedTag { get; set; } = Array.Empty<MTL.APP.Models.Tag>();
+	List<int> ListIDTags = new List<int>();
+
+	private string searchString = "";
+	static readonly List<MTL_GetAllInvoiceResult> _emptyInvoices = new();
+
+	/// <summary>Lookup O(1): userId → tên user. Rebuild khi UserList thay đổi.</summary>
+	Dictionary<int, string> _userNameById = new();
+
+	/// <summary>Lookup O(1): bankId → "TÊN TK". Rebuild khi BankList thay đổi.</summary>
+	Dictionary<int, string> _bankNameById = new();
+
+	/// <summary>Mã HĐ → tách TM / CK / CK dự kiến (batch sau mỗi lần tải danh sách).</summary>
+	Dictionary<string, InvoicePaymentBreakdownDto> _paymentBreakdownByMahd = new(StringComparer.OrdinalIgnoreCase);
+
+	/// <summary>Lookup O(1): tagId → Tag. Rebuild khi ListTag thay đổi.</summary>
+	Dictionary<int, MTL.APP.Models.Tag> _tagById = new();
+
+	/// <summary>Cache kết quả filter search. Rebuild khi searchString hoặc data thay đổi.</summary>
+	IReadOnlyList<MTL_GetAllInvoiceResult> _filteredData = Array.Empty<MTL_GetAllInvoiceResult>();
+
+	/// <summary>Search string đã build cache — dùng để detect thay đổi.</summary>
+	string _searchCache = "";
+
+	/// <summary>Danh sách Báo giá (idLoaiPhieu == 4).</summary>
+	IReadOnlyList<MTL_GetAllInvoiceResult> _baoGiaData = Array.Empty<MTL_GetAllInvoiceResult>();
+
+	/// <summary>Danh sách Chưa xữ lý (isDichVuDaXuLy != true).</summary>
+	IReadOnlyList<MTL_GetAllInvoiceResult> _chuaXuLyData = Array.Empty<MTL_GetAllInvoiceResult>();
+
+	/// <summary>Danh sách Đã xữ lý (isDichVuDaXuLy == true).</summary>
+	IReadOnlyList<MTL_GetAllInvoiceResult> _daXuLyData = Array.Empty<MTL_GetAllInvoiceResult>();
+
+	/// <summary>0 = Báo giá, 1 = Chưa xữ lý, 2 = Đã xữ lý.</summary>
+	int _invoiceTabIndex = 1;
+
+	/// <summary>Mã HĐ đang mở chi tiết (master-detail).</summary>
+	readonly HashSet<string> _expandedInvoiceMahd = new(StringComparer.OrdinalIgnoreCase);
+
+	IReadOnlyList<MTL_GetAllInvoiceResult> ActiveInvoiceTabData => _invoiceTabIndex switch
+	{
+		0 => _baoGiaData,
+		1 => _chuaXuLyData,
+		2 => _daXuLyData,
+		_ => _chuaXuLyData
+	};
+
+	string ActiveInvoiceTabTitle => _invoiceTabIndex switch
+	{
+		0 => "Báo giá",
+		1 => "Chưa xữ lý",
+		2 => "Đã xữ lý",
+		_ => "Hóa đơn"
+	};
+
+	void SetInvoiceTab(int index)
+	{
+		if (index < 0 || index > 2 || _invoiceTabIndex == index) return;
+		_invoiceTabIndex = index;
+		_expandedInvoiceMahd.Clear();
+		StateHasChanged();
+	}
+
+	bool IsInvoiceExpanded(string? mahd) =>
+		!string.IsNullOrEmpty(mahd) && _expandedInvoiceMahd.Contains(mahd);
+
+	void ToggleInvoiceExpand(string? mahd)
+	{
+		if (string.IsNullOrEmpty(mahd)) return;
+		if (!_expandedInvoiceMahd.Add(mahd))
+			_expandedInvoiceMahd.Remove(mahd);
+		StateHasChanged();
+	}
+
+	string InvoiceRowClassFunc(MTL_GetAllInvoiceResult row, int index) =>
+		IsInvoiceExpanded(row.mahd) ? "mtl-invoice-row-expanded" : "";
+
+	string FormatInvoiceMetaCaption(MTL_GetAllInvoiceResult inv)
+	{
+		var m = GetInvoiceMeta(inv);
+		return $"{m.tenLoaiPhieu} · {m.maHD} · {m.httt} {m.tenNH}".Trim();
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadConfigFromCompany();
+		UserList = await userService.GetAllUserCompanyAsync(idcompany) ?? new();
+		ListKhachHang = await khachHangService.GetAllKhachHangAsync(idcompany, Idnhomkhachhang) ?? new();
+		ListTag = await hangHoaService.GetTagAsync(idcompany) ?? new();
+		BankList = await hangHoaService.GetBankAsync(idcompany) ?? new();
+		BuildLookupDicts();
+		await FilterDataList();
+	}
+
+	void BuildLookupDicts()
+	{
+		_userNameById = UserList?
+			.ToDictionary(u => u.userid, u => u.Fullname ?? "")
+			?? new Dictionary<int, string>();
+
+		_bankNameById = BankList?
+			.ToDictionary(b => b.Id, b => $"{b.BankingName} {b.AccountName}".Trim())
+			?? new Dictionary<int, string>();
+
+		_tagById = ListTag?
+			.ToDictionary(t => t.Id, t => t)
+			?? new Dictionary<int, MTL.APP.Models.Tag>();
+	}
+
+	async Task LoadConfigFromCompany()
+	{
+		userSession = await configs.LoadAllConfig();
+		company = userSession.company ?? new Company();
+		idcompany = userSession.company?.Id ?? 0;
+	}
+
+	async Task ValueChangedHandler_Day(string newValue)
+	{
+		_filter.v_theongay = newValue;
+		await FilterDataList();
+	}
+
+	async Task ValueChangedHandler_LoaiPhieu(int newValue)
+	{
+		_filter.v_loaiphieu = newValue;
+		await FilterDataList();
+	}
+
+	async Task ValueChangedHandler_TinhTrangDichVu(string newValue)
+	{
+		_filter.v_dichvuxuly = newValue;
+		await FilterDataList();
+	}
+
+	async Task ValueChangedHandler_SoDong(int newValue)
+	{
+		_filter.v_sodong = newValue;
+	}
+
+	async Task FilterDataList()
+	{
+		IsLoading = true;
+		StateHasChanged();
+		int tinhtrangdichvu = 0;
+		if (_filter.v_dichvuxuly == "Chưa xữ lý") tinhtrangdichvu = 1;
+		else if (_filter.v_dichvuxuly == "Đã xữ lý") tinhtrangdichvu = 2;
+		var rows = await invoiceService.GetAllInvoiceAsync(idcompany, _filter.v_theongay
+							, _filter.v_loaiphieu
+							, tinhtrangdichvu
+							, isLocNgay
+							, _TuNgay.ToString("MM/dd/yyyy")
+							, _DenNgay.ToString("MM/dd/yyyy")
+							, isHienCongNo
+							, ListIDTags);
+		data = rows ?? new List<MTL_GetAllInvoiceResult>();
+		await RefreshPaymentBreakdownCacheAsync();
+		_expandedInvoiceMahd.Clear();
+		BuildFilteredCache();
+		IsLoading = false;
+		StateHasChanged();
+	}
+
+	/// <summary>Filter search + build cache — gọi khi data hoặc searchString thay đổi.
+	/// ĐÃ TỐI ƯU: 1 pass duy nhất, phân loại trực tiếp vào các danh sách.</summary>
+	void BuildFilteredCache()
+	{
+		_searchCache = searchString ?? "";
+		var hasSearch = !string.IsNullOrEmpty(_searchCache);
+		string lower = hasSearch ? _searchCache.ToLowerInvariant() : "";
+
+		var source = data ?? new List<MTL_GetAllInvoiceResult>();
+
+		// Single-pass: phân loại trực tiếp vào 4 danh sách
+		var filteredAll = new List<MTL_GetAllInvoiceResult>();
+		var filteredBaoGia = new List<MTL_GetAllInvoiceResult>();
+		var filteredChuaXuLy = new List<MTL_GetAllInvoiceResult>();
+		var filteredDaXuLy = new List<MTL_GetAllInvoiceResult>();
+
+		// Cache ngày thành chuỗi tìm kiếm (tránh lặp ToString)
+		string? searchDate = hasSearch ? DateTime.Now.ToString("dd/MM/yyyy") : null;
+
+		foreach (var inv in source)
+		{
+			// Check search match trước
+			bool matchSearch = !hasSearch || MatchSearch(inv, lower);
+
+			if (!matchSearch) continue;
+
+			// Phân loại vào đúng danh sách
+			filteredAll.Add(inv);
+
+			int idLoai = inv.idLoaiPhieu ?? 0;
+			if (idLoai == 4)
+			{
+				filteredBaoGia.Add(inv);
+			}
+			else
+			{
+				if (inv.isDichVuDaXuLy != true)
+					filteredChuaXuLy.Add(inv);
+				else
+					filteredDaXuLy.Add(inv);
+			}
+		}
+
+		_filteredData = filteredAll.AsReadOnly();
+		_baoGiaData = filteredBaoGia.AsReadOnly();
+		_chuaXuLyData = filteredChuaXuLy.AsReadOnly();
+		_daXuLyData = filteredDaXuLy.AsReadOnly();
+	}
+
+	/// <summary>Kiểm tra invoice có match với search string không.
+	/// ĐÃ TỐI ƯU: dùng switch expression và short-circuit evaluation.</summary>
+	bool MatchSearch(MTL_GetAllInvoiceResult inv, string lower)
+	{
+		// Short-circuit: kiểm tra nhanh nhất trước (có thể null)
+		if (inv.mahd?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.sodienthoai?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.tenkh?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.Model?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.ghichukohienbill?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+
+		// Check ngày - ít khi match nên để cuối
+		if (inv.ngaytraphieu.HasValue &&
+			inv.ngaytraphieu.Value.ToString("dd/MM/yyyy").Contains(lower, StringComparison.OrdinalIgnoreCase)) return true;
+		if (inv.ngaylapphieu.HasValue &&
+			inv.ngaylapphieu.Value.ToString("dd/MM/yyyy").Contains(lower, StringComparison.OrdinalIgnoreCase)) return true;
+
+		return false;
+	}
+
+	/// <summary>Gọi khi user gõ ô tìm kiếm.</summary>
+	void OnSearchChanged(string value)
+	{
+		searchString = value ?? "";
+		BuildFilteredCache();
+		StateHasChanged();
+	}
+
+	async Task LocNgay_CheckedChanged(bool value)
+	{
+		isLocNgay = value;
+		await FilterDataList();
+	}
+
+	async Task HienCongNo_CheckedChanged(bool value)
+	{
+		isHienCongNo = value;
+		await FilterDataList();
+	}
+
+	async Task OnDateTuNgayChanged(DateTime newValue)
+	{
+		_TuNgay = newValue;
+		await FilterDataList();
+	}
+
+	async Task OnDateDenNgayChanged(DateTime newValue)
+	{
+		_DenNgay = newValue;
+		await FilterDataList();
+	}
+
+	async Task OnDateChanged(DateTime? newValue, bool isTuNgay)
+	{
+		if (isTuNgay)
+			_TuNgay = newValue ?? DateTime.Now;
+		else
+			_DenNgay = newValue ?? DateTime.Now;
+		await FilterDataList();
+	}
+
+	async Task SaoChepDonDialog(MTL_GetAllInvoiceResult context)
+	{
+		string noidung = string.Format("HÓA ĐƠN '{0}' : {1}", context.mahd, context.ghichukohienbill);
+		var parameters = new DialogParameters<QuestionDialog>();
+		parameters.Add(x => x.NoiDung, noidung);
+		parameters.Add(x => x.TieuDeLon, "SAO CHÉP HÓA ĐƠN ?");
+		parameters.Add(x => x.TieuDeNho, "Dữ liệu toàn bộ hóa đơn sẽ được sao chép, Bạn có chắc không ?");
+		parameters.Add(x => x.UrlAnhThaoTac, "/images/icons/copy-icon.jpg");
+		var dialog = await DialogService.ShowEx<QuestionDialog>("SAO CHÉP HÓA ĐƠN", parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			TblHoaDonBanHang hdbh = new TblHoaDonBanHang();
+			hdbh_copy.Mahd = context.mahd;
+			hdbh = await invoiceService.CopyInvoiceAsync(hdbh_copy);
+			string noidung1 = $"Copy thành công hóa đơn [{context.mahd}] - [{context.ghichukohienbill}]";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, noidung1);
+			await FilterDataList();
+		}
+	}
+
+	async Task XoaHoaDonDialog(MTL_GetAllInvoiceResult context)
+	{
+		hdbh_delete.Mahd = context.mahd;
+		string noidung = string.Format("HÓA ĐƠN '{0}' : {1}", context.mahd, context.ghichukohienbill);
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, noidung);
+		var dialog = await DialogService.ShowEx<DeleteDialog>("XÓA HÓA ĐƠN", parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			TblHoaDonBanHang hdbh = new TblHoaDonBanHang();
+			hdbh = await invoiceService.DeleteInvoice(hdbh_delete);
+			noidung = $"Xóa thành công hóa đơn [{context.mahd}] - [{context.ghichukohienbill}]";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, noidung);
+			await FilterDataList();
+		}
+	}
+
+	async Task TagsValueChanged(IEnumerable<MTL.APP.Models.Tag> _selectTags)
+	{
+		SelectedTag = _selectTags ?? Array.Empty<MTL.APP.Models.Tag>();
+		if (!SelectedTag.Any()) ListIDTags = new List<int>();
+		else
+		{
+			ListIDTags = new List<int>();
+			foreach (MTL.APP.Models.Tag tag in SelectedTag.ToList())
+				ListIDTags.Add(tag.Id);
+		}
+		await FilterDataList();
+		StateHasChanged();
+	}
+
+	bool open = false;
+	void ToggleDrawer()
+	{
+		open = !open;
+	}
+
+	async Task ResetFilters()
+	{
+		_filter.v_theongay = "Ngày cập nhật";
+		_filter.v_loaiphieu = MTLEnum.LoaiPhieu.TatCa;
+		_filter.v_dichvuxuly = "Tất cả";
+		_filter.v_sodong = 10;
+		isHienCongNo = false;
+		isLocNgay = false;
+		_TuNgay = DateTime.Now;
+		_DenNgay = DateTime.Now;
+		SelectedTag = Array.Empty<MTL.APP.Models.Tag>();
+		ListIDTags = new List<int>();
+		await FilterDataList();
+	}
+
+	public string FormatCurrency(double? amount)
+	{
+		return string.Format("{0:n0}", amount);
+	}
+
+	string GetLoaiPhieuText(int? id)
+	{
+		if (id == null) return "";
+		return MTLEnum.GetListLoaiPhieu().FirstOrDefault(p => p.Id == id)?.Loaiphieu ?? "";
+	}
+
+	/// <summary>Nhãn loại phiếu trên pill cột khách hàng (cùng nguồn với filter / Excel).</summary>
+	string GetLoaiPhieuTagLabel(int? id)
+	{
+		var t = GetLoaiPhieuText(id);
+		return string.IsNullOrEmpty(t) ? "Khác" : t;
+	}
+
+	/// <summary>Màu viền + chữ pill theo theme.</summary>
+	string GetLoaiPhieuPillStyle(int? id) => id switch
+	{
+		MTLEnum.LoaiPhieu.HoaDon => "color:var(--mud-palette-primary);border-color:var(--mud-palette-primary);",
+		MTLEnum.LoaiPhieu.DichVu => "color:var(--mud-palette-info);border-color:var(--mud-palette-info);",
+		MTLEnum.LoaiPhieu.BaoGia => "color:var(--mud-palette-tertiary);border-color:var(--mud-palette-tertiary);",
+		MTLEnum.LoaiPhieu.DatHang => "color:var(--mud-palette-success);border-color:var(--mud-palette-success);",
+		_ => "color:var(--mud-palette-text-secondary);border-color:var(--mud-palette-lines-default);"
+	};
+
+	string GetNguoiXuatText(int? userId)
+	{
+		if (userId == null || userId == 0) return "";
+		return UserList?.FirstOrDefault(p => p.userid == userId)?.Fullname ?? "";
+	}
+
+	async Task ExportExcel()
+	{
+		var src = _filteredData?.ToList() ?? new List<MTL_GetAllInvoiceResult>();
+		if (!src.Any())
+		{
+			SnackbarService.Add("Không có dữ liệu để xuất.", Severity.Warning);
+			return;
+		}
+		var exportData = src.Select(d => new
+		{
+			d.mahd,
+			NgayLap = d.ngaylapphieu?.ToString("dd/MM/yyyy"),
+			NgayHD = d.ngaytraphieu?.ToString("dd/MM/yyyy"),
+			d.ghichukohienbill,
+			d.sodienthoai,
+			d.tenkh,
+			d.giamgia,
+			d.thanhtoan,
+			d.conlai,
+			LoaiPhieu = GetLoaiPhieuText(d.idLoaiPhieu),
+			NguoiXuat = GetNguoiXuatText(d.idnguoixuat),
+			d.serial
+		}).ToList();
+		try
+		{
+			await JSRuntime.InvokeVoidAsync("exportToExcel",
+				"DanhSachHoaDon",
+				new[] { "Mã HĐ", "Ngày lập", "Ngày HĐ", "Thông tin đơn hàng", "SĐT", "Khách hàng", "Thành tiền", "Thanh toán", "Nợ", "Loại phiếu", "Người xuất", "Serial" },
+				exportData.Select(e => new object[] { e.mahd, e.NgayLap, e.NgayHD, e.ghichukohienbill, e.sodienthoai, e.tenkh, e.giamgia, e.thanhtoan, e.conlai, e.LoaiPhieu, e.NguoiXuat, e.serial }).ToList());
+			SnackbarService.Add("Đã xuất file Excel.", Severity.Success);
+		}
+		catch (JSException)
+		{
+			SnackbarService.Add("Không xuất được Excel (thiếu thư viện XLSX).", Severity.Error);
+		}
+	}
+
+	private void UpdateSearchString(string phoneNumber)
+	{
+		searchString = phoneNumber ?? "";
+		BuildFilteredCache();
+	}
+
+	/// <summary>Trả về CSS background-color dựa trên trạng thái hóa đơn.</summary>
+	string GetRowStyle(MTL_GetAllInvoiceResult inv)
+	{
+		// Báo giá (loại 4) ưu tiên màu riêng
+		if (inv.idLoaiPhieu == 4)
+			return "background-color:#e0f7fa;border-left:4px solid #26a69a;";
+		if (inv.isDichVuDaXuLy != true)
+			return "background-color:#ffebee;border-left:4px solid #e57373;";
+		return "";
+	}
+
+	/// <summary>Trả về (tên loại phiếu, mã HD, hình thức TT, tên NH) — đều in hoa.</summary>
+	(string tenLoaiPhieu, string maHD, string httt, string tenNH) GetInvoiceMeta(MTL_GetAllInvoiceResult inv)
+	{
+		var idLp = inv.idLoaiPhieu ?? 0;
+		var lpRow = MTLEnum.GetListLoaiPhieu().FirstOrDefault(p => p.Id == idLp);
+		var tenLP = (lpRow?.Loaiphieu ?? "").ToUpperInvariant();
+		var ma = (inv.mahd ?? "").ToUpperInvariant();
+
+		var htttStr = "";
+		var tenNHStr = "";
+		int? httId = inv.idhinhthucthanhtoan;
+		if (httId == null && !string.IsNullOrEmpty(inv.mahd) && _paymentBreakdownByMahd.TryGetValue(inv.mahd!, out var brInfer))
+		{
+			var tmI = brInfer.Tienmat ?? 0;
+			var ckI = brInfer.Tienchuyenkhoan ?? 0;
+			var dkI = brInfer.Tienchuyenkhoandukien ?? 0;
+			if (dkI >= 0.01) httId = MTLEnum.HinhThucThanhToan.Tragop;
+			else if (tmI >= 0.01 && ckI >= 0.01) httId = MTLEnum.HinhThucThanhToan.TienMatVaChuyenKhoan;
+			else if (ckI >= 0.01) httId = MTLEnum.HinhThucThanhToan.ChuyenKhoan;
+			else if (tmI >= 0.01) httId = MTLEnum.HinhThucThanhToan.TienMat;
+		}
+		if (httId != null)
+		{
+			var htttRow = MTLEnum.GetListHinhThucThanhToan().FirstOrDefault(p => p.Id == httId);
+			htttStr = (htttRow?.Mota ?? "").ToUpperInvariant();
+			if (inv.idbank != null && (httId == 2 || httId == 3 || httId == 4 || httId == 5))
+				_bankNameById.TryGetValue(inv.idbank.Value, out tenNHStr);
+		}
+		return (tenLP, ma, htttStr, tenNHStr.ToUpperInvariant());
+	}
+
+	async Task RefreshPaymentBreakdownCacheAsync()
+	{
+		_paymentBreakdownByMahd.Clear();
+		if (data == null || data.Count == 0) return;
+		var map = await invoiceService.GetInvoicePaymentBreakdownsAsync(idcompany, data.Select(x => x.mahd));
+		foreach (var kv in map)
+			_paymentBreakdownByMahd[kv.Key] = kv.Value;
+	}
+
+	/// <summary>Tiền mặt / CK đã thu / CK dự kiến — ưu tiên cột DB; fallback giống HydratePaymentFromLegacy (ThemHoaDon).</summary>
+	(double tm, double ck, double ckDuKien) ResolvePaymentAmounts(MTL_GetAllInvoiceResult inv)
+	{
+		var tt = inv.thanhtoan ?? 0;
+		var cl = inv.conlai ?? 0;
+
+		if (!string.IsNullOrEmpty(inv.mahd) && _paymentBreakdownByMahd.TryGetValue(inv.mahd!, out var br))
+		{
+			var tmB = br.Tienmat ?? 0;
+			var ckB = br.Tienchuyenkhoan ?? 0;
+			var dkB = br.Tienchuyenkhoandukien ?? 0;
+			if (tmB >= 0.01 || ckB >= 0.01 || dkB >= 0.01)
+				return (tmB, ckB, dkB);
+		}
+
+		if (tt < 0.01 && cl < 0.01)
+			return (0, 0, 0);
+
+		var htt = inv.idhinhthucthanhtoan ?? MTLEnum.HinhThucThanhToan.TienMat;
+		if (htt == MTLEnum.HinhThucThanhToan.Quetthe)
+			htt = MTLEnum.HinhThucThanhToan.ChuyenKhoan;
+
+		if (htt == MTLEnum.HinhThucThanhToan.TienMat)
+			return (tt, 0, 0);
+		if (htt == MTLEnum.HinhThucThanhToan.ChuyenKhoan)
+			return (0, tt, 0);
+		if (htt == MTLEnum.HinhThucThanhToan.Tragop)
+			return (tt, 0, cl >= 0.01 ? cl : 0);
+		return (0, 0, 0);
+	}
+
+	string FormatPaymentOneLine(MTL_GetAllInvoiceResult inv)
+	{
+		var m = GetInvoiceMeta(inv);
+		var nh = string.IsNullOrWhiteSpace(m.tenNH) ? "" : m.tenNH;
+		var (tm, ck, dk) = ResolvePaymentAmounts(inv);
+		var htt = inv.idhinhthucthanhtoan ?? 0;
+		if (htt == MTLEnum.HinhThucThanhToan.Quetthe)
+			htt = MTLEnum.HinhThucThanhToan.ChuyenKhoan;
+
+		if (htt == MTLEnum.HinhThucThanhToan.TienMatVaChuyenKhoan && tm < 0.01 && ck < 0.01 && dk < 0.01)
+			return string.IsNullOrEmpty(nh) ? m.httt : $"{m.httt} · {nh}";
+
+		var parts = new List<string>();
+		if (tm >= 0.01) parts.Add($"TM {FormatCurrency(tm)}");
+		if (ck >= 0.01) parts.Add($"CK {FormatCurrency(ck)}");
+		if (dk >= 0.01)
+			parts.Add(htt == MTLEnum.HinhThucThanhToan.Tragop
+				? $"Còn lại trả góp (theo TK) {FormatCurrency(dk)}"
+				: $"CK dự kiến {FormatCurrency(dk)}");
+		if ((ck >= 0.01 || dk >= 0.01) && !string.IsNullOrEmpty(nh))
+			parts.Add(nh);
+		if (parts.Count > 0)
+			return string.Join(" · ", parts);
+		return string.IsNullOrWhiteSpace(m.httt) ? "—" : m.httt;
+	}
+
+	IReadOnlyList<(string Text, Color Color, string Icon)> GetPaymentDetailChips(MTL_GetAllInvoiceResult inv)
+	{
+		var list = new List<(string Text, Color Color, string Icon)>();
+		var m = GetInvoiceMeta(inv);
+		if (string.IsNullOrWhiteSpace(m.httt))
+			list.Add(("Hình thức: —", Color.Default, Icons.Material.Filled.HelpOutline));
+		else
+			list.Add(($"Hình thức: {m.httt}", Color.Primary, Icons.Material.Filled.Payments));
+
+		var (tm, ck, dk) = ResolvePaymentAmounts(inv);
+		if (tm >= 0.01)
+			list.Add(($"Tiền mặt: {FormatCurrency(tm)}", Color.Primary, Icons.Material.Filled.Payments));
+		if (ck >= 0.01)
+			list.Add(($"CK đã thu: {FormatCurrency(ck)}", Color.Success, Icons.Material.Filled.AccountBalance));
+		if (dk >= 0.01)
+		{
+			var httChip = inv.idhinhthucthanhtoan ?? 0;
+			var tragopChip = httChip == MTLEnum.HinhThucThanhToan.Tragop;
+			list.Add((tragopChip
+					? $"Còn lại trả góp (CK theo TK): {FormatCurrency(dk)}"
+					: $"CK dự kiến: {FormatCurrency(dk)}",
+				Color.Warning, Icons.Material.Filled.Schedule));
+		}
+
+		if (!string.IsNullOrWhiteSpace(m.tenNH))
+			list.Add(($"TK: {m.tenNH}", Color.Info, Icons.Material.Filled.AccountBalanceWallet));
+
+		var htt = inv.idhinhthucthanhtoan ?? 0;
+		if (htt == MTLEnum.HinhThucThanhToan.TienMatVaChuyenKhoan && tm < 0.01 && ck < 0.01 && dk < 0.01)
+			list.Add(("Chưa có tách TM/CK trên DB — mở sửa HĐ để cập nhật", Color.Default, Icons.Material.Filled.Info));
+
+		return list;
+	}
+
+	/// <summary>Lookup O(1) tên user từ id. Trả về chuỗi rỗng nếu không có.</summary>
+	string GetUserName(int? userId) =>
+		userId.HasValue && _userNameById.TryGetValue(userId.Value, out var name) ? name : "";
+
+	/// <summary>Dòng 2 cột Đơn hàng: hiển thị khi có model hoặc có thẻ định danh.</summary>
+	bool HasInvoiceOrderMetaLine(MTL_GetAllInvoiceResult inv) =>
+		!string.IsNullOrWhiteSpace(inv.Model) || !string.IsNullOrWhiteSpace(inv.ListIDTag);
+
+	/// <summary>Chuỗi model hiển thị trước dấu hai chấm (cột Model đã gộp vào Đơn hàng).</summary>
+	string InvoiceModelLabel(MTL_GetAllInvoiceResult inv) =>
+		string.IsNullOrWhiteSpace(inv.Model) ? "—" : inv.Model.Trim();
+
+	/// <summary>Render tag chips từ danh sách ID (đã join bằng ',').</summary>
+	RenderFragment RenderTagChips(string? listIdTags)
+	{
+		if (string.IsNullOrWhiteSpace(listIdTags)) return __builder => { };
+
+		RenderFragment rf = chipBuilder =>
+		{
+			var parts = listIdTags.Split(',', StringSplitOptions.RemoveEmptyEntries);
+			var seq = 0;
+			foreach (var part in parts)
+			{
+				if (int.TryParse(part.Trim(), out var tagId) && _tagById.TryGetValue(tagId, out var tag))
+				{
+					var baseSeq = seq * 10;
+					chipBuilder.OpenComponent<MudChip<string>>(baseSeq);
+					chipBuilder.AddAttribute(baseSeq + 1, "Icon", tag.Icon ?? "");
+					chipBuilder.AddAttribute(baseSeq + 2, "Size", Size.Small);
+					chipBuilder.AddAttribute(baseSeq + 3, "T", string.Empty);
+					chipBuilder.AddAttribute(baseSeq + 4, "Style", $"color:{tag.Textcolor};background:{tag.Backgroundcolor};");
+					chipBuilder.AddAttribute(baseSeq + 5, "ChildContent", (RenderFragment)(b => b.AddContent(baseSeq + 6, $" {tag.Name}")));
+					chipBuilder.CloseComponent();
+					seq++;
+				}
+			}
+		};
+		return rf;
+	}
+
+	async Task SuaHoaDonDialog(MTL_GetAllInvoiceResult context)
+	{
+		mtl_invoice = context;
+		var parameters = new DialogParameters<ThemHoaDon>();
+		parameters.Add(x => x.data, data);
+		parameters.Add(x => x.MaHD, mtl_invoice.mahd);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.IdLoaiPhieu, mtl_invoice.idLoaiPhieu);
+		parameters.Add(x => x.isNew, false);
+		parameters.Add(x => x.UserList, UserList);
+		parameters.Add(x => x.ListTag, ListTag);
+		parameters.Add(x => x.BankList, BankList);
+		parameters.Add(x => x.ListKhachHang, ListKhachHang);
+		var lpSua = MTLEnum.GetListLoaiPhieu().FirstOrDefault(p => p.Id == mtl_invoice.idLoaiPhieu);
+		string TenLoaiPhieu = (lpSua?.Loaiphieu ?? "HÓA ĐƠN").ToUpperInvariant();
+		string headerText = $"SỬA {TenLoaiPhieu} [{mtl_invoice.mahd} - {mtl_invoice.ghichukohienbill}]";
+		var dialog = await DialogService.ShowEx<ThemHoaDon>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await FilterDataList();
+		}
+	}
+
+	async Task ThemHoaDonDialog(int LoaiHD)
+	{
+		var parameters = new DialogParameters<ThemHoaDon>();
+		parameters.Add(x => x.data, data);
+		parameters.Add(x => x.MaHD, null);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.IdLoaiPhieu, LoaiHD);
+		parameters.Add(x => x.isNew, true);
+		parameters.Add(x => x.UserList, UserList);
+		parameters.Add(x => x.ListTag, ListTag);
+		parameters.Add(x => x.BankList, BankList);
+		parameters.Add(x => x.ListKhachHang, ListKhachHang);
+		var lpThem = MTLEnum.GetListLoaiPhieu().FirstOrDefault(p => p.Id == LoaiHD);
+		string TenLoaiPhieu = (lpThem?.Loaiphieu ?? "HÓA ĐƠN").ToUpperInvariant();
+		string headerText = $"THÊM {TenLoaiPhieu.ToUpper()} MỚI";
+		var dialog = await DialogService.ShowEx<ThemHoaDon>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await FilterDataList();
+		}
+	}
+
+	async Task ThemNhatKyKhachHangDialog(MTL_GetAllInvoiceResult context)
+	{
+		mtl_invoice = context;
+		TblUser? KhachHang = ListKhachHang.FirstOrDefault(p => p.Id == mtl_invoice.idkhachhang);
+		if (KhachHang == null)
+		{
+			SnackbarService.Add("Không tìm thấy khách hàng trên hóa đơn.", Severity.Warning);
+			return;
+		}
+		var parameters = new DialogParameters<KhachHang.DialogNhatKyKhachHang>();
+		parameters.Add(x => x.KhachHang, KhachHang);
+		parameters.Add(x => x.NgayHoaDon, mtl_invoice.ngaytraphieu);
+		string headerText = $"THÊM NHẬT KÝ KHÁCH HÀNG [{KhachHang.Fullname} - {KhachHang.Dienthoai}]";
+		var dialog = await DialogService.ShowEx<KhachHang.DialogNhatKyKhachHang>(headerText, parameters, options_dialog);
+		var result = await dialog.Result;
+	}
+
+	async Task AddZNSDialog(MTL_GetAllInvoiceResult context)
+	{
+		mtl_invoice = context;
+		TblUser? KhachHang = ListKhachHang.FirstOrDefault(p => p.Id == mtl_invoice.idkhachhang);
+		if (KhachHang == null)
+		{
+			SnackbarService.Add("Không tìm thấy khách hàng trên hóa đơn.", Severity.Warning);
+			return;
+		}
+		var parameters = new DialogParameters<KhachHang.DialogAddZNS>();
+		parameters.Add(x => x.invoice, mtl_invoice);
+		parameters.Add(x => x.KhachHang, KhachHang);
+		parameters.Add(x => x.userSession, userSession);
+		string headerText = $"GỬI ZNS CHO KHÁCH HÀNG [{KhachHang.Fullname} - {KhachHang.Dienthoai}]";
+		var dialog = await DialogService.ShowEx<KhachHang.DialogAddZNS>(headerText, parameters, options_dialog);
+		var result = await dialog.Result;
+	}
+}

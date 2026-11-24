@@ -1,0 +1,107 @@
+@page "/config"
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using Blazored.LocalStorage;
+@using MTL.APP.Models;
+@using Newtonsoft.Json.Linq;
+@using System.Text;
+@using System.Net.Http.Headers;
+@using System.Text.Json;
+@using System.Text.Json.Serialization;
+@using Newtonsoft.Json;
+@using static System.Net.WebRequestMethods;
+@using System.Net.Http;
+@inject HttpClient Http;
+@inject IJSRuntime JSRuntime
+@inject ProtectedLocalStorage BrowserStorage
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserService userService
+@inject IToastService toastService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+<!-- AuthorizeView allows us to only show sections of the page -->
+<!-- based on the security on the current user -->
+<style>
+	.my-style {
+		font-weight: bold !important;
+		color: #0d6efd;
+	}
+
+	.price {
+		font-weight: bold !important;
+		color: red;
+	}
+
+</style>
+<AuthorizeView>
+	<!-- Show this section if the user is logged in -->
+	<Authorized>
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="true" PageName="Config" />
+		}
+		else
+		{
+			<ConfigLayout ListUser="@ListUser"
+						  _Company="@_Company"
+						  userSession="@userSession"
+						  isAdmin="false"
+						  isNew="false" />
+		}
+	</Authorized>
+</AuthorizeView>
+
+@code {
+	bool IsLoading = true;
+	int ActiveTabIndex { get; set; } = 0;
+	private string? image_company = "/images/logo.png";
+	private ToastParameters _toastParameters;
+	UserSession userSession { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	public List<MTL_GetAllUserCompanyResult>? ListUser { get; set; }
+	Company _Company = new Company();
+
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			try
+			{
+				IsLoading = true;
+				StateHasChanged();
+				userSession = await configs.LoadAllConfig();
+				_Company = userSession.company;
+				ListUser = await userService.GetAllUserSettingAsync(userSession.company.Id);
+			}
+			catch (Exception ex)
+			{
+				_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, $"Không tải được cấu hình: {ex.Message}");
+			}
+			finally
+			{
+				IsLoading = false;
+				StateHasChanged();
+			}
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+
+	async Task SaveConfig()
+	{
+		string mess = $"Lưu thông tin {userSession.company.Name} thành công";
+		_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+	}
+
+	async Task KichHoatAPI_CheckedChanged(bool value)
+	{
+		_Company.IsActiveApi = value;
+	}
+
+
+}
+

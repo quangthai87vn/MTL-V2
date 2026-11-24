@@ -1,0 +1,463 @@
+@page "/AddContent/Add"
+@page "/AddContent/{idTimeSheet:int}"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+@using MudExRichTextEditor
+@using MudBlazor.Extensions.Options
+@inject IJSRuntime JSRuntime
+@inject ContentService contentService
+@inject UserService userService
+@inject IToastService toastService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@inject WordPressRESTAPI wordPressRESTAPI
+
+@attribute [Authorize]
+
+<style>
+	.my-style {
+		font-weight: bold !important;
+		color: #0d6efd;
+	}
+</style>
+
+<AuthorizeView>
+	<Authorized>
+		<div class="card-body">
+
+			<MudGrid Spacing=1>
+				<MudItem xs="6" sm="6" md="3">
+					<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.List"
+							   FullWidth="true" Disabled=IsLoading
+							   OnClick="OpenLinkDSNoiDung" Color="Color.Primary">DS NỘI DUNG</MudButton>
+				</MudItem>
+				<MudItem xs="6" sm="6" md="3">
+					<MudButton FullWidth=true Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save" Disabled=IsLoading
+							   OnClick="LuuNoiDung" Color="Color.Success">LƯU NỘI DUNG</MudButton>
+				</MudItem>
+				<SpinLoader IsLoading="IsLoading" Spinner="SpinnerType.Chase">
+					<LoadingTemplate>
+						<Loading />
+					</LoadingTemplate>
+					<ContentTemplate>
+						<MudItem xs="12" sm="12" md="12">
+							<MudPaper Class="pa-4" Elevation="4">
+								<MudStack Row="true" Spacing="2">
+									<MudAvatar Image=@userSession.company.Logourl Size="Size.Medium" />
+									<MudStack Justify="Justify.Center" Spacing="0">
+										<MudExGradientText Typo="Typo.h5" style="font-weight: bold; text-align:center">1. THÔNG TIN</MudExGradientText>
+									</MudStack>
+								</MudStack>
+								<MudGrid Spacing=1>
+									<MudItem xs="6" sm="6" md="2">
+										<MudSwitch Label="Đăng site"
+												   ReadOnly=!isNew
+												   @bind-Value=@model.Ispublicweb
+												   T="bool?"
+												   Color="Color.Primary" />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="2">
+										<MudSelect Label="Dự án" T="int?"
+												   ReadOnly=!isNew
+												   @bind-Value=@model.Idduan
+												   AnchorOrigin="Origin.BottomCenter"
+												   Required="true">
+											@foreach (var item in ListDuAn)
+											{
+												<MudSelectItem T="int?" Value="@item.Id">@item.Tenduan</MudSelectItem>
+											}
+										</MudSelect>
+									</MudItem>
+									<MudItem xs="12" sm="12" md="8">
+										<MudTextField T="string"
+													  Label="Tiêu đề bài viết:"
+													  Required="true"
+													  HelperTextOnFocus="true"
+													  @bind-Text=model.Tenbaidang />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="2">
+										<MudSelect T="string" ReadOnly=true
+												   Label="Trạng thái site"
+												   ValueChanged="ApiStatus_ValueChanged"
+												   Value="model.ApiStatus"
+												   AnchorOrigin="Origin.BottomCenter">
+											@foreach (var post in RestAPIEnum.GetListPostStatus())
+											{
+												<MudSelectItem T=string Value=@post.Status>@post.Status</MudSelectItem>
+											}
+										</MudSelect>
+									</MudItem>
+									<MudItem xs="12" sm="12" md="2">
+										<MudRadioGroup T="bool"
+													   Disabled=@CheckStateVisibleLenLich()
+													   Value="isLenLich"
+													   ValueChanged="HinhThucDangBaiChange">
+											<MudRadio Value=false Color="Color.Primary" Size="Size.Medium">Đăng ngay</MudRadio>
+											<MudRadio Value=true Color="Color.Secondary" Size="Size.Medium">Lên lịch</MudRadio>
+										</MudRadioGroup>
+									</MudItem>
+									<MudItem xs="6" sm="6" md="2">
+										<MudDatePicker Label="Ngày lên bài"
+													   Disabled=!isLenLich
+													   DateFormat="dd/MM/yyyy"
+													   @bind-Date=model.Ngaylenbai />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="2">
+										<MudTimePicker Label="Giờ lên bài" Disabled=!isLenLich
+													   @bind-Time=GioLenBai />
+									</MudItem>
+									<MudItem xs="6" sm="6" md="2">
+										<MudSelect @bind-Value="@model.Idusertask"
+												   Label="Người đăng"
+												   AnchorOrigin="Origin.BottomCenter"
+												   Required="true">
+											@foreach (var user in UserList)
+											{
+												<MudSelectItem T=int? Value="@user.userid">@user.Fullname</MudSelectItem>
+											}
+										</MudSelect>
+									</MudItem>
+									<MudItem xs="6" sm="6" md="2">
+										<MudSelect Label="Trạng thái MTL" T="int?"
+												   @bind-Value="@model.Idtrangthai"
+												   AnchorOrigin="Origin.BottomCenter"
+												   Required="true">
+											@foreach (var item in MTLEnum.GetListTrangThaiBaiDang())
+											{
+												<MudSelectItem T="int?" Value="@item.Id">@item.TrangThai</MudSelectItem>
+											}
+										</MudSelect>
+									</MudItem>
+									<MudItem xs="12" sm="12" md="6">
+										<MudTextField T="string" Label="Link tham khảo:"
+													  style="color:var(--mud-palette-primary); font-weight: bold;"
+													  HelperTextOnFocus="true" @bind-Text=model.Linkthamkhao />
+									</MudItem>
+									<MudItem xs="12" sm="12" md="6">
+										<MudTextField T="string" Label="Link bài viết:"
+													  style="color:var(--mud-palette-primary); font-weight: bold;"
+													  HelperTextOnFocus="true" @bind-Text=model.Link />
+									</MudItem>
+									<MudItem xs="12" sm="12" md="12">
+										<MudTextField T="string" Label="Link Facebook:"
+													  style="color:var(--mud-palette-primary); font-weight: bold;"
+													  HelperTextOnFocus="true" @bind-Text=model.Facebook />
+									</MudItem>
+									<MudItem xs="12" sm="12" md="12">
+										<CKEditorBlazor Id="TagEditor" style="height:700px"
+														@bind-Value=@TagEditor.InitialText>
+										</CKEditorBlazor>
+										@* UrlToPostImage="http://localhost:44301/api/qaiser/Upload" *@
+									</MudItem>
+									<MudItem xs="12" sm="12" md="12">
+										<CKEditorBlazor Id="NoiDungEditor" style="height:700px"
+														@bind-Value=@NoiDungEditor.InitialText>
+										</CKEditorBlazor>
+									</MudItem>
+								</MudGrid>
+							</MudPaper>
+						</MudItem>
+					</ContentTemplate>
+				</SpinLoader>
+			</MudGrid>
+		</div>
+	</Authorized>
+</AuthorizeView>
+@code
+{
+	[Parameter]
+	public int idTimeSheet { get; set; }
+
+	UserSession userSession { get; set; }
+	bool IsLoading = true;
+	DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.Medium,
+			MaximizeButton = true,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+
+		};
+
+	IEnumerable<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	List<TimeSheetDuAn>? ListDuAn { get; set; }
+	public bool isNew { get; set; }
+	TimeSheetBaiViet model = new TimeSheetBaiViet();
+	public TimeSheetBaiViet baiviet { get; set; }
+	public int idduan { get; set; } = 1;
+	MudExRichTextEdit NoidungControl = new MudExRichTextEdit();
+	EditorOptions TagEditor;
+	EditorOptions NoiDungEditor;
+	TimeSpan? GioLenBai = new TimeSpan(6, 40, 00);
+	TimeSheetDuAn duan { get; set; }
+	public bool isLenLich { get; set; } = true;
+	MTL.APP.WordPressRestAPI.Post post = new WordPressRestAPI.Post();
+
+	protected override async Task OnInitializedAsync()
+	{
+		TagEditor = new EditorOptions();
+		TagEditor.InitialText = "";
+		NoiDungEditor = new EditorOptions();
+		NoiDungEditor.InitialText = "";
+	}
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			userSession = await configs.LoadAllConfig();
+			ListDuAn = await contentService.GetAllDuAnAsync();
+			UserList = await userService.GetAllUserCompanyAsync(userSession.company.Id);
+			if (idTimeSheet == null || idTimeSheet == 0)
+			{
+				//add
+				isNew = true;
+				model = new TimeSheetBaiViet();
+				model.Ispublicweb = false; // khong dang web
+				model.Id = 0;
+				model.Idduan = 1;
+				model.Idtrangthai = MTLEnum.TrangThaiBaiDang.DangXuLy;
+				model.Iduserupdate = userSession.user.UserId;
+				model.Ngaylenbai = DateTime.Now;
+				GioLenBai = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, DateTime.Now.Second);
+				model.Idusertask = userSession.user.UserId;
+			}
+			else
+			{
+				//edit
+				isNew = false;
+				baiviet = await contentService.GetTimeSheetBaiVietAsync(idTimeSheet);
+				model = baiviet;
+				TagEditor.InitialText = baiviet.Keytag;
+				NoiDungEditor.InitialText = baiviet.Noidung;
+
+				if (baiviet.ApiPostid != null) // có data api
+				{
+					post = await this.RetrievePostsAsync((int)baiviet.ApiPostid);
+					model.ApiStatus = post.status;
+					// if (post.status=="public")
+					// {
+					// 	// da dang bai
+
+
+					// }
+					model.ApiDate = post.date;
+					GioLenBai = new TimeSpan(post.date.Hour, post.date.Minute, post.date.Second);
+					model.Ngaylenbai = post.date;
+					model.Tenbaidang = post.title.rendered;
+					model.ApiSlug = post.slug;
+
+					NoiDungEditor.InitialText = post.content.rendered;
+				}
+
+				//StateHasChanged();
+			}
+
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task<MTL.APP.WordPressRestAPI.Post> RetrievePostsAsync(int postid)
+	{
+		duan = ListDuAn.Where(p => p.Id == (int)model.Idduan).FirstOrDefault();
+		MTL.APP.WordPressRestAPI.Post post = await wordPressRESTAPI.RetrievePostsAsync(duan.Url, duan.Username, duan.Password, postid);
+		return post;
+	}
+
+	DateTime CombinedaytimeGMT(DateTime day, TimeSpan time)
+	{
+		DateTime dtComplete;
+		if (isLenLich)//len lich dang bai moi chon ngay
+		{
+			dtComplete = new DateTime(day.Year,
+				day.Month, day.Day, time.Hours,
+				time.Minutes, time.Seconds);
+		}
+		else // ko phai len lich: Đăng ngay, hoặc đã đăng
+		{
+
+			if (model.ApiStatus == "publish") //đã đăng rồi
+			{
+				dtComplete = new DateTime(day.Year,
+				day.Month, day.Day, time.Hours,
+				time.Minutes, time.Seconds);
+			}
+			else
+			{
+				dtComplete = DateTime.Now;
+			}
+		}
+		//dtComplete = dtComplete.AddHours(7);// GMT+7
+		return dtComplete;
+	}
+
+	async Task<MTL.APP.WordPressRestAPI.Post> CreatePostRESTAPI(TimeSheetBaiViet model)
+	{
+		duan = ListDuAn.Where(p => p.Id == (int)model.Idduan).FirstOrDefault();
+		MTL.APP.WordPressRestAPI.Post postreturn = null;
+		MTL.APP.WordPressRestAPI.Post post = new WordPressRestAPI.Post();
+
+		if (isLenLich)
+			post.status = "future";
+		else post.status = "publish";//model.ApiStatus;
+
+
+		post.type = "post";
+		post.date = this.CombinedaytimeGMT((DateTime)model.Ngaylenbai, (TimeSpan)GioLenBai);
+		post.date_gmt = this.CombinedaytimeGMT((DateTime)model.Ngaylenbai, (TimeSpan)GioLenBai);
+		WordPressRestAPI.Title Title = new WordPressRestAPI.Title()
+			{
+				rendered = model.Tenbaidang,
+				raw = model.Tenbaidang
+			};
+		post.title = Title;
+		postreturn = await wordPressRESTAPI.CreatePostsAsync(duan.Url, duan.Username, duan.Password, post);
+		return postreturn;
+	}
+	async Task<MTL.APP.WordPressRestAPI.Post> UpdatePostRESTAPI(TimeSheetBaiViet model)
+	{
+		duan = ListDuAn.Where(p => p.Id == (int)model.Idduan).FirstOrDefault();
+		MTL.APP.WordPressRestAPI.Post postreturn = null;
+		// post.status = "future";
+		// post.type = "post";
+		post.date = this.CombinedaytimeGMT((DateTime)model.Ngaylenbai, (TimeSpan)GioLenBai);
+		post.date_gmt = this.CombinedaytimeGMT((DateTime)model.Ngaylenbai, (TimeSpan)GioLenBai);
+		WordPressRestAPI.Title Title = new WordPressRestAPI.Title()
+			{
+				rendered = model.Tenbaidang,
+				raw = model.Tenbaidang
+			};
+		post.title = Title;
+		post.id = model.ApiPostid.ToString();
+		post.slug = model.ApiSlug;
+
+		postreturn = await wordPressRESTAPI.UpdatePostsAsync(duan.Url, duan.Username, duan.Password, post);
+		return postreturn;
+	}
+	async Task<TimeSheetBaiViet> LuuNoiDung()
+	{
+		try
+		{
+			IsLoading = true;
+			if (isNew) //Mới
+			{
+				if (model.Ispublicweb == true) // Đăng web
+				{
+					MTL.APP.WordPressRestAPI.Post newpost = await this.CreatePostRESTAPI(model);
+					model.ApiPostid = int.Parse(newpost.id);
+					model.ApiSlug = newpost.slug;
+					model.ApiStatus = newpost.status;
+					model.ApiType = newpost.type;
+					model.ApiDate = newpost.date_gmt;
+					model.ApiLink = newpost.link;
+					model.Tenbaidang = newpost.title.rendered;
+					model.Link = $"{duan.Url}/{newpost.slug}";
+				}
+				model.Beginupdate = model.Lastupdate = DateTime.Now;
+				model.Ngaylenbai = this.CombinedaytimeGMT((DateTime)model.Ngaylenbai, (TimeSpan)GioLenBai);
+				model.Keytag = TagEditor.InitialText;
+				model.Noidung = NoiDungEditor.InitialText;
+				model = await contentService.CreateTimeSheetBaiVietAsync(model);
+				string mess = $"Tạo thành công bài viết [{model.Tenbaidang}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			else //update
+			{
+				if (model.Ispublicweb == true) // Đăng web
+				{
+					if (model.ApiStatus != "publish") // Chưa Public bài mới lưu API
+					{
+						MTL.APP.WordPressRestAPI.Post newpost = await this.UpdatePostRESTAPI(model);
+						model.ApiPostid = int.Parse(newpost.id);
+						model.ApiSlug = newpost.slug;
+						model.ApiStatus = newpost.status;
+						model.ApiType = newpost.type;
+						model.ApiDate = newpost.date_gmt;
+						model.ApiLink = newpost.link;
+						model.Tenbaidang = newpost.title.rendered;
+						model.Link = $"{duan.Url}/{newpost.slug}";
+					}
+				}
+				model.Lastupdate = DateTime.Now;
+				model.Ngaylenbai = this.CombinedaytimeGMT((DateTime)model.Ngaylenbai, (TimeSpan)GioLenBai);
+				model.Noidung = NoiDungEditor.InitialText;
+				model.Keytag = TagEditor.InitialText;
+				baiviet = await contentService.UpdateTimeSheetBaiVietAsync(model);
+				string mess = $"Lưu thành công bài viết [{model.Tenbaidang}]";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			IsLoading = false;
+			return model;
+		}
+		catch (Exception)
+		{
+			return null;
+		}
+	}
+
+	async Task DuAnValueChanged(int id)
+	{
+		model.Idduan = id;
+	}
+	private async Task OpenLinkDSNoiDung()
+	{
+		string Link = "/Content";
+		await JSRuntime.InvokeVoidAsync("open", Link, "_self");
+	}
+
+	void HinhThucDangBaiChange(bool value)
+	{
+		if (value) // len lich
+		{
+			isLenLich = true;
+		}
+		else // dang ngay
+		{
+			isLenLich = false;
+			model.Ngaylenbai = DateTime.Now;
+			GioLenBai = new TimeSpan(DateTime.Now.Hour, DateTime.Now.Minute, DateTime.Now.Second);
+		}
+	}
+
+	async Task ApiStatus_ValueChanged(string newValue)
+	{
+		IsLoading = true;
+		if (newValue == "publish") // đã đăng
+		{
+			isLenLich = false;
+		}
+		else // chưa đăng
+		{
+			isLenLich = true;
+		}
+		IsLoading = false;
+	}
+
+	bool CheckStateVisibleLenLich()
+	{
+		bool retu = false;
+		if (model.ApiStatus == "publish")// da dang roi
+		{
+			//readonly lên lịch
+			isLenLich = false;
+			retu = true;
+		}
+		if ((bool)!model.Ispublicweb)// ko co id post web
+		{
+			//readonly lên lịch
+			retu = true;
+		}
+		return retu;
+	}
+}

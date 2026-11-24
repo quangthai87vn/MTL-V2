@@ -1,0 +1,18 @@
+@page "/KhachHang/InNameCard/{Id:int}"
+@layout NoMenuLayout
+@attribute [Authorize]
+
+<MudContainer Class="pa-6">
+	<MudAlert Severity="Severity.Info" Variant="Variant.Filled">
+		Mẫu in Khách hàng (phiếu gửi hàng / danh thiếp) trước đây dùng DevExpress — chưa có bản HTML.
+		<strong>In tem hàng hóa</strong> dùng trang riêng sau khi build mới; nếu mở <code>/HangHoa/TemDanHangHoa/...</code> mà vẫn ra trang giống nội dung cũ, hãy tắt hết <code>dotnet</code> đang chạy, rồi <code>dotnet build</code> và <code>dotnet run</code> lại.
+	</MudAlert>
+	<MudStack Row="true" Spacing="2" Class="mt-4" Wrap="Wrap.Wrap">
+		<MudButton Variant="Variant.Filled" Href="/invoice">Về danh sách hóa đơn</MudButton>
+		<MudButton Variant="Variant.Filled" Color="Color.Secondary" Href="/Product">Về hàng hóa</MudButton>
+	</MudStack>
+</MudContainer>
+
+@code {
+	[Parameter] public int Id { get; set; }
+}

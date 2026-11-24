@@ -1,0 +1,289 @@
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@inject InvoiceService invoiceService
+@inject Configs configs
+@inject IJSRuntime JS
+@inject ISnackbar SnackbarService
+
+<MudDialog Style="width:95vw; max-width:1200px;">
+	<DialogContent>
+		@if (_loading)
+		{
+			<MudProgressLinear Indeterminate="true" />
+		}
+		else if (_error != null)
+		{
+			<MudAlert Severity="Severity.Error" Class="ma-4">@_error</MudAlert>
+		}
+		else if (_invoice != null)
+		{
+			var inv = _invoice;
+			var lines = _lines ?? new List<MTL_GetHoaDonChiTietResult>();
+			var rootClass = IsBill ? "invoice-root-bill" : "invoice-root-a4";
+
+			<div id="@_rootId" class="@rootClass">
+				@if (!IsBill)
+				{
+					<div class="invoice-a4-header-band"></div>
+					<div class="invoice-a4-header">
+						<div class="invoice-a4-hdr-grid">
+							<div class="invoice-a4-cell-logo">
+								@if (!string.IsNullOrWhiteSpace(_company?.Logourl))
+								{
+									<img src="@_company.Logourl" alt="logo" class="invoice-a4-logo-img" />
+								}
+							</div>
+							<div class="invoice-a4-cell-company">
+								<div class="invoice-co-name">@(_company?.Name ?? "CÔNG TY")</div>
+								<div class="invoice-company-block">
+									@foreach (var line in AddressLines(_company?.Diachi)) { <div>@line</div> }
+									<div><strong>Hotline:</strong> @(_company?.Sodienthoai)</div>
+									<div><strong>Email:</strong> @(_company?.Email) — @(_company?.Website)</div>
+								</div>
+							</div>
+							<div class="invoice-a4-cell-meta">
+								<div class="invoice-hd-box">
+									<div class="invoice-hd-title">HÓA ĐƠN</div>
+									<div class="invoice-hd-meta">
+										<div class="invoice-hd-line">
+											<span class="invoice-hd-lbl">Số HĐ</span>
+											<span class="invoice-hd-val">@MaHD</span>
+										</div>
+										<div class="invoice-hd-line">
+											<span class="invoice-hd-lbl">Ngày xuất</span>
+											<span class="invoice-hd-val">@NgayLap(inv)</span>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="invoice-a4-customer">
+						<div>
+							<div class="invoice-a4-customer-label">Thông tin khách hàng</div>
+							<div class="invoice-a4-customer-meta">
+								<div><strong>Tên:</strong> @(inv.tenkh ?? "-")</div>
+								<div><strong>Điện thoại:</strong> @(inv.sodienthoai ?? "-")</div>
+							</div>
+						</div>
+						<div>
+							<div class="invoice-a4-customer-label">Thông tin đơn hàng</div>
+							<div class="invoice-a4-customer-right">
+								<div><strong>NV bán hàng:</strong> @(inv.tennv ?? "-")</div>
+								<div><strong>Ghi chú:</strong> @(inv.ghichukohienbill ?? "—")</div>
+							</div>
+						</div>
+					</div>
+					<table class="invoice-table">
+						<thead>
+							<tr>
+								<th style="width:36px;">STT</th>
+								<th>HÀNG HÓA</th>
+								<th style="width:44px;">SL</th>
+								<th style="width:56px;">B.HÀNH</th>
+								<th style="width:88px;">ĐƠN GIÁ</th>
+								<th style="width:96px;">THÀNH TIỀN</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var item in lines.OrderBy(x => x.order ?? x.id).Select((x, idx) => new { line = x, idx = idx + 1 }))
+							{
+								<tr>
+									<td class="text-center">@item.idx</td>
+									<td>@item.line.tensp</td>
+									<td class="text-center">@(item.line.sl ?? 0)</td>
+									<td class="text-center">@(!string.IsNullOrWhiteSpace(item.line.baohanh) ? "BH" : "")</td>
+									<td class="text-right">@Money(item.line.dongia)</td>
+									<td class="text-right">@Money(item.line.thanhtien)</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+					<div class="invoice-a4-bottom">
+						<div class="invoice-section-pay">THÔNG TIN THANH TOÁN</div>
+						<div class="invoice-a4-pay-body">
+							<div class="invoice-pay-totals">
+								<div class="invoice-totals-grid">
+									<div class="invoice-total-row">
+										<span>Tổng tiền hàng</span>
+										<span>@Money(inv.tongtien)</span>
+									</div>
+									<div class="invoice-total-row discount">
+										<span>Chiết khấu (CK)</span>
+										<span>- @Money(inv.CK)</span>
+									</div>
+									<div class="invoice-total-row discount">
+										<span>Giảm giá</span>
+										<span>- @Money(inv.giamgia)</span>
+									</div>
+									<div class="invoice-total-row grand">
+										<span>THANH TOÁN</span>
+										<span>@Money(inv.thanhtoan)</span>
+									</div>
+									@if (inv.tienck > 0)
+									{
+										<div class="invoice-total-row sub"><span>Tiền CK</span><span>@Money(inv.tienck)</span></div>
+									}
+									@if (inv.conlai > 0)
+									{
+										<div class="invoice-total-row sub"><span>Còn lại</span><span class="text-danger">@Money(inv.conlai)</span></div>
+									}
+								</div>
+							</div>
+						</div>
+					</div>
+				}
+				else
+				{
+					<div class="invoice-bill-header">
+						<div class="invoice-co-name">@(_company?.Name ?? "CÔNG TY")</div>
+						@foreach (var line in AddressLines(_company?.Diachi)) { <div>@line</div> }
+						<div>Hotline: @(_company?.Sodienthoai)</div>
+					</div>
+					<div class="invoice-bill-meta">
+						<div><strong>Ngày:</strong> @NgayLap(inv)</div>
+						<div><strong>HD:</strong> @MaHD</div>
+						<div><strong>KH:</strong> @(inv.tenkh ?? "-")</div>
+						<div><strong>NV:</strong> @(inv.tennv ?? "-")</div>
+					</div>
+					<table class="invoice-table bill-table">
+						<thead>
+							<tr>
+								<th>SP</th>
+								<th style="width:44px;">SL</th>
+								<th style="width:88px;">Đ.GIÁ</th>
+								<th style="width:96px;">T.TIỀN</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var item in lines.OrderBy(x => x.order ?? x.id).Select((x, idx) => new { line = x, idx = idx + 1 }))
+							{
+								<tr>
+									<td>@item.line.tensp</td>
+									<td class="text-center">@(item.line.sl ?? 0)</td>
+									<td class="text-right">@Money(item.line.dongia)</td>
+									<td class="text-right">@Money(item.line.thanhtien)</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+					<div class="invoice-bill-totals">
+						<div class="invoice-total-row">
+							<span>Tổng cộng</span>
+							<span>@Money(inv.tongtien)</span>
+						</div>
+						<div class="invoice-total-row discount">
+							<span>Chiết khấu</span>
+							<span>- @Money(inv.CK)</span>
+						</div>
+						<div class="invoice-total-row discount">
+							<span>Giảm giá</span>
+							<span>- @Money(inv.giamgia)</span>
+						</div>
+						<div class="invoice-total-row grand">
+							<span>THANH TOÁN</span>
+							<span>@Money(inv.thanhtoan)</span>
+						</div>
+					</div>
+					<div class="invoice-bill-footer">
+						<div>Cảm ơn quý khách!</div>
+					</div>
+				}
+			</div>
+		}
+	</DialogContent>
+	<DialogActions>
+		<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="pa-2" Style="width:100%; border-top:1px solid var(--mud-palette-lines-default);">
+			<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="DoPrint">IN</MudButton>
+			<MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="DoPdf">PDF</MudButton>
+			<MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Image" OnClick="DoPng">ẢNH PNG</MudButton>
+			<MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.TableView" OnClick="DoExcel">EXCEL</MudButton>
+			<MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.DataObject" OnClick="DoJson">JSON</MudButton>
+			<MudSpacer />
+			<MudButton Variant="Variant.Text" OnClick="() => MudDialog?.Close()">ĐÓNG</MudButton>
+		</MudStack>
+	</DialogActions>
+</MudDialog>
+
+<link href="/css/invoice-print.css" rel="stylesheet" />
+
+@code {
+	[CascadingParameter] MudDialogInstance? MudDialog { get; set; }
+
+	[Parameter] public string MaHD { get; set; } = "";
+	[Parameter] public bool IsBill { get; set; } = false;
+
+	bool _loading = true;
+	string? _error = null;
+	MTL_GetHoaDonResult? _invoice = null;
+	List<MTL_GetHoaDonChiTietResult>? _lines = null;
+	MTL.APP.Models.Company? _company = null;
+	string _rootId = "hd-print-" + Guid.NewGuid().ToString("N");
+
+	string NgayLap(MTL_GetHoaDonResult inv) =>
+		inv.ngaylapphieu?.ToString("dd/MM/yyyy HH:mm") ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+
+	string Money(double? v) => (v ?? 0).ToString("N0");
+
+	IEnumerable<string> AddressLines(string? addr) =>
+		string.IsNullOrWhiteSpace(addr)
+			? Enumerable.Empty<string>()
+			: addr.Split('\n').Where(x => !string.IsNullOrWhiteSpace(x));
+
+	protected override async Task OnInitializedAsync()
+	{
+		_loading = true;
+		_error = null;
+		try
+		{
+			var allConfigs = await configs.LoadAllConfig();
+			_company = allConfigs.company;
+			var hdList = await invoiceService.GetHoaDon(MaHD);
+			_invoice = hdList.FirstOrDefault();
+			if (_invoice == null) { _error = "Không tìm thấy hóa đơn."; }
+			else { _lines = (await invoiceService.GetHoaDonChiTiet_MaHDAsync(MaHD)).ToList(); }
+		}
+		catch (Exception ex) { _error = "Lỗi tải hóa đơn: " + ex.Message; }
+		_loading = false;
+	}
+
+	async Task DoPrint() =>
+		await JS.InvokeVoidAsync("mtlInvoiceExport.printBill", _rootId, IsBill);
+
+	async Task DoPdf()
+	{
+		var name = MaHD + (IsBill ? "_bill" : "_A4");
+		await JS.InvokeVoidAsync("mtlInvoiceExport.downloadPdf", _rootId, name);
+	}
+
+	async Task DoPng()
+	{
+		await JS.InvokeVoidAsync("mtlInvoiceExport.downloadPng", _rootId, MaHD + ".png");
+	}
+
+	async Task DoExcel()
+	{
+		if (_invoice == null || _lines == null) return;
+		var data = _lines.Select((x, idx) => new
+		{
+			STT = idx + 1,
+			x.tensp,
+			SL = x.sl ?? 0,
+			Đơn_giá = x.dongia,
+			Thành_tiền = x.thanhtien,
+			Bảo_hành = !string.IsNullOrWhiteSpace(x.baohanh) ? "Có" : "Không"
+		}).ToList();
+		await JS.InvokeVoidAsync("exportToExcel",
+			"HoaDon_" + MaHD,
+			new[] { "STT", "Tên sản phẩm", "Số lượng", "Đơn giá", "Thành tiền", "Bảo hành" },
+			data);
+	}
+
+	async Task DoJson()
+	{
+		var json = System.Text.Json.JsonSerializer.Serialize(new { HD = _invoice, Lines = _lines });
+		await JS.InvokeVoidAsync("mtlInvoiceExport.downloadTextFile",
+			json, $"HoaDon_{MaHD}.json", "application/json;charset=utf-8");
+	}
+}

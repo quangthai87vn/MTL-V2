@@ -1,0 +1,514 @@
+@page "/ProductAPI"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using Microsoft.Extensions.Options;
+@using System.Data;
+@using System.Globalization;
+@using System.Linq
+@using MudBlazor.Extensions.Options
+
+@inject IJSRuntime JSRuntime
+@inject HangHoaService hangHoaService
+@inject UserService userService
+@inject IToastService toastService
+@inject APIWooService aPIWooService
+@inject ISnackbar SnackbarService
+@inject Configs configs
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<AuthorizeView Context="auth">
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.CloudSync" Title="DANH SÁCH SẢN PHẨM API">
+			<Actions>
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap mtl-product-api-toolbar-actions">
+					<MudSelect T="string" Class="mtl-product-api-filter-select" Value="@_filter.v_trangthai" ValueChanged="ValueChangedHandler_TrangThai"
+							   Label="Trạng thái" Margin="Margin.Dense" Variant="Variant.Outlined" ReadOnly="@IsLoading" AnchorOrigin="Origin.BottomCenter">
+						@foreach (var item in s_trangthaiAPI)
+						{
+							<MudSelectItem T="string" Value="@item">@item</MudSelectItem>
+						}
+					</MudSelect>
+					<MudSelect T="string" Class="mtl-product-api-filter-select" Value="@_filter.v_tonkho" ValueChanged="ValueChangedHandler_TonKho"
+							   Label="Tồn kho" Margin="Margin.Dense" Variant="Variant.Outlined" ReadOnly="@IsLoading" AnchorOrigin="Origin.BottomCenter">
+						@foreach (var item in s_tonkho)
+						{
+							<MudSelectItem T="string" Value="@item">@item</MudSelectItem>
+						}
+					</MudSelect>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Class="mtl-header-action-btn"
+							   Disabled="@IsLoading" Color="Color.Primary">THÊM API</MudButton>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FileDownload" Class="mtl-header-action-btn"
+							   Disabled="@IsLoading" OnClick="ExportXlsx" Color="Color.Error">EXCEL</MudButton>
+				</MudStack>
+			</Actions>
+			<ChildContent>
+				<MudStack Spacing="2">
+					<MudTextField T="string" Class="mtl-page-header-search" Label="Gõ tên hoặc mã sản phẩm cần tìm…"
+								  @bind-Text="searchSP" Margin="Margin.Dense" Variant="Variant.Outlined" FullWidth="true"
+								  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium"
+								  Immediate="true" Clearable="true" Disabled="@IsLoading" />
+					<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mtl-product-api-search-row">
+						<MudButton Variant="Variant.Filled" Class="mtl-product-api-search-btn mtl-header-action-btn" StartIcon="@Icons.Material.Filled.Search"
+								   Disabled="@IsLoading" OnClick="TimSP" Color="Color.Primary">TÌM HÀNG HÓA</MudButton>
+						<div class="mtl-product-api-pagination-scroll mtl-product-api-pagination-flex">
+							<MudPagination ShowFirstButton="false" ShowLastButton="false" Color="Color.Primary"
+										   Variant="Variant.Filled" Count="@PageCount" Selected="@_wooPage" SelectedChanged="OnWooPageSelectedAsync" Disabled="@IsLoading" />
+						</div>
+					</MudStack>
+				</MudStack>
+			</ChildContent>
+		</PageStandardHeader>
+
+		<div class="mtl-page-wrapper mtl-product-api-root">
+			<div class="mtl-page-body">
+				<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+					@if (IsLoading)
+					{
+						<Loading IsFullPage="false" PageName="HÀNG HÓA API" />
+					}
+					else if (!(ListProduct ?? _emptyProducts).Any())
+					{
+						<MudDivider Class="mud-width-full" />
+						<MudPaper Elevation="0" Class="pa-8">
+							<MudStack AlignItems="AlignItems.Center" Spacing="2">
+								<MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Class="mud-text-secondary" Style="opacity:0.45" />
+								<MudText Typo="Typo.body1" Class="mud-text-secondary">Không có sản phẩm trên trang này.</MudText>
+							</MudStack>
+						</MudPaper>
+					}
+					else
+					{
+						<MudDivider Class="mud-width-full" />
+						<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-4 py-2 flex-wrap" Style="min-height:40px;">
+							<MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" Style="opacity:0.85" />
+							<MudText Typo="Typo.subtitle2" Class="mud-typography-weight-bold">Sản phẩm WooCommerce</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">Double-click mở web · Hover → xóa</MudText>
+						</MudStack>
+						<div class="pa-2">
+							<div class="mtl-prod-grid">
+								@foreach (var p in ListProduct ?? _emptyProducts)
+								{
+									var imgUrl = GetPrimaryImageUrl(p) ?? "/images/logo.png";
+									var inStock = string.Equals(p.stock_status, "instock", StringComparison.OrdinalIgnoreCase);
+									var hasPermalink = !string.IsNullOrWhiteSpace(p.permalink);
+									var name = p.name ?? "—";
+									<div class="mtl-prod-card" @ondblclick="@(async () => await OpenWooProductPageAsync(p))">
+										<div class="mtl-prod-card__img-wrap">
+											@if (hasPermalink)
+											{
+												<a class="mtl-prod-card__img-link" href="@p.permalink" target="_blank" rel="noopener noreferrer" title="Mở @name">
+													<img src="@imgUrl" alt="@name"
+														 class="mtl-prod-card__img @(inStock ? "" : "grayscale")"
+														 loading="lazy"
+														 width="400" height="400"
+														 onerror="this.style.display='none'; var ph=this.nextElementSibling; if(ph) ph.style.display='flex'" />
+													<div class="mtl-prod-card__img-placeholder" style="display:none">
+														<MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" />
+													</div>
+												</a>
+											}
+											else
+											{
+												<img src="@imgUrl" alt="@name"
+													 class="mtl-prod-card__img @(inStock ? "" : "grayscale")"
+													 loading="lazy"
+													 width="400" height="400"
+													 onerror="this.style.display='none'; var ph=this.nextElementSibling; if(ph) ph.style.display='flex'" />
+												<div class="mtl-prod-card__img-placeholder" style="display:none">
+													<MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" />
+												</div>
+											}
+
+											<span class="mtl-prod-badge @WooStockBadgeClass(p.stock_status)">
+												@StockLabelVi(p.stock_status).ToUpperInvariant()
+											</span>
+
+											<div class="mtl-prod-card__actions">
+												<button type="button" class="mtl-prod-card__action-btn mtl-prod-card__action-btn--del"
+														title="Xóa trên WooCommerce"
+														@onclick="@(() => XoaProductAPIDialog(p))" @onclick:stopPropagation="true">
+													<i class="fas fa-trash"></i>
+												</button>
+											</div>
+										</div>
+
+										<div class="mtl-prod-card__body">
+											<span class="mtl-prod-card__cat mtl-product-api-card-cat" title="@WooCategoryLine(p)">@WooCategoryLine(p)</span>
+											<span class="mtl-prod-card__name" title="@name">@name</span>
+											<span class="mtl-prod-card__woo-id mtl-product-api-woo-id">ID Woo: @p.id</span>
+
+											<div class="mtl-prod-card__price-wrap">
+												@if (WooHasDistinctSale(p))
+												{
+													<span class="mtl-prod-card__price">@FormatPriceVnd(p.sale_price)</span>
+													<span class="mtl-prod-card__price-original">@FormatPriceVnd(p.regular_price)</span>
+												}
+												else
+												{
+													<span class="mtl-prod-card__price">@FormatPriceVnd(!string.IsNullOrWhiteSpace(p.sale_price) ? p.sale_price : p.regular_price)</span>
+												}
+											</div>
+										</div>
+									</div>
+								}
+							</div>
+						</div>
+						<div class="mtl-product-api-cards-footer px-4 pb-3">
+							<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="flex-wrap mb-2">
+								<MudText Typo="Typo.body2" Class="mud-text-secondary">
+									Trang <strong class="mtl-product-api-stat-em">@_wooPage</strong> / <strong>@PageCount</strong>
+									· Trên trang: <strong>@(ListProduct?.Count ?? 0)</strong>
+									· Tổng WooCommerce: <strong>@(_productCountTotal?.ToString("N0") ?? "—")</strong>
+								</MudText>
+								<MudSpacer />
+							</MudStack>
+							<div class="mtl-product-api-pagination-scroll">
+								<MudPagination ShowFirstButton="true" ShowLastButton="true" Color="Color.Primary"
+											   Variant="Variant.Filled" Count="@PageCount" Selected="@_wooPage" SelectedChanged="OnWooPageSelectedAsync" Disabled="@IsLoading" />
+							</div>
+						</div>
+					}
+				</MudPaper>
+			</div>
+		</div>
+	</Authorized>
+</AuthorizeView>
+
+@code {
+	DialogOptionsEx options = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.Medium,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	UserSession userSession { get; set; } = default!;
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+	bool IsLoading = true;
+	public List<MTL.APP.WooRestAPI.Product>? ListProduct { get; set; }
+	/// <summary>Trang WooCommerce (1-based), khớp MudPagination.Selected.</summary>
+	int _wooPage = 1;
+	int? _productCountTotal;
+	static readonly List<MTL.APP.WooRestAPI.Product> _emptyProducts = new();
+	const string WooOrderBy = "date_modified";
+	private ToastParameters _toastParameters;
+	List<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+	List<String> s_theongay = new List<string> { "Ngày tạo", "Giá tăng dần", "Giá giảm dần" };
+	List<String> s_tonkho = new List<string> { "Còn hàng", "Hết hàng", "Tất cả" };
+	List<int> s_sodong = new List<int> { 100 };
+	FilterCondition _filter = new FilterCondition();
+	FilterConditionAPI _filterAPI = new FilterConditionAPI();
+	List<String> s_tonkhoAPI = new List<string> { "TẤT CẢ", "CÒN HÀNG", "CHỜ HÀNG", "HẾT HÀNG" };
+	List<String> s_trangthaiAPI = new List<string> { "publish", "pending", "private", "draft" };
+	List<MTL.APP.WooRestAPI.Product>? productlist_API { get; set; }
+	APP.WooRestAPI.Product? product_woo { get; set; }
+	FilterCondition filter_detail = new FilterCondition();
+	class FilterCondition
+	{
+		public string v_tonkho { get; set; } = "Tất cả";
+		public string v_trangthai { get; set; } = "publish";
+		public string v_theongay { get; set; } = "Ngày tạo";
+		public int v_loaihh { get; set; } = 1;
+		public int v_sl { get; set; } = 1;
+		public double v_dongia { get; set; } = 0;
+		public int v_baohanh { get; set; } = 3;
+		public int v_tensp { get; set; } = 1;
+		public string v_loaiHHDVNullText { get; set; } = "Chọn Hàng hóa";
+		public string v_tenspEdit { get; set; } = "";
+		public bool v_SPAo { get; set; } = false;
+		public bool v_HDVAT { get; set; } = false;
+		public int v_NhomKhachHang { get; set; } = 1;
+		public int v_loaiphieu { get; set; } = 1;
+		public string v_dichvuxuly { get; set; } = "Tất cả";
+		public int v_perpage { get; set; } = 100;
+		public string v_model { get; set; } = "";
+	}
+
+	int PageCount { get; set; } = 1;
+	MTL.APP.WooRestAPI.ProductCount? _ProductCount { get; set; }
+	string searchSP = "";
+
+	string LinkAnhXoa { get; set; } = "";
+	string NoiDungXoa { get; set; } = "";
+
+	class FilterConditionAPI
+	{
+		public string v_tonkho { get; set; } = "TẤT CẢ";
+		public string v_timhanghoa { get; set; } = "";
+		public string v_wooid { get; set; } = "";
+		public string v_wooid_all { get; set; } = "";
+		public IEnumerable<MTL.APP.WooRestAPI.tag> woo_tags_data { get; set; }
+	}
+	MTL.APP.WooRestAPI.Product WooProDelete = new APP.WooRestAPI.Product();
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			userSession = await configs.LoadAllConfig();
+			if (userSession.company.IsActiveApi)
+				await FilterDataList();
+			else
+			{
+				ListProduct = _emptyProducts;
+				SnackbarService.Add("Công ty chưa bật API WooCommerce (IsActiveApi).", Severity.Warning);
+			}
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task FilterDataList()
+	{
+		try
+		{
+			_ProductCount = await aPIWooService.GetProductCountAsync(userSession.company.Wookey, userSession.company.Woosecret, userSession.company.Woourl);
+			_productCountTotal = _ProductCount?.count;
+			_wooPage = 1;
+			await SearchSanPham();
+		}
+		catch (Exception ex)
+		{
+			ListProduct = _emptyProducts;
+			SnackbarService.Add("Không lấy được dữ liệu WooCommerce: " + ex.Message, Severity.Error);
+		}
+	}
+
+	static string FormatPriceVnd(string? raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+			return "—";
+		if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
+			return d.ToString("N0", CultureInfo.GetCultureInfo("vi-VN")) + " đ";
+		return raw;
+	}
+
+	static string? GetPrimaryImageUrl(MTL.APP.WooRestAPI.Product p)
+	{
+		if (p.images is { Count: > 0 } && !string.IsNullOrEmpty(p.images[0].src))
+			return p.images[0].src;
+		return null;
+	}
+
+	static string StockLabelVi(string? stock) => stock switch
+	{
+		"instock" => "Còn hàng",
+		"outofstock" => "Hết hàng",
+		"onbackorder" => "Chờ hàng",
+		_ => "Khác"
+	};
+
+	static string WooStockBadgeClass(string? stock) => stock switch
+	{
+		"instock" => "mtl-prod-badge--active",
+		"outofstock" => "mtl-prod-badge--outofstock",
+		"onbackorder" => "mtl-prod-badge--lowstock",
+		_ => "mtl-prod-badge--inactive"
+	};
+
+	static string WooCategoryLine(MTL.APP.WooRestAPI.Product p)
+	{
+		if (p.categories == null || p.categories.Count == 0)
+			return "WooCommerce";
+		var first = p.categories[0].name;
+		if (string.IsNullOrWhiteSpace(first))
+			return "WooCommerce";
+		if (p.categories.Count == 1)
+			return first!;
+		return first + " +" + (p.categories.Count - 1);
+	}
+
+	static bool WooHasDistinctSale(MTL.APP.WooRestAPI.Product p)
+	{
+		var s = p.sale_price?.Trim();
+		var r = p.regular_price?.Trim();
+		if (string.IsNullOrWhiteSpace(s)) return false;
+		if (!decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var sd))
+			return false;
+		if (sd <= 0) return false;
+		if (!decimal.TryParse(r, NumberStyles.Any, CultureInfo.InvariantCulture, out var rd))
+			return true;
+		return sd < rd;
+	}
+
+	async Task OpenWooProductPageAsync(MTL.APP.WooRestAPI.Product p)
+	{
+		if (string.IsNullOrWhiteSpace(p.permalink))
+			return;
+		await JSRuntime.InvokeVoidAsync("open", p.permalink, "_blank");
+	}
+
+	static string ResolveStockStatusFilter(string? tonkhoLabel)
+	{
+		if (string.IsNullOrWhiteSpace(tonkhoLabel)) return "";
+		var s = tonkhoLabel.Trim();
+		if (s.Equals("Còn hàng", StringComparison.OrdinalIgnoreCase)) return "instock";
+		if (s.Equals("Hết hàng", StringComparison.OrdinalIgnoreCase)) return "outofstock";
+		if (s.Equals("Chờ hàng", StringComparison.OrdinalIgnoreCase)) return "onbackorder";
+		return "";
+	}
+
+	void RecalculatePageCount()
+	{
+		if (_ProductCount == null || _filter.v_perpage <= 0)
+		{
+			PageCount = 1;
+			return;
+		}
+		var total = Math.Max(0, _ProductCount.count);
+		PageCount = Math.Max(1, (total + _filter.v_perpage - 1) / _filter.v_perpage);
+		if (_wooPage > PageCount)
+			_wooPage = PageCount;
+	}
+
+	async Task ExportXlsx()
+	{
+		if (ListProduct == null || !ListProduct.Any())
+		{
+			SnackbarService.Add("Không có dữ liệu để xuất.", Severity.Warning);
+			return;
+		}
+		var exportData = ListProduct.Select(p => new
+		{
+			p.id,
+			p.name,
+			stock_status = p.stock_status == "instock" ? "Còn hàng" : p.stock_status == "outofstock" ? "Hết hàng" : "Chết",
+			p.sale_price,
+			p.regular_price
+		}).ToList();
+		await JSRuntime.InvokeVoidAsync("exportToExcel",
+			"DanhSachSanPhamAPI",
+			new[] { "ID", "Tên sản phẩm", "Tồn kho", "Giá KM", "Giá thường" },
+			exportData.Select(e => new object[] { e.id, e.name, e.stock_status, e.sale_price, e.regular_price }).ToList()
+		);
+	}
+
+	async Task ValueChangedHandler_TonKho(string newValue)
+	{
+		_filter.v_tonkho = newValue;
+		_wooPage = 1;
+		IsLoading = true;
+		try
+		{
+			await SearchSanPham();
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task ValueChangedHandler_TrangThai(string newValue)
+	{
+		_filter.v_trangthai = newValue;
+		_wooPage = 1;
+		IsLoading = true;
+		try
+		{
+			await SearchSanPham();
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task ValueChangedHandler_SoDong(int newValue)
+	{
+		_filter.v_perpage = newValue;
+		_wooPage = 1;
+		IsLoading = true;
+		try
+		{
+			RecalculatePageCount();
+			await SearchSanPham();
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task SearchSanPham()
+	{
+		if (_ProductCount == null)
+			return;
+
+		RecalculatePageCount();
+
+		var stockFilter = ResolveStockStatusFilter(_filter.v_tonkho);
+		var status = _filter.v_trangthai;
+		var page = await aPIWooService.GetListProductsByPageAsync(
+			_filter.v_perpage,
+			_wooPage,
+			searchSP,
+			stockFilter,
+			status,
+			WooOrderBy,
+			userSession.company.Wookey,
+			userSession.company.Woosecret,
+			userSession.company.Woourl);
+		ListProduct = page ?? _emptyProducts;
+	}
+
+	async Task TimSP()
+	{
+		_wooPage = 1;
+		IsLoading = true;
+		try
+		{
+			await SearchSanPham();
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task OnWooPageSelectedAsync(int page)
+	{
+		_wooPage = page;
+		IsLoading = true;
+		try
+		{
+			await SearchSanPham();
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	async Task XoaProductAPIDialog(MTL.APP.WooRestAPI.Product product)
+	{
+		WooProDelete = product;
+		NoiDungXoa = string.Format("Xóa khỏi trang web {0} - Sản phẩm: {1}", userSession.company.Woourl, WooProDelete.name);
+		LinkAnhXoa = userSession.company.Logourl;
+		if (WooProDelete.images is { Count: > 0 })
+			LinkAnhXoa = WooProDelete.images[0].src ?? LinkAnhXoa;
+
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, NoiDungXoa);
+		parameters.Add(x => x.LinkAnh, LinkAnhXoa);
+		var dialog = await DialogService.ShowEx<DeleteDialog>("XÓA API", parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await aPIWooService.DeleteProductAsync(WooProDelete.id, userSession.company.Wookey, userSession.company.Woosecret, userSession.company.Woourl);
+			await FilterDataList();
+			string noidung = string.Format("Xóa '{0}' thành công từ Website {1}", WooProDelete.name, userSession.company.Woourl);
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, noidung);
+		}
+	}
+}

@@ -1,0 +1,246 @@
+@page "/Profile"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using Newtonsoft.Json.Linq;
+@using System.Text;
+@using System.Net.Http.Headers;
+@using System.Text.Json;
+@using System.Text.Json.Serialization;
+@using Newtonsoft.Json;
+@using static System.Net.WebRequestMethods;
+@using System.Net.Http;
+@inject HttpClient Http;
+@inject IJSRuntime JSRuntime
+@inject UserService userService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+
+<style>
+	.my-style {
+		font-weight: bold !important;
+		color: #0d6efd;
+	}
+
+	.price {
+		font-weight: bold !important;
+		color: red;
+	}
+</style>
+<AuthorizeView>
+
+	<Authorized>
+		<div class="card-body">
+			<MudGrid Spacing=1>
+				<MudItem xs="6" sm="6" md="2">
+					<MudButton Variant="Variant.Filled" FullWidth=true StartIcon="@Icons.Material.Filled.Save"
+							   OnClick="SaveConfig" Color="Color.Success">LƯU THÔNG TIN</MudButton>
+				</MudItem>
+				<br />
+				<MudItem xs="12" sm="12" md="12">
+					<MudTabs Elevation="4" Rounded="true" Centered="true" Color="@Color.Primary">
+						<MudTabPanel Icon="@Icons.Material.Filled.AccountBox" Text="HỒ SƠ">
+							<br />
+							<MudGrid>
+								<MudItem xs="12" sm="12" md="12">
+									<MudTextField T="string" Label="Nhập họ tên của bạn"
+												  HelperTextOnFocus="true"
+												  @bind-Text=@_user.Fullname />
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudTextField T="string" Label="Nhập địa chỉ Email của bạn"
+												  HelperTextOnFocus="true"
+												  @bind-Text=@_user.EmailAddress />
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudTextField T="string" Label="Nhập điện thoại của bạn"
+												  HelperTextOnFocus="true"
+												  @bind-Text=@_user.Phone />
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudTextField T="string" Label="Nhập địa chỉ nhà của bạn"
+												  HelperTextOnFocus="true"
+												  @bind-Text=@_user.Diachi />
+								</MudItem>
+							</MudGrid>
+						</MudTabPanel>
+						<MudTabPanel Icon="@Icons.Material.Filled.VerifiedUser" Text="ĐỔI MẬT KHẨU">
+							<br />
+							<MudGrid>
+								<MudItem xs="12" sm="12" md="9">
+									<MudTextField T="string" Label="Nhập mật khẩu hiện tại của bạn"
+												  HelperTextOnFocus="true" InputType="InputType.Password"
+												  @bind-Text=@oldpass />
+								</MudItem>
+								<MudItem xs="12" sm="12" md="3">
+									<MudButton Variant="Variant.Filled" FullWidth=true StartIcon="@Icons.Material.Filled.Check"
+											   OnClick="CheckPassword" Color="Color.Error">KIỂM TRA MẬT KHẨU</MudButton>
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudTextField T="string" Label="Nhập mật khẩu mới của bạn"
+												  HelperTextOnFocus="true" InputType="InputType.Password"
+												  Disabled=!isCheckPass @bind-Text=@newpass_repeat />
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudTextField T="string" Label="Nhập lại mật khẩu mới của bạn"
+												  HelperTextOnFocus="true" InputType="InputType.Password"
+												  Disabled=!isCheckPass @bind-Text=@newpass_repeat />
+								</MudItem>
+								<MudItem xs="12" sm="12" md="12">
+									<MudButton Variant="Variant.Filled" FullWidth=true StartIcon="@Icons.Material.Filled.Check"
+											   Disabled=!isCheckPass OnClick="ChangePassWordAsync" Color="Color.Error">ĐỔI MẬT KHẨU</MudButton>
+								</MudItem>
+							</MudGrid>
+						</MudTabPanel>
+					</MudTabs>
+				</MudItem>
+			</MudGrid>	
+		</div>
+	</Authorized>	
+</AuthorizeView>
+
+@code {
+	UserSession userSession { get; set; }
+	bool IsLoading = false;
+	int ActiveTabIndex { get; set; } = 0;
+	private string? image_company = "/images/logo.png";
+	private ToastParameters _toastParameters;
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	APP.Models.User _user = new APP.Models.User();
+	int Iduserlastupdate = 0;
+	User returnedUser { get; set; }
+
+	string oldpass { get; set; }
+	string newpass { get; set; }
+	string newpass_repeat { get; set; }
+	public bool isCheckPass { get; set; } = false;
+	string noidung = "";
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			userSession = await configs.LoadAllConfig();
+			_user = userSession.user;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+	async Task SaveConfig()
+	{
+		returnedUser = _user; //new User();
+									// returnedUser.UserId = _user.UserId;
+									// returnedUser.Fullname = _user.Fullname;
+									// returnedUser.EmailAddress = _user.EmailAddress;
+									// returnedUser.Phone = _user.Phone;
+									// returnedUser.Diachi = _user.Diachi;
+									// returnedUser.Isactive = _user.Isactive;
+									// returnedUser.RoleId = _user.RoleId;
+		returnedUser = await userService.UpdateTaiKhoanAsync(returnedUser, false);
+		if (returnedUser.UserId != 0)
+		{
+			noidung = $"Lưu thông tin thành công";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, noidung);
+		}
+		else
+		{
+			noidung = $"Lưu thông tin không thành công";
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, noidung);
+		}
+	}
+
+	public async Task ChangePassWordAsync()
+	{
+		try
+		{
+			if (isCheckPass)
+			{
+				if (newpass == newpass_repeat)
+				{
+					returnedUser = userSession.user;
+					// returnedUser.UserId = _user.UserId;
+					// returnedUser.Fullname = _user.Fullname;
+					// returnedUser.EmailAddress = _user.EmailAddress;
+					// returnedUser.Phone = _user.Phone;
+					// returnedUser.Diachi = _user.Diachi;
+					returnedUser.Password = newpass_repeat;
+					returnedUser = await userService.UpdateTaiKhoanAsync(returnedUser, true);
+					if (returnedUser.UserId != 0)
+					{
+						noidung = $"Bạn đã đổi mật khẩu thành công";
+						_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, noidung);
+					}
+					else
+					{
+						noidung = $"Bạn đã đổi mật khẩu không thành công";
+						_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, noidung);
+					}
+				}
+				else
+				{
+					noidung = $"Bạn đã nhập hai mật khẩu không giống nhau, vui lòng xem lại";
+					_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, noidung);
+				}
+			}
+			else
+			{
+				noidung = $"Hãy nhập mật khẩu cũ để kiểm tra hợp lệ trước khi có quyền đổi mật khẩu mới";
+				_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, noidung);
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	async Task CheckPassword()
+	{
+		try
+		{
+			User user = new User();
+			user.EmailAddress = _user.EmailAddress;
+			user.Password = oldpass;
+			AddKhachHangModel model = new AddKhachHangModel();
+			model.Password = user.Password;
+			model.EmailAddress = userSession.user.EmailAddress;
+			returnedUser = await userService.LoginAsync(model);
+			if (returnedUser != null)
+			{
+				if (returnedUser.UserId == 0)// sai pass
+				{
+					isCheckPass = false;
+					newpass = newpass_repeat = "";
+					noidung = $"Bạn đã nhập sai mật khẩu, Không thể đổi mật khẩu mới";
+					_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, noidung);
+				}
+				else
+				{
+					isCheckPass = true;
+					noidung = $"Bạn đã nhập đúng mật khẩu, hãy đổi mật khẩu đi ạ";
+					_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, noidung);
+				}
+			}
+			else
+			{
+				isCheckPass = false;
+				newpass = newpass_repeat = "";
+				noidung = $"Bạn đã nhập sai mật khẩu, Không thể đổi mật khẩu mới";
+				_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, noidung);
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+}
+
+
+
+
+

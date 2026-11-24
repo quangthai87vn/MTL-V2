@@ -1,0 +1,121 @@
+@using MTL.APP.Models
+@using MTL.APP.Services
+@inject ISnackbar SnackbarService
+@inject IJSRuntime JSRuntime
+@inject KhachHangService khachHangService
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface mtl-themdon-dialog-actions">
+	<DialogContent>
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="false" HideText="true" />
+		}
+		else
+		{
+			<MudPaper Class="pa-4">
+				<MudGrid Spacing=1>
+					<MudItem xs="12" sm="12" md="12">												
+						<MudTextField T="string" Label="Khách hàng" ReadOnly="true"
+							HelperTextOnFocus="true"
+							@bind-Text=ThongTinKhachHang
+							Lines="1" Margin="Margin.Dense" Variant="Variant.Outlined" />	
+					</MudItem>
+					<MudItem xs="12" sm="12" md="6">
+						<MudDatePicker Label="Ngày ghi chú"
+							Mask="@(new DateMask("dd/MM/yyyy"))"
+							DateFormat="dd/MM/yyyy"
+							@bind-Date=khachhangghichu.Ngayghichu />
+					</MudItem>
+					<MudItem xs="12" sm="12" md="6">
+						<MudSelect Required="true"
+							@bind-Value="khachhangghichu.Idghichu"
+							T=int?									
+							Label="Loại ghi chú"
+							AnchorOrigin="Origin.BottomCenter">
+							@foreach (var loai in LoaiGhiChu)
+							{
+								<MudSelectItem T=int? Value="@loai.Id">@loai.Loaichamsoc</MudSelectItem>
+							}
+						</MudSelect>
+					</MudItem>
+					<MudItem xs="12" sm="12" md="12">
+						<MudTextField T="string" Label="Nội dung" 
+							HelperTextOnFocus="true"
+							@bind-Text=khachhangghichu.Noidung
+							Lines="5" Margin="Margin.Dense" Variant="Variant.Outlined" />
+					</MudItem>
+				</MudGrid>
+			</MudPaper>
+		}
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="ThemGhiChu" Color="Color.Success">THÊM GHI CHÚ</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="OnCancelDeleteClick" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	bool IsLoading = false;
+
+	[Parameter]
+	public TblUser KhachHang { get; set; }
+
+	[Parameter]
+	public DateTime? NgayHoaDon { get; set; }
+	public int? idLoaiGhiChu { get; set; }
+	public string? NoiDungGhiChu { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+
+	TblKhachHangGhiChu khachhangghichu = new TblKhachHangGhiChu();
+	public string ThongTinKhachHang { get; set; }
+
+
+	List<TblLoaiChamSocKh> LoaiGhiChu { get; set; }
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			IsLoading = true;
+			LoaiGhiChu = await khachHangService.GetAllLoaiChamSocKhachHangAsync();
+			string NgayHD = ((DateTime)NgayHoaDon).ToString("dd/MM/yyyy");
+			khachhangghichu.Noidung = $"Mỹ Tho Laptop xin chào {KhachHang.Fullname}. Máy tính của Anh/Chị đã mua ngày {NgayHD} đến nay đã khá lâu.Anh/Chị nên mang máy đến shop tiến hành vệ sinh lại đồng thời kiểm tra miễn phí để máy hoạt động ổn định hơn. Vui lòng giữ lại tin nhắn này để được giảm giá 20 % khi thanh toán tại Mỹ Tho Laptop. Xin cám ơn! ";
+			khachhangghichu.Idkhachhang = KhachHang.Id;
+			khachhangghichu.Idghichu = 1;
+			khachhangghichu.Ngayghichu = (DateTime?)(DateTime.Now);
+			ThongTinKhachHang = $"{KhachHang.Fullname} - {KhachHang.Dienthoai}";
+			IsLoading = false;
+		}
+		catch (Exception)
+		{
+			IsLoading = false;
+		}
+	}
+
+	void OnCancelDeleteClick()
+	{
+		MudDialog.Cancel();
+	}
+
+	async Task ThemGhiChu()
+	{
+		await khachHangService.InsertGhiChuKhachHangAsync(khachhangghichu);
+		string mess = $"Lưu ghi chú [{KhachHang.Fullname}] thành công !!!";
+		_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+		MudDialog.Close(DialogResult.Ok(true));
+	}
+
+
+
+}

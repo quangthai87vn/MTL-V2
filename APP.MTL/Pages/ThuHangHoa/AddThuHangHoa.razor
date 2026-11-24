@@ -1,0 +1,529 @@
+@page "/AddThuHangHoa/Add"
+@page "/AddThuHangHoa/{id:int}"
+@using MTL.APP.Models;
+@using MTL.APP.Services;
+@using MTL.APP.Utils;
+@using MTL.APP.Pages.KhachHang;
+@using MudBlazor.Extensions.Options;
+@inject IJSRuntime JSRuntime
+@inject ThuHangHoaService thuHangHoaService
+@inject KhachHangService khachHangService
+@inject UserService userService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+
+@attribute [Authorize]
+
+<AuthorizeView>
+	<Authorized>
+		<div class="card-body">
+			<MudGrid Spacing=1>
+				<MudItem xs="6" sm="6" md="3">
+					<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.List"
+							   FullWidth="true" Disabled=IsLoading
+							   OnClick="OpenLinkDS" Color="Color.Primary">DS PHIẾU THU</MudButton>
+				</MudItem>
+				<MudItem xs="6" sm="6" md="3">
+					<MudButton FullWidth=true Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save" Disabled=@(!CoTheLuu || IsLoading)
+							   OnClick="LuuPhieu" Color="Color.Success">LƯU PHIẾU</MudButton>
+				</MudItem>
+				<MudItem xs="12" sm="12" md="12">
+					<MudPaper Class="pa-4" Elevation="4">
+						<MudStack Row="true" Spacing="2" Class="mb-3">
+							<MudText Typo="Typo.h6" Style="font-weight:bold">
+								@(isNew ? "THÊM PHIẾU NHẬP HÀNG HOÁ" : "SỬA PHIẾU NHẬP HÀNG HOÁ")
+							</MudText>
+						</MudStack>
+
+						<MudGrid Spacing=1>
+						@* ===== 1. THÔNG TIN KHÁCH HÀNG ===== *@
+						<MudItem xs="12" sm="12" md="12">
+							<MudPaper Class="pa-3" Elevation="2" Style="border-left: 4px solid #667eea;">
+								<MudGrid Spacing="2" AlignItems="AlignItems.End">
+									<MudItem xs="12" sm="12" md="2">
+										<MudText Typo="Typo.subtitle1" Style="font-weight:bold; color:#667eea">
+											1. KHÁCH HÀNG
+										</MudText>
+									</MudItem>
+									<MudItem xs="9" sm="9" md="4">
+										<MudTextField T="string" Label="Số điện thoại"
+													  @bind-Value=_sdtInput
+													  Variant="Variant.Outlined" Margin="Margin.Dense"
+													  Placeholder="Nhập SĐT..." />
+									</MudItem>
+									<MudItem xs="3" sm="3" md="1">
+										<MudButton Variant="Variant.Filled" Color="Color.Primary"
+												   OnClick="TimKiemKhachHang" FullWidth="true"
+												   StartIcon="@Icons.Material.Filled.Search">
+											TÌM
+										</MudButton>
+									</MudItem>
+								</MudGrid>
+
+								@* Thông tin khách hàng (nếu tìm thấy) *@
+								@if (_khachHangHienThi != null)
+								{
+									<MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+										<MudGrid>
+											<MudItem xs="12" sm="4" md="4">
+												<MudText><strong>Tên:</strong> @_khachHangHienThi.Fullname</MudText>
+												<MudText><strong>Địa chỉ:</strong> @(_khachHangHienThi.Diachi ?? "-")</MudText>
+											</MudItem>
+											<MudItem xs="12" sm="4" md="4">
+												<MudText><strong>CMND:</strong> @(_khachHangHienThi.Makh ?? "-")</MudText>
+												<MudText><strong>Mã KH:</strong> @_khachHangHienThi.Id</MudText>
+											</MudItem>
+											<MudItem xs="12" sm="4" md="4" Style="text-align:right;">
+												<MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+														   StartIcon="@Icons.Material.Filled.Edit"
+														   OnClick="SuaThongTinKhachHang">
+													CHỈNH SỬA
+												</MudButton>
+											</MudItem>
+										</MudGrid>
+									</MudAlert>
+								}
+								else if (!string.IsNullOrEmpty(_sdtInput) && _daTimKiem)
+								{
+									<MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mt-3">
+										<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+											<MudText Class="mt-2">Không tìm thấy khách hàng. Vui lòng thêm mới!</MudText>
+											<MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+													   StartIcon="@Icons.Material.Filled.PersonAdd"
+													   OnClick="MoPopupThemKhachHang">
+												THÊM MỚI
+											</MudButton>
+										</MudStack>
+									</MudAlert>
+								}
+							</MudPaper>
+						</MudItem>
+
+						@* ===== 2. NGÀY THU & TRẠNG THÁI ===== *@
+						<MudItem xs="12" sm="12" md="12">
+							<MudGrid Spacing="2">
+								<MudItem xs="12" sm="4" md="4">
+									<MudDatePicker Label="Ngày thu" DateFormat="dd/MM/yyyy"
+												   @bind-Date=model.Ngaythu Variant="Variant.Outlined" Margin="Margin.Dense" />
+								</MudItem>
+								<MudItem xs="12" sm="4" md="4">
+									<MudTextField T="string" Label="Mã phiếu"
+												 @bind-Text=model.Maphieu
+												 Variant="Variant.Outlined" Margin="Margin.Dense"
+												 Disabled=true />
+								</MudItem>
+								<MudItem xs="12" sm="4" md="4">
+									<MudSelect T="bool?" Label="Thanh toán" @bind-Value=model.IsThanhToan
+											   Variant="Variant.Outlined" Margin="Margin.Dense">
+										<MudSelectItem T="bool?" Value="null">-- Chọn --</MudSelectItem>
+										<MudSelectItem T="bool?" Value="true">Đã thanh toán</MudSelectItem>
+										<MudSelectItem T="bool?" Value="false">Chưa thanh toán</MudSelectItem>
+									</MudSelect>
+								</MudItem>
+							</MudGrid>
+						</MudItem>
+						@* ===== Ghi chú ===== *@
+						<MudItem xs="12" sm="12" md="12">
+							<MudTextField T="string" Label="Ghi chú phiếu thu"
+										  @bind-Text=model.Ghichu
+										  Variant="Variant.Outlined" Margin="Margin.Dense"
+										  Placeholder="Ghi chú thêm..." />
+						</MudItem>
+						@* ===== TỔNG TIỀN THU - NỔI BẬT ===== *@
+						<MudItem xs="12" sm="12" md="12">
+							<MudPaper Elevation="3" Style="background:linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);" Class="pa-4 rounded-lg">
+								<MudGrid Spacing="2" AlignItems="AlignItems.Center">
+									<MudItem xs="6" sm="6" md="6">
+										<MudText Typo="Typo.h6" Class="white-text" Style="opacity:0.9">TỔNG TIỀN THU</MudText>
+									</MudItem>
+									<MudItem xs="6" sm="6" md="6" Style="text-align:right;">
+										<MudText Typo="Typo.h3" Class="white-text fw-bold">@TongCong.ToString("N0") đ</MudText>
+									</MudItem>
+								</MudGrid>
+							</MudPaper>
+						</MudItem>
+
+					
+
+						@* ===== 3. DANH SÁCH HÀNG THU ===== *@
+						<MudItem xs="12" sm="12" md="12">
+							<MudPaper Class="pa-3" Elevation="2" Style="border-left: 4px solid #4facfe;">
+								<MudStack Spacing="2">
+									<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+										<MudText Typo="Typo.subtitle1" Style="font-weight:bold; color:#4facfe">
+											2. DANH SÁCH HÀNG THU
+										</MudText>
+										<MudButton Variant="Variant.Filled" Size="Size.Small"
+												   StartIcon="@Icons.Material.Filled.Add"
+												   OnClick="ThemChiTiet" Color="Color.Primary">
+											THÊM HÀNG
+										</MudButton>
+									</MudStack>
+
+									<MudSimpleTable Striped=true Hover=true Bordered=true Dense=true Class="mt-2">
+										<thead style="background:var(--mtl-table-head-bg)">
+											<tr>
+												<th style="width:40px">STT</th>
+												<th>TÊN SẢN PHẨM</th>
+												<th style="width:80px">SL</th>
+												<th style="width:130px">ĐƠN GIÁ</th>
+												<th style="width:140px">THÀNH TIỀN</th>
+												<th style="width:60px">XÓA</th>
+											</tr>
+										</thead>
+										<tbody>
+											@if (ListChiTiet.Count == 0)
+											{
+												<tr>
+													<td colspan="6" class="text-center mud-text-secondary py-4">
+														<MudText>Chưa có hàng nào. Nhấn "THÊM HÀNG" để thêm.</MudText>
+													</td>
+												</tr>
+											}
+											@for (int i = 0; i < ListChiTiet.Count; i++)
+											{
+												var idx = i;
+												var item = ListChiTiet[i];
+												<tr>
+													<td>@(idx + 1)</td>
+													<td>
+														<MudTextField T="string" @bind-Text=item.Tensanpham Dense="true"
+																	  Style="min-width:150px"
+																	  Variant="Variant.Outlined" Margin="Margin.Dense"
+																	  Placeholder="Tên hàng..." />
+													</td>
+													<td>
+														<MudNumericField T="double?" Value="item.Soluong"
+																	 ValueChanged="@SoluongValueChanged(item)"
+																	 Dense="true"
+																	 HideSpinButtons="true" Style="width:70px"
+																	 Variant="Variant.Outlined" Margin="Margin.Dense"
+																	 Min="1" />
+													</td>
+													<td>
+														<MudNumericField T="double?" Value="item.Dongia"
+																	 ValueChanged="@DongiaValueChanged(item)"
+																	 Dense="true"
+																	 HideSpinButtons="true" Style="width:120px"
+																	 Variant="Variant.Outlined" Margin="Margin.Dense"
+																	 Format="N0" Adornment="Adornment.End" AdornmentText="đ" />
+													</td>
+													<td>
+														<MudText Typo="Typo.body2" Style="font-weight:700; color:var(--mud-palette-error)">
+															@((item.Thanhtien ?? 0).ToString("N0")) đ
+														</MudText>
+													</td>
+													<td>
+														<MudIconButton Icon="@Icons.Material.Filled.Delete"
+																	   Color="Color.Error" Size="Size.Small"
+																	   OnClick="@(() => XoaChiTiet(idx))" Title="Xóa" />
+													</td>
+												</tr>
+											}
+										</tbody>
+									</MudSimpleTable>
+								</MudStack>
+							</MudPaper>
+						</MudItem>
+					</MudGrid>
+				</MudPaper>
+			</MudItem>
+		</MudGrid>
+	</div>
+	</Authorized>
+	</AuthorizeView>
+@code
+{
+	[Parameter]
+	public int id { get; set; }
+
+	UserSession userSession { get; set; }
+	bool IsLoading = true;
+	bool isNew = true;
+
+	TblThuHangHoa model = new TblThuHangHoa();
+	List<TblThuHangHoaChiTiet> ListChiTiet = new List<TblThuHangHoaChiTiet>();
+
+	// Khách hàng
+	string _sdtInput = "";
+	TblUser? _khachHangHienThi = null;
+	bool _daTimKiem = false;
+
+	// Kiểm tra có thể lưu được không
+	bool CoTheLuu => _khachHangHienThi != null && _khachHangHienThi.Id > 0;
+
+	DialogOptionsEx options = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.ExtraLarge,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+	double TongCong => ListChiTiet.Sum(x => x.Thanhtien ?? 0);
+
+	EventCallback<double?> SoluongValueChanged(TblThuHangHoaChiTiet row) =>
+		EventCallback.Factory.Create<double?>(this, v => OnSoluongChangedAsync(row, v));
+
+	EventCallback<double?> DongiaValueChanged(TblThuHangHoaChiTiet row) =>
+		EventCallback.Factory.Create<double?>(this, v => OnDongiaChangedAsync(row, v));
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			userSession = await configs.LoadAllConfig();
+
+			if (id == 0)
+			{
+				isNew = true;
+				model = new TblThuHangHoa { Id = 0, Ngaythu = DateTime.Now };
+			}
+			else
+			{
+				isNew = false;
+				var existing = await thuHangHoaService.GetByIdAsync(id);
+				if (existing != null)
+				{
+					model = existing;
+					ListChiTiet = await thuHangHoaService.GetChiTietByPhieuAsync(id);
+					RecalTong();
+
+				// Load thông tin khách hàng nếu có
+				if (model.Idkhachhang > 0)
+				{
+					_khachHangHienThi = await khachHangService.GetKhachHangAsync(model.Idkhachhang);
+					_sdtInput = _khachHangHienThi?.Dienthoai ?? "";
+				}
+				}
+			}
+
+			IsLoading = false;
+			StateHasChanged();
+		}
+	}
+
+	// === KHÁCH HÀNG ===
+	async Task TimKiemKhachHang()
+	{
+		if (string.IsNullOrWhiteSpace(_sdtInput))
+		{
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Vui lòng nhập số điện thoại!");
+			return;
+		}
+
+		_daTimKiem = true;
+		var kh = await khachHangService.GetKhachHangBySdtAsync(userSession.company.Id, _sdtInput);
+		if (kh != null && kh.Id > 0)
+		{
+			_khachHangHienThi = kh;
+			model.Idkhachhang = kh.Id;
+		}
+		else
+		{
+			_khachHangHienThi = null;
+			model.Idkhachhang = null;
+		}
+		StateHasChanged();
+	}
+
+	async Task MoPopupThemKhachHang()
+	{
+		var parameters = new DialogParameters<DialogAddKhachHang>();
+		parameters.Add(x => x.Idnhomkhachhang, 1);
+		parameters.Add(x => x.isNew, true);
+		parameters.Add(x => x.idcompany, userSession.company.Id);
+		parameters.Add(x => x.userSession, userSession);
+
+		// Pre-fill thông tin
+		var preKhach = new TblUser
+		{
+			Dienthoai = _sdtInput
+		};
+		parameters.Add(x => x.KhachHang, preKhach);
+
+		string headerText = "THÊM KHÁCH HÀNG MỚI";
+		var dialog = await DialogService.ShowEx<DialogAddKhachHang>(headerText, parameters, options);
+		var result = await dialog.Result;
+
+		if (!result.Canceled)
+		{
+			var newKhach = result.Data as TblUser;
+			if (newKhach != null && newKhach.Id > 0)
+			{
+				_khachHangHienThi = newKhach;
+				model.Idkhachhang = newKhach.Id;
+				_daTimKiem = true;
+				StateHasChanged();
+			}
+		}
+	}
+
+	async Task SuaThongTinKhachHang()
+	{
+		if (_khachHangHienThi == null) return;
+
+		var parameters = new DialogParameters<DialogAddKhachHang>();
+		parameters.Add(x => x.Idnhomkhachhang, 1);
+		parameters.Add(x => x.isNew, false);
+		parameters.Add(x => x.idcompany, userSession.company.Id);
+		parameters.Add(x => x.userSession, userSession);
+		parameters.Add(x => x.KhachHang, _khachHangHienThi);
+
+		string headerText = "SỬA THÔNG TIN KHÁCH HÀNG";
+		var dialog = await DialogService.ShowEx<DialogAddKhachHang>(headerText, parameters, options);
+		var result = await dialog.Result;
+
+		if (!result.Canceled)
+		{
+			var updatedKhach = result.Data as TblUser;
+			if (updatedKhach != null)
+			{
+				_khachHangHienThi = updatedKhach;
+				StateHasChanged();
+			}
+		}
+	}
+
+	void ThemChiTiet()
+	{
+		ListChiTiet.Add(new TblThuHangHoaChiTiet
+		{
+			Soluong = 1,
+			Dongia = 0,
+			Thanhtien = 0,
+			Idtinhtrang = 1
+		});
+		RecalTong();
+	}
+
+	Task OnSoluongChangedAsync(TblThuHangHoaChiTiet row, double? v)
+	{
+		row.Soluong = v;
+		CapNhatThanhTien(row);
+		return Task.CompletedTask;
+	}
+
+	Task OnDongiaChangedAsync(TblThuHangHoaChiTiet row, double? v)
+	{
+		row.Dongia = v;
+		CapNhatThanhTien(row);
+		return Task.CompletedTask;
+	}
+
+	void CapNhatThanhTien(TblThuHangHoaChiTiet row)
+	{
+		row.Thanhtien = (row.Soluong ?? 0) * (row.Dongia ?? 0);
+		RecalTong();
+	}
+
+	void XoaChiTiet(int index)
+	{
+		if (index >= 0 && index < ListChiTiet.Count)
+		{
+			ListChiTiet.RemoveAt(index);
+			RecalTong();
+		}
+	}
+
+	void RecalTong()
+	{
+		model.Tongtienthu = ListChiTiet.Sum(x => x.Thanhtien ?? 0);
+		model.Thanhtoan = model.Tongtienthu ?? 0;
+		StateHasChanged();
+	}
+
+	async Task LuuPhieu()
+	{
+		try
+		{
+			IsLoading = true;
+			StateHasChanged();
+
+			// BẮT LỖI: Phải có thông tin khách hàng mới được lưu
+			if (model.Idkhachhang == null || model.Idkhachhang == 0)
+			{
+				_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Vui lòng tìm kiếm hoặc thêm mới khách hàng trước khi lưu!");
+				IsLoading = false;
+				return;
+			}
+
+			if (ListChiTiet.Count == 0)
+			{
+				_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Vui lòng thêm ít nhất 1 mặt hàng!");
+				IsLoading = false;
+				return;
+			}
+
+			if (userSession?.company == null)
+			{
+				_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Không có thông tin công ty. Vui lòng đăng nhập lại.");
+				IsLoading = false;
+				return;
+			}
+
+			// === Tính toán chi tiết và lưu phiếu ===
+			foreach (var row in ListChiTiet)
+				row.Thanhtien = (row.Soluong ?? 0) * (row.Dongia ?? 0);
+			RecalTong();
+			model.Giamgia = 0;
+
+			model.Idcompany = userSession.company.Id;
+			model.Idnguoithu = userSession.user?.UserId;
+			model.Iduserlastupdate = userSession.user?.UserId;
+
+			int phieuId;
+			if (isNew)
+			{
+				var created = await thuHangHoaService.CreateAsync(model);
+				phieuId = created.Id;
+				model.Maphieu = created.Maphieu;
+			}
+			else
+			{
+				await thuHangHoaService.UpdateAsync(model);
+				phieuId = model.Id;
+
+				var oldItems = await thuHangHoaService.GetChiTietByPhieuAsync(phieuId);
+				foreach (var old in oldItems)
+					await thuHangHoaService.DeleteChiTietAsync(old.Id);
+			}
+
+			foreach (var item in ListChiTiet)
+			{
+				item.Id = 0;
+				item.Idphieu = phieuId;
+				item.Maphieu = model.Maphieu;
+				item.Thanhtien = (item.Soluong ?? 1) * (item.Dongia ?? 0);
+				await thuHangHoaService.AddChiTietAsync(item);
+			}
+
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService,
+				isNew ? "Đã tạo phiếu thu hàng!" : "Đã lưu phiếu thu hàng!");
+
+			isNew = false;
+			model.Id = phieuId;
+		}
+		catch (Exception ex)
+		{
+			var detail = ex.InnerException != null ? $"{ex.Message} | {ex.InnerException.Message}" : ex.Message;
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Lỗi: " + detail);
+		}
+		finally
+		{
+			IsLoading = false;
+			StateHasChanged();
+		}
+	}
+
+	private async Task OpenLinkDS()
+	{
+		await JSRuntime.InvokeVoidAsync("open", "/DSThuHangHoa", "_self");
+	}
+}

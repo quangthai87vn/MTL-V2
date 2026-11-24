@@ -1,0 +1,344 @@
+{
+  "name": "MTL App Get Zalo Token",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4",
+          "mode": "list",
+          "cachedResultName": "zalo-zns",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 577440755,
+          "mode": "list",
+          "cachedResultName": "ZNS-configs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4/edit#gid=577440755"
+        },
+        "options": {}
+      },
+      "name": "Read Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        384,
+        -288
+      ],
+      "id": "e2880509-5810-42a4-a7d4-bbaf3fa8aede",
+      "typeVersion": 4.4,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://openapi.zalo.me/v2.0/oa/getoa?access_token={{ $json.access_token }}",
+        "options": {}
+      },
+      "name": "Test Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        -288
+      ],
+      "id": "c5fbeb01-6c81-4ac8-8e0e-7fdabd201860",
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Kiem tra token co hop le khong\nconst testResult = $input.first().json;\nconst currentToken = $('Extract Token1').first().json;\n\nif (testResult.error === 0 || testResult.error === '0') {\n  return {\n    json: {\n      ...currentToken,\n      source: 'cached',\n      valid: true\n    }\n  };\n}\n\nreturn {\n  json: {\n    ...currentToken,\n    valid: false,\n    zalo_error: testResult.error,\n    zalo_message: testResult.message\n  }\n};"
+      },
+      "name": "Parse Test Result",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1136,
+        -288
+      ],
+      "id": "b3bc6b09-e2d2-4c4a-bf72-976a5fb20ecc",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Is Token Expired?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1392,
+        -288
+      ],
+      "id": "07a5b2f4-33a3-402c-bcb5-f6aa6e4d2d02",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "=https://oauth.zaloapp.com/v4/oa/refresh_token",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "app_id",
+              "value": "2099106038566356072"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            },
+            {
+              "name": "refresh_token",
+              "value": "={{ $('Parse Test Result').item.json.refresh_token }}"
+            },
+            {
+              "name": "app_secret",
+              "value": "H3WqZYKN3sPM2H2fSsDL"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Refresh Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1696,
+        -528
+      ],
+      "id": "e379e6cf-7f19-44bd-8ca8-7f230c38805f",
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Xu ly ket qua refresh token\nconst refreshResult = $input.first().json;\n\nif (refreshResult.error !== 0) {\n  throw new Error('Refresh token failed: ' + refreshResult.message + ' (error ' + refreshResult.error + ')');\n}\n\nreturn {\n  json: {\n    access_token: refreshResult.access_token,\n    refresh_token: refreshResult.refresh_token,\n    expires_in: refreshResult.expires_in || 3600,\n    note: 'Auto-refreshed at ' + new Date().toISOString(),\n    source: 'refreshed',\n    valid: true\n  }\n};"
+      },
+      "name": "Process Refresh",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1936,
+        -528
+      ],
+      "id": "d25f8a8f-d2a2-46bf-9b3a-18218bd9658f",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "access_token": "={{ $json.access_token }}",
+          "refresh_token": "={{ $json.refresh_token }}"
+        },
+        "options": {}
+      },
+      "name": "Update Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2224,
+        -528
+      ],
+      "id": "41f18e7b-d23f-4aa7-95fc-e7a086740c2b",
+      "typeVersion": 4.4,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "zalo-token",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook Trigger1",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        128,
+        -288
+      ],
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "id": "9a4f48dd-da1b-4365-81e7-0c49664cbbed",
+      "typeVersion": 2.1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Doc access_token va refresh_token tu row 2\nconst sheetData = $input.all();\n\nif (!sheetData || sheetData.length === 0) {\n  throw new Error('Khong co du lieu tu Google Sheet');\n}\n\nconst rows = sheetData.map(item => item.json);\n\nlet tokenRow = null;\nfor (let i = 0; i < rows.length; i++) {\n  const row = rows[i];\n  if (row.access_token && row.access_token.trim() !== '') {\n    tokenRow = row;\n    break;\n  }\n}\n\nif (!tokenRow) {\n  throw new Error('Khong tim thay access_token trong Sheet');\n}\n\nreturn {\n  json: {\n    access_token: tokenRow.access_token,\n    refresh_token: tokenRow.refresh_token || '',\n    expires_in: tokenRow.expires_in || 3600,\n    note: tokenRow.note || ''\n  }\n};"
+      },
+      "name": "Extract Token1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        640,
+        -288
+      ],
+      "id": "525f18eb-5fa9-4072-bc1d-0277a5331195",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond OK1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        2384,
+        -288
+      ],
+      "id": "fa9e0975-523e-4edd-bf78-d03444f2c896",
+      "typeVersion": 1.4
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Read Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Extract Token1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Token": {
+      "main": [
+        [
+          {
+            "node": "Parse Test Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Test Result": {
+      "main": [
+        [
+          {
+            "node": "Is Token Expired?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Token Expired?": {
+      "main": [
+        [
+          {
+            "node": "Refresh Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Token": {
+      "main": [
+        [
+          {
+            "node": "Process Refresh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Refresh": {
+      "main": [
+        [
+          {
+            "node": "Update Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond OK1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Read Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Token1": {
+      "main": [
+        [
+          {
+            "node": "Test Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9135ca8c-63af-456c-8bd0-dd3bfef951db",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c4ab0e4644dcb78d149d4da8a6d2d3f2f80109e42206d175a4f79e023b9174e0"
+  },
+  "id": "SeKSseLZAYHZaYhh",
+  "tags": []
+}

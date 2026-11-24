@@ -1,0 +1,375 @@
+@using MTL.APP.Models
+@using MTL.APP.Services
+@inject NavigationManager navigationManager
+@inject UserService userService
+@inject ProtectedLocalStorage ProtectedLocalStorage
+
+@* ── Desktop: menu ngang *@
+@if (DesktopOnly || (!MobileOnly && !DesktopOnly))
+{
+@if (DesktopOnly)
+{
+	<MudStack Row="true" Spacing="0" AlignItems="AlignItems.Stretch" Style="height:48px; min-height:48px">
+		@* Tổng quan – click trực tiếp, không dropdown *@
+		<MudButton Class="crm-group-btn"
+				   Variant="Variant.Text"
+				   Color="Color.Inherit"
+				   OnClick="@(() => NavTo("/OverviewReport"))"
+				   Style="color:white; font-weight:600; text-transform:none; height:48px; border-radius:0; padding:0 16px; letter-spacing:0.03em; min-width:0">
+			<MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" Class="mr-1" />
+			TỔNG QUAN
+		</MudButton>
+
+		@foreach (var group in CRMGroups)
+		{
+			<MudMenu ActivationEvent="MouseEvent.MouseOver"
+					 PopoverClass="crm-dropdown-popover"
+					 Color="Color.Inherit">
+				<ActivatorContent>
+					<MudButton Class="crm-group-btn"
+							   Variant="Variant.Text"
+							   Color="Color.Inherit"
+							   Style="color:white; font-weight:600; text-transform:none; height:48px; border-radius:0; padding:0 16px; letter-spacing:0.03em; min-width:0">
+						<MudIcon Icon="@group.Icon" Size="Size.Small" Class="mr-1" />
+						@group.Name
+						<MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="Size.Small" Class="ml-1" />
+					</MudButton>
+				</ActivatorContent>
+				<ChildContent>
+					@foreach (var item in group.Items)
+					{
+						if (item.IsDivider)
+						{
+							<MudDivider Class="my-1" />
+						}
+						else
+						{
+							<MudMenuItem Class="crm-menu-item"
+										 OnClick="@(() => NavTo(item.Url))"
+										 Icon="@item.Icon"
+										 IconColor="Color.Error">
+								<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="0" Style="width:100%">
+									<MudText Style="font-weight:500">@item.Title</MudText>
+									@if (!string.IsNullOrEmpty(item.Badge))
+									{
+										<MudChip T="string" Size="Size.Small" Color="Color.Error" Style="height:18px; font-size:0.65rem">@item.Badge</MudChip>
+									}
+								</MudStack>
+							</MudMenuItem>
+						}
+					}
+				</ChildContent>
+			</MudMenu>
+		}
+	</MudStack>
+}
+else
+{
+	<MudHidden Breakpoint="Breakpoint.Xs">
+		<MudStack Row="true" Spacing="0" AlignItems="AlignItems.Stretch" Style="height:48px; min-height:48px">
+			<MudButton Class="crm-group-btn"
+					   Variant="Variant.Text"
+					   Color="Color.Inherit"
+					   OnClick="@(() => NavTo("/OverviewReport"))"
+					   Style="color:white; font-weight:600; text-transform:none; height:48px; border-radius:0; padding:0 16px; letter-spacing:0.03em; min-width:0">
+				<MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" Class="mr-1" />
+				TỔNG QUAN
+			</MudButton>
+			@foreach (var group in CRMGroups)
+			{
+				<MudMenu ActivationEvent="MouseEvent.MouseOver"
+						 PopoverClass="crm-dropdown-popover"
+						 Color="Color.Inherit">
+					<ActivatorContent>
+						<MudButton Class="crm-group-btn"
+								   Variant="Variant.Text"
+								   Color="Color.Inherit"
+								   Style="color:white; font-weight:600; text-transform:none; height:48px; border-radius:0; padding:0 16px; letter-spacing:0.03em; min-width:0">
+							<MudIcon Icon="@group.Icon" Size="Size.Small" Class="mr-1" />
+							@group.Name
+							<MudIcon Icon="@Icons.Material.Filled.ArrowDropDown" Size="Size.Small" Class="ml-1" />
+						</MudButton>
+					</ActivatorContent>
+					<ChildContent>
+						@foreach (var item in group.Items)
+						{
+							if (item.IsDivider)
+							{
+								<MudDivider Class="my-1" />
+							}
+							else
+							{
+								<MudMenuItem Class="crm-menu-item"
+											 OnClick="@(() => NavTo(item.Url))"
+											 Icon="@item.Icon"
+											 IconColor="Color.Error">
+									<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="0" Style="width:100%">
+										<MudText Style="font-weight:500">@item.Title</MudText>
+										@if (!string.IsNullOrEmpty(item.Badge))
+										{
+											<MudChip T="string" Size="Size.Small" Color="Color.Error" Style="height:18px; font-size:0.65rem">@item.Badge</MudChip>
+										}
+									</MudStack>
+								</MudMenuItem>
+							}
+						}
+					</ChildContent>
+				</MudMenu>
+			}
+		</MudStack>
+	</MudHidden>
+}
+}
+
+@* ── Mobile: nút trái, panel xổ xuống *@
+@if (MobileOnly || (!MobileOnly && !DesktopOnly))
+{
+@if (MobileOnly)
+{
+	<MudMenu AnchorOrigin="Origin.BottomLeft"
+			 TransformOrigin="Origin.TopLeft"
+			 PopoverClass="mtl-mobile-nav-panel"
+			 Dense="false"
+			 MaxHeight="520">
+		<ActivatorContent>
+			<MudIconButton Icon="@Icons.Material.Filled.Menu"
+						   Color="Color.Inherit"
+						   Edge="Edge.Start"
+						   Size="Size.Large"
+						   title="Danh mục"
+						   Class="mtl-mobile-menu-trigger" />
+		</ActivatorContent>
+		<ChildContent>
+			<MudMenuItem OnClick="@(() => NavTo("/OverviewReport"))" Icon="@Icons.Material.Filled.Dashboard">
+				Tổng quan
+			</MudMenuItem>
+			<MudDivider />
+			@foreach (var group in CRMGroups)
+			{
+				<MudSubHeader Class="mtl-mobile-nav-subheader">
+					<MudIcon Icon="@group.Icon" Size="Size.Small" Class="mr-1" />
+					@group.Name
+				</MudSubHeader>
+				@foreach (var item in group.Items)
+				{
+					if (!item.IsDivider)
+					{
+						<MudMenuItem OnClick="@(() => NavTo(item.Url))" Icon="@item.Icon" Class="mtl-mobile-nav-item">
+							@item.Title
+						</MudMenuItem>
+					}
+				}
+				<MudDivider Class="my-1" />
+			}
+		</ChildContent>
+	</MudMenu>
+}
+else
+{
+	<MudHidden Breakpoint="Breakpoint.SmAndUp">
+		<MudMenu AnchorOrigin="Origin.BottomLeft"
+				 TransformOrigin="Origin.TopLeft"
+				 PopoverClass="mtl-mobile-nav-panel"
+				 Dense="false"
+				 MaxHeight="520">
+			<ActivatorContent>
+				<MudIconButton Icon="@Icons.Material.Filled.Menu"
+							   Color="Color.Inherit"
+							   Edge="Edge.Start"
+							   Size="Size.Large"
+							   title="Danh mục"
+							   Class="mtl-mobile-menu-trigger" />
+			</ActivatorContent>
+			<ChildContent>
+				<MudMenuItem OnClick="@(() => NavTo("/OverviewReport"))" Icon="@Icons.Material.Filled.Dashboard">
+					Tổng quan
+				</MudMenuItem>
+				<MudDivider />
+				@foreach (var group in CRMGroups)
+				{
+					<MudSubHeader Class="mtl-mobile-nav-subheader">
+						<MudIcon Icon="@group.Icon" Size="Size.Small" Class="mr-1" />
+						@group.Name
+					</MudSubHeader>
+					@foreach (var item in group.Items)
+					{
+						if (!item.IsDivider)
+						{
+							<MudMenuItem OnClick="@(() => NavTo(item.Url))" Icon="@item.Icon" Class="mtl-mobile-nav-item">
+								@item.Title
+							</MudMenuItem>
+						}
+					}
+					<MudDivider Class="my-1" />
+				}
+			</ChildContent>
+		</MudMenu>
+	</MudHidden>
+}
+}
+
+<style>
+	.crm-group-btn {
+		position: relative;
+		transition: background 0.2s ease;
+	}
+	.crm-group-btn:hover {
+		background: rgba(255, 255, 255, 0.15) !important;
+	}
+	.crm-group-btn::after {
+		content: '';
+		position: absolute;
+		bottom: 0;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 0;
+		height: 3px;
+		background: white;
+		border-radius: 3px 3px 0 0;
+		transition: width 0.2s ease;
+	}
+	.crm-group-btn:hover::after {
+		width: 80%;
+	}
+	.crm-menu-item:hover {
+		background-color: #FFEBEE !important;
+		color: #D32F2F !important;
+	}
+	.crm-dropdown-popover {
+		border-radius: 8px !important;
+		box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
+		border: 1px solid #E0E0E0 !important;
+	}
+</style>
+
+@code {
+	/// <summary>Khi true: chỉ render menu mobile (dùng trong AppBar trái).</summary>
+	[Parameter] public bool MobileOnly { get; set; }
+	/// <summary>Khi true: chỉ render thanh menu desktop.</summary>
+	[Parameter] public bool DesktopOnly { get; set; }
+
+	public IEnumerable<MTL_GetMenuByRolesResult>? MenuList { get; set; }
+	UserSession? userSession { get; set; }
+	bool IsLoading = true;
+
+	// ── CRM Menu Groups ────────────────────────────────────────────────────────
+	List<CRMMenuGroup> CRMGroups = new()
+	{
+		new CRMMenuGroup
+		{
+			Name = "BÁN HÀNG",
+			Icon = Icons.Material.Filled.PointOfSale,
+			Items = new()
+			{
+				new CRMMenuItem { Title = "Hoá đơn", Icon = Icons.Material.Filled.Receipt, Url = "/invoice" },
+				new CRMMenuItem { Title = "Nhập hàng", Icon = Icons.Material.Filled.ShoppingBag, Url = "/DSThuHangHoa" },
+			}
+		},
+		new CRMMenuGroup
+		{
+			Name = "HÀNG HÓA",
+			Icon = Icons.Material.Filled.Inventory2,
+			Items = new()
+			{
+				new CRMMenuItem { Title = "Sản phẩm", Icon = Icons.Material.Filled.ShoppingCart, Url = "/Product" },
+				new CRMMenuItem { Title = "Sản phẩm API", Icon = Icons.Material.Filled.Api, Url = "/ProductAPI" },
+				new CRMMenuItem { Title = "Nhóm hàng", Icon = Icons.Material.Filled.Category, Url = "/NhomHang" },
+				new CRMMenuItem { Title = "Thương hiệu", Icon = Icons.Material.Filled.Label, Url = "/ThuongHieu" },
+				new CRMMenuItem { Title = "Nhà cung cấp", Icon = Icons.Material.Filled.LocalShipping, Url = "/NhaCungCap" },
+			}
+		},
+		new CRMMenuGroup
+		{
+			Name = "KHÁCH HÀNG",
+			Icon = Icons.Material.Filled.People,
+			Items = new()
+			{
+				new CRMMenuItem { Title = "Danh sách khách hàng", Icon = Icons.Material.Filled.PeopleAlt, Url = "/KhachHang" },
+				new CRMMenuItem { Title = "Tra cứu khách hàng", Icon = Icons.Material.Filled.Search, Url = "/TraCuuKhachHang" },
+				new CRMMenuItem { Title = "Gửi ZNS", Icon = Icons.Material.Filled.Send, Url = "/KhachHang/zns-vesinh" },
+			}
+		},
+		new CRMMenuGroup
+		{
+			Name = "HỢP ĐỒNG",
+			Icon = Icons.Material.Filled.Description,
+			Items = new()
+			{
+				new CRMMenuItem { Title = "Danh sách hợp đồng", Icon = Icons.Material.Filled.Article, Url = "/DSHopDong" },
+				new CRMMenuItem { Title = "Nội dung mẫu", Icon = Icons.Material.Filled.ContentCopy, Url = "/Content" },
+			}
+		},
+		// BÁO CÁO — tạm ẩn (3 mục con chưa dùng); /OverviewReport qua TỔNG QUAN
+		new CRMMenuGroup
+		{
+			Name = "CAMERA",
+			Icon = Icons.Material.Filled.Videocam,
+			Items = new()
+			{
+				new CRMMenuItem { Title = "Xem Camera", Icon = Icons.Material.Filled.Videocam, Url = "/camera" },
+			}
+		},
+		new CRMMenuGroup
+		{
+			Name = "TIN NHẮN",
+			Icon = Icons.Material.Filled.Chat,
+			Items = new()
+			{
+				new CRMMenuItem { Title = "Zalo OA Messenger", Icon = Icons.Material.Filled.ChatBubble, Url = "/zalo-messenger" },
+				new CRMMenuItem { Title = "Facebook Messenger", Icon = Icons.Material.Filled.Forum, Url = "/tinnhan/facebook" },
+			}
+		},
+		new CRMMenuGroup
+		{
+			Name = "CẤU HÌNH",
+			Icon = Icons.Material.Filled.Settings,
+			Items = new()
+			{
+				new CRMMenuItem { Title = "Cài đặt hệ thống", Icon = Icons.Material.Filled.Tune, Url = "/config" },
+				new CRMMenuItem { Title = "Danh sách công ty", Icon = Icons.Material.Filled.Business, Url = "/dscongty" },
+				new CRMMenuItem { Title = "Người dùng", Icon = Icons.Material.Filled.SupervisorAccount, Url = "/DSnguoidung" },
+				new CRMMenuItem { Title = "Phân quyền", Icon = Icons.Material.Filled.Security, Url = "/PhanQuyen" },
+				new CRMMenuItem { Title = "Nhân viên", Icon = Icons.Material.Filled.Badge, Url = "/NhanVien" },
+			}
+		},
+	};
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadAllConfig();
+	}
+
+	async Task LoadAllConfig()
+	{
+		try
+		{
+			var UserSessionStorageResult = await ProtectedLocalStorage.GetAsync<UserSession>("UserSession");
+			if (UserSessionStorageResult.Success && UserSessionStorageResult.Value != null)
+				userSession = UserSessionStorageResult.Value;
+		}
+		catch { }
+	}
+
+	void NavTo(string url)
+	{
+		if (string.IsNullOrEmpty(url)) return;
+		navigationManager.NavigateTo(url, true);
+	}
+
+	// ── Data Models ────────────────────────────────────────────────────────────
+	class CRMMenuGroup
+	{
+		public string Name { get; set; } = "";
+		public string Icon { get; set; } = "";
+		public List<CRMMenuItem> Items { get; set; } = new();
+	}
+
+	class CRMMenuItem
+	{
+		public string Title { get; set; } = "";
+		public string Icon { get; set; } = "";
+		public string Url { get; set; } = "";
+		public string Badge { get; set; } = "";
+		public bool IsDivider { get; set; } = false;
+	}
+}

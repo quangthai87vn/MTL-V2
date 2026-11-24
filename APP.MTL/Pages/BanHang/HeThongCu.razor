@@ -1,0 +1,164 @@
+@page "/HeThongCu"
+@using Blazored.LocalStorage;
+@using MTL.APP.Models
+@using MTL.APP.Services
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+@inject UserService userService
+@inject ILocalStorageService localStorageService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject HoaDonService hoaDonService
+
+<AuthorizeView Context="auth">
+	<Authorized>
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="true" PageName="HeThongCu" />
+		}
+		else
+		{
+			@if (ListHoaDonCu != null)
+				{
+					<div class="card-body">
+						<div class="row">
+							<div class="col-md-12">
+								<MudDataGrid T="MTL_GetAllHoaDonCuResult"
+											 Items="@ListHoaDonCu"
+											 Filterable="true"
+											 FilterMode="@DataGridFilterMode.Simple"
+											 Sortable="true"
+											 Hover="true"
+											 Striped="true"
+											 Bordered="true"
+											 Dense="true"
+											 RowsPerPage="5"
+											 ShowMenuIcon="false"
+											 ShowColumnOptions="true"
+											 ColumnResizeMode="ResizeMode.Container"
+											 RowClick="OnRowClick"
+											 class="MTLGrid">
+									<NoRecordsContent>
+										<MudText Typo="Typo.body1">Không có dữ liệu hóa đơn cũ.</MudText>
+									</NoRecordsContent>
+									<LoadingContent>
+										<MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText>
+									</LoadingContent>
+								<ToolBarContent>
+									<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+										<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+										<MudText Typo="Typo.subtitle2" Style="font-weight:600">Danh sách hóa đơn</MudText>
+										<MudSpacer />
+										<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+									</MudStack>
+								</ToolBarContent>
+									<Columns>
+										<PropertyColumn Property="x => x.NgayBan" Title="NGÀY BÁN" HeaderStyle="width:150px;" Format="dd/MM/yyyy HH:mm:ss" Filterable="true" />
+										<PropertyColumn Property="x => x.TenKH" Title="KHÁCH HÀNG" HeaderStyle="width:650px;" Filterable="true" />
+										<PropertyColumn Property="x => x.GhiChu" Title="GHI CHÚ" HeaderStyle="width:150px;" Filterable="true" />
+										<PropertyColumn Property="x => x.TongTienMuaVao" Title="MUA VÀO" HeaderStyle="width:170px;" Format="N0" Filterable="true" />
+										<PropertyColumn Property="x => x.TongTienBanRa" Title="BÁN RA" HeaderStyle="width:170px;" Format="N0" Filterable="true" />
+										<PropertyColumn Property="x => x.LoiNhuan" Title="LỢI NHUẬN" HeaderStyle="width:170px;" Format="N0" Filterable="true" />
+									</Columns>
+								<PagerContent>
+									<MudText Typo="Typo.body2" Class="pa-2">
+										Tổng: <strong>@(ListHoaDonCu?.Count() ?? 0)</strong> hóa đơn
+									</MudText>
+									<MudDataGridPager T="MTL_GetAllHoaDonCuResult" PageSizeOptions="new int[] { 5, 10, 20, 50 }" />
+								</PagerContent>
+							</MudDataGrid>
+							</div>
+						</div>
+						<br />
+						<div class="row">
+							<div class="col-md-12">
+								@if (ListHoaDonChiTiet != null)
+								{
+									<MudDataGrid T="TblHoaDonChiTiet"
+												 Items="@ListHoaDonChiTiet"
+												 Filterable="false"
+												 Sortable="true"
+												 Hover="true"
+												 Striped="true"
+												 Bordered="true"
+												 Dense="true"
+												 RowsPerPage="5"
+												 ShowMenuIcon="false"
+												 ShowColumnOptions="true"
+												 ColumnResizeMode="ResizeMode.Container"
+												 class="MTLGrid">
+										<NoRecordsContent>
+											<MudText Typo="Typo.body1">Không có chi tiết hóa đơn.</MudText>
+										</NoRecordsContent>
+										<LoadingContent>
+											<MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText>
+										</LoadingContent>
+										<ToolBarContent>
+											<MudText Typo="Typo.h6">CHI TIẾT HÓA ĐƠN</MudText>
+											<MudSpacer />
+										</ToolBarContent>
+										<Columns>
+											<PropertyColumn Property="x => x.MatHang" Title="SẢN PHẨM" HeaderStyle="width:550px;" Filterable="false" />
+											<PropertyColumn Property="x => x.DonGiaMua" Title="MUA VÀO" HeaderStyle="width:170px;" Format="N0" Filterable="false" />
+											<PropertyColumn Property="x => x.DonGiaBan" Title="BÁN RA" HeaderStyle="width:170px;" Format="N0" Filterable="false" />
+											<PropertyColumn Property="x => x.LoiNhuan" Title="LỢI NHUẬN" HeaderStyle="width:170px;" Format="N0" Filterable="false" />
+											<PropertyColumn Property="x => x.BaoHanh" Title="BẢO HÀNH" HeaderStyle="width:150px;" Filterable="false" />
+										</Columns>
+										<PagerContent>
+											<MudText Typo="Typo.body2" Class="pa-2">
+												Tổng: <strong>@(ListHoaDonChiTiet?.Count() ?? 0)</strong> mặt hàng
+											</MudText>
+											<MudDataGridPager T="TblHoaDonChiTiet" PageSizeOptions="new int[] { 5, 10, 20, 50 }" />
+										</PagerContent>
+									</MudDataGrid>
+								}
+							</div>
+						</div>
+					</div>
+				}
+		}
+	</Authorized>
+	<NotAuthorized>
+		@{
+			NavigationManager.NavigateTo("/login");
+		}
+	</NotAuthorized>
+</AuthorizeView>
+
+@code
+{
+	bool IsLoading = true;
+	[CascadingParameter]
+	private Task<AuthenticationState>? authenticationStateTask { get; set; }
+	private string UserIdentityName = "";
+	readonly TaskCompletionSource<bool> dataLoadedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+	IEnumerable<MTL_GetAllHoaDonCuResult>? ListHoaDonCu { get; set; }
+	IEnumerable<TblHoaDonChiTiet>? ListHoaDonChiTiet { get; set; }
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			ListHoaDonCu = await hoaDonService.GetAllHoaDonCuAsync();
+			IsLoading = false;
+			dataLoadedTcs.TrySetResult(true);
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	void IDisposable.Dispose()
+	{
+	}
+
+	private void Add()
+	{
+	}
+
+	async Task OnRowClick(DataGridRowClickEventArgs<MTL_GetAllHoaDonCuResult> args)
+	{
+		int IdhoaDon = args.Item.ID ?? 0;
+		ListHoaDonChiTiet = await hoaDonService.GetAllHoaDonChiTietCuAsync(IdhoaDon);
+		StateHasChanged();
+	}
+}

@@ -1,0 +1,774 @@
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Pages.MTLConfig
+@using MTL.APP.Services
+@using MTL.DEV.Handlers;
+@using MudBlazor.Extensions.Options
+@inject IToastService toastService
+@inject UserService userService
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+
+<div class="card-body">
+	<MudGrid Spacing=1>
+		<MudItem xs="6" sm="6" md="2">
+			<MudButton Variant="Variant.Filled"
+					   FullWidth=true
+					   StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="SaveCompanyAsync"
+					   Color="Color.Success">LƯU THÔNG TIN</MudButton>
+		</MudItem>
+		<MudItem xs="6" sm="6" md="2">
+			<MudButton Variant="Variant.Filled"
+					   StartIcon="@Icons.Material.Filled.Close"
+					   FullWidth="true"
+					   OnClick="ClosePopup"
+					   Color="Color.Error">HỦY BỎ</MudButton>
+		</MudItem>
+		<br />
+		<MudItem xs="12" sm="12" md="12">
+			<MudTabs Elevation="4" Rounded="true" Centered="true" Color="@Color.Primary">
+				<MudTabPanel Icon="@Icons.Material.Filled.Home" Text="TỔNG QUAN">
+					<br />
+					<MudGrid>
+						<MudItem xs="12" sm="12" md="3">
+							<MudGrid Spacing=1>
+								<MudItem xs="12" sm="12" md="12">
+									<MudImage Fluid="true" Src=@_Company.Logourl Alt="" Class="rounded-lg" />
+								</MudItem>
+							</MudGrid>
+						</MudItem>
+						<MudItem xs="12" sm="12" md="9">
+							<MudGrid Spacing=2>
+								<MudItem xs="12" sm="12" md="12">
+									<MudPaper Class="pa-4" Elevation="4">
+										<MudGrid Spacing=1>
+											<MudItem xs="12" sm="12" md="12">
+												<MudExGradientText Typo="Typo.h6" style="font-weight: bold; text-align:center">THÔNG TIN CƠ BẢN</MudExGradientText>
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập tên công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Name />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập Địa chỉ công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Diachi />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập số điện thoại công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Sodienthoai />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="6">
+												<MudTextField T="string" Label="Nhập mã số thuế công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Masothue />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="6">
+												<MudTextField T="string" Label="Nhập Website công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Website />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="6">
+												<MudTextField T="string" Label="Nhập Email công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Email />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="6">
+												<MudTextField T="string" Label="Nhập đường dẩn logo công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Logourl />
+											</MudItem>
+										</MudGrid>
+									</MudPaper>
+								</MudItem>
+								<br />
+								<MudItem xs="12" sm="12" md="12">
+									<MudPaper Class="pa-4" Elevation="4">
+										<MudGrid Spacing=1>
+											<MudItem xs="12" sm="12" md="12">
+												<MudExGradientText Typo="Typo.h6" style="font-weight: bold; text-align:center">THÔNG TIN CHUYỂN KHOẢN</MudExGradientText>
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập tên ngân hàng công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Tennganhang />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập số tài khoản công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Sotaikhoan />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập tên chủ tài khoản công ty"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Chutaikhoan />
+											</MudItem>
+										</MudGrid>
+									</MudPaper>
+								</MudItem>
+							</MudGrid>
+						</MudItem>
+					</MudGrid>
+				</MudTabPanel>
+				<MudTabPanel Icon="@Icons.Material.Filled.FmdGood" Text="SẢN PHẨM">
+					<br />
+					<MudGrid>
+						<MudItem xs="12" sm="12" md="12">
+							<MudGrid Spacing=2>
+								<MudItem xs="12" sm="12" md="12">
+									<MudPaper Class="pa-4" Elevation="4">
+										<MudGrid Spacing=1>
+											<MudItem xs="12" sm="12" md="12">
+												<MudExGradientText Typo="Typo.h6" style="font-weight: bold; text-align:center">CẤU HÌNH HÀNG HÓA</MudExGradientText>
+											</MudItem>
+											<MudItem xs="4" sm="4" md="4">
+												<MudSwitch Checked=_Company.IsThuongHieu
+														   ValueChanged="KichHoatThuongHieu_CheckedChanged"
+														   Label="Thương hiệu"
+														   T="bool?" Color="Color.Primary" />
+											</MudItem>
+											<MudItem xs="4" sm="4" md="4">
+												<MudSwitch Checked=_Company.IsKhoHang
+														   ValueChanged="KichHoatKhoHang_CheckedChanged"
+														   Label="Kho hàng"
+														   T="bool?" Color="Color.Primary" />
+											</MudItem>
+											<MudItem xs="4" sm="4" md="4">
+												<MudSwitch Checked=_Company.IsBaoHanh
+														   ValueChanged="KichHoatBaoHanh_CheckedChanged"
+														   Label="Bảo hành"
+														   T="bool?" Color="Color.Primary" />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Đường dẩn upload sản phẩm"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.UploadProductUrl />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Đường dẩn upload"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.UploadUrl />
+											</MudItem>
+										</MudGrid>
+									</MudPaper>
+								</MudItem>
+								<br />
+								<MudItem xs="12" sm="12" md="12">
+									<MudPaper Class="pa-4" Elevation="4">
+										<MudGrid Spacing=1>
+											<MudItem xs="12" sm="12" md="12">
+												<MudExGradientText Typo="Typo.h6" style="font-weight: bold; text-align:center">CẤU HÌNH SẢN PHẨM LIÊN KẾT API (CHỈ DÀNH CHO WORDPRESS)</MudExGradientText>
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudSwitch Value=_Company.IsActiveApi
+														   ValueChanged="KichHoatAPI_CheckedChanged"
+														   Label="Kích hoạt API"
+														   T="bool" Color="Color.Primary" />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập Woo URL"
+															  Disabled=!_Company.IsActiveApi
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Woourl />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập Woo Key API"
+															  Disabled=!_Company.IsActiveApi
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Wookey />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập Woo Secret Key"
+															  Disabled=!_Company.IsActiveApi
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Woosecret />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập Watermark"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Watermark />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudTextField T="string" Label="Nhập mã tự động"
+															  HelperTextOnFocus="true"
+															  @bind-Text=@_Company.Autocode />
+											</MudItem>
+											<MudItem xs="12" sm="12" md="12">
+												<MudNumericField @bind-Value=@_Company.Sodonghienthi
+																 Label="Số dòng hiển thị"
+																 Variant="Variant.Text"
+																 Min="0"
+																 Max="1000" />
+											</MudItem>
+										</MudGrid>
+									</MudPaper>
+								</MudItem>
+							</MudGrid>
+						</MudItem>
+					</MudGrid>
+				</MudTabPanel>
+				<MudTabPanel Icon="@Icons.Material.Filled.PinInvoke" Text="HÓA ĐƠN BÁN HÀNG">
+					<br />
+					<MudGrid>
+						<MudItem xs="12" sm="12" md="12">
+							<MudExGradientText Typo="Typo.h6" style="font-weight: bold; text-align:center">CẤU HÌNH HÓA ĐƠN BÁN HÀNG</MudExGradientText>
+						</MudItem>
+						<MudItem xs="12" sm="12" md="12">
+							<MudSwitch Checked=_Company.IsActiveSpao
+									   ValueChanged="KichHoatSPAo_CheckedChanged"
+									   Label="Kích hoạt sản phẩm ảo"
+									   T="bool?" Color="Color.Primary" />
+						</MudItem>
+					</MudGrid>
+				</MudTabPanel>
+				<MudTabPanel Icon="@Icons.Material.Filled.VerifiedUser" Text="NHÂN VIÊN">
+					<br />
+					<MudGrid>
+						<MudItem xs="12" sm="12" md="12">
+							<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+									   FullWidth="true"
+									   OnClick="OnCreateNhanVienClick"
+									   Color="Color.Success">THÊM NHÂN VIÊN</MudButton>
+						</MudItem>
+						<MudItem xs="12" sm="12" md="12">
+							<MudPaper Class="pa-4" Elevation="4">
+								<MudGrid Spacing=1>
+									<MudTable Items="@ListUser"
+											  Hover="true"
+											  Striped="true"
+											  Bordered="true"
+											  RowsPerPage="50"
+											  LoadingProgressColor="Color.Primary">
+										<HeaderContent>
+											<MudTh>THAO TÁC</MudTh>
+											<MudTh>NHÂN VIÊN</MudTh>
+											<MudTh>ĐIỆN THOẠI</MudTh>
+											<MudTh>ĐỊA CHỈ</MudTh>
+											<MudTh>EMAIL</MudTh>
+											<MudTh>VAI TRÒ</MudTh>
+											<MudTh>KÍCH HOẠT</MudTh>
+										</HeaderContent>
+										<RowTemplate Context="contextUser">
+											<MudTd DataLabel="THAO TÁC">
+												<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+													<MudIconButton @onclick="@(() => OnEditUserCompany(contextUser))"
+																   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+																   Color="Color.Primary" Size="Size.Medium" />
+													<MudIconButton @onclick="@(() => OnChangePassWordNhanVienClick(contextUser))"
+																   Icon="@Icons.Material.Filled.Password"
+																   Variant="Variant.Filled"
+																   Color="Color.Success" Size="Size.Medium" />
+													<MudIconButton @onclick="@(() => OnDeleteUserCompany(contextUser))"
+																   Icon="@Icons.Material.Filled.Delete"
+																   Variant="Variant.Filled"
+																   Color="Color.Error" Size="Size.Medium" />
+												</MudButtonGroup>
+											</MudTd>
+											<MudTd DataLabel="NHÂN VIÊN">@contextUser.Fullname</MudTd>
+												<MudTd DataLabel="ĐIỆN THOẠI">@contextUser.Phone</MudTd>
+												<MudTd DataLabel="ĐỊA CHỈ">@contextUser.Diachi</MudTd>
+												<MudTd DataLabel="EMAIL">@contextUser.Email</MudTd>
+												<MudTd DataLabel="VAI TRÒ">
+													@if (contextUser.Roleid != null)
+													{
+														if (contextUser.Roleid != 0)
+														if (RoleList != null)															
+																@RoleList.Where(p => p.RoleId == (int)contextUser.Roleid).FirstOrDefault().RoleDesc
+													}
+											</MudTd>
+											<MudTd DataLabel="KÍCH HOẠT">
+												<MudSwitch ReadOnly=true @bind-Checked=@contextUser.IsActive Label="Kích hoạt"
+														   T="bool?" Color="Color.Primary" />
+											</MudTd>
+										</RowTemplate>
+										<PagerContent>
+											<MudTablePager PageSizeOptions="new int[] { 50, 100 }" />
+										</PagerContent>
+									</MudTable>
+								</MudGrid>
+							</MudPaper>
+						</MudItem>
+					</MudGrid>
+				</MudTabPanel>
+				<MudTabPanel Icon="@Icons.Material.Filled.Verified" Text="QUYỀN SỬ DỤNG">
+					<br />
+					<MudGrid>
+						<MudItem xs="12" sm="12" md="12">
+							<MudSelect Label="Chọn vai trò" T="int"
+									   ValueChanged="VaiTro_ValueChangedHandler"
+									   AnchorOrigin="Origin.BottomCenter" Required="true">
+								@foreach (var item in RoleList)
+								{
+									<MudSelectItem T="int" Value="@item.RoleId">@item.RoleDesc</MudSelectItem>
+								}
+							</MudSelect>
+						</MudItem>
+						<MudItem xs="12" sm="12" md="12">
+							<MudDataGrid T="MTL_GetMenuByRolesResult"
+										 Data=@MenuList
+										 Bordered="true"
+										 Dense="true"
+										 Hover="true"
+										 Striped="true"
+										 StartedEditingItem="@GridPhanQuyen_StartedEditingItem"
+										 CanceledEditingItem="@GridPhanQuyen_CanceledEditingItem"
+										 CommittedItemChanges="@GridPhanQuyen_CommittedItemChanges"
+										 RowsPerPage="10"
+										 QuickFilter="@_quickFilterMenu"
+										 Class="MTLGrid">
+								<ToolBarContent>
+									<MudTextField @bind-Value="_searchStringMenu" Placeholder="Gõ nội dung cần tìm ..." Adornment="Adornment.Start" Immediate="true"
+												 AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0" />
+								</ToolBarContent>
+								<Columns>
+<TemplateColumn T="MTL_GetMenuByRolesResult" Style="width: 100px" Title="HÀNH ĐỘNG">
+									<CellTemplate>
+										<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+											<MudIconButton Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+															   Color="Color.Primary" Size="Size.Medium"
+															   OnClick="@(() => GridPhanQuyen_StartedEditingItem(context.Item))" />
+										</MudButtonGroup>
+									</CellTemplate>
+<EditTemplate>
+										<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+											<MudIconButton Icon="@Icons.Material.Filled.Save" Variant="Variant.Filled"
+															   Color="Color.Success" Size="Size.Medium"
+															   OnClick="@(() => GridPhanQuyen_CommittedItemChanges(context.Item))" />
+											<MudIconButton Icon="@Icons.Material.Filled.Cancel" Variant="Variant.Filled"
+															   Color="Color.Error" Size="Size.Medium"
+															   OnClick="@(() => GridPhanQuyen_CanceledEditingItem(context.Item))" />
+										</MudButtonGroup>
+									</EditTemplate>
+									</TemplateColumn>
+									<PropertyColumn Property="x => x.name" T="MTL_GetMenuByRolesResult" TProperty="string" ReadOnly="true" Title="TÊN MENU" />
+									<PropertyColumn Property="x => x.order" T="MTL_GetMenuByRolesResult" TProperty="int?" Title="THỨ TỰ" HeaderAlignment="MudBlazor.Align.Right" ContentAlignment="MudBlazor.Align.Right" />
+									<PropertyColumn Property="x => x.link" T="MTL_GetMenuByRolesResult" TProperty="string" Title="LINK" HeaderAlignment="MudBlazor.Align.Right" ContentAlignment="MudBlazor.Align.Right" />
+									<TemplateColumn T="MTL_GetMenuByRolesResult" Title="HIỂN THỊ" HeaderClass="mud-allitem">
+										<CellTemplate>
+											<MudSwitch ReadOnly="true" Value="context.Item.active ?? false" Color="Color.Primary" T="bool" />
+										</CellTemplate>
+									</TemplateColumn>
+								</Columns>
+								<NoRecordsContent>
+									<MudText>Không có dữ liệu</MudText>
+								</NoRecordsContent>
+								<LoadingContent>
+									<MudText>Đang tải ...</MudText>
+								</LoadingContent>
+							<PagerContent>
+								<MudText Class="pa-2" Style="font-weight:bold">Tổng: @MenuList?.Count()</MudText>
+								<MudDataGridPager T="MTL_GetMenuByRolesResult" />
+							</PagerContent>
+						</MudDataGrid>
+						</MudItem>
+					</MudGrid>
+				</MudTabPanel>
+				<MudTabPanel Icon="@Icons.Material.Filled.AdminPanelSettings" Text="DANH SÁCH VAI TRÒ">
+					<br />
+					<MudGrid>
+						<MudItem xs="12" sm="12" md="12">
+							<MudPaper Class="pa-4" Elevation="4">
+								<MudGrid Spacing=1>
+									<MudTable Items="@RoleList"
+											  Hover="true"
+											  Striped="true"
+											  Bordered="true"
+											  RowsPerPage="50"
+											  LoadingProgressColor="Color.Primary">
+										<HeaderContent>
+											<MudTh>TÊN VAI TRÒ</MudTh>
+											<MudTh>GHI CHÚ</MudTh>
+										</HeaderContent>
+										<RowTemplate>
+											<MudTd DataLabel="TÊN VAI TRÒ">@context.RoleDesc</MudTd>
+												<MudTd DataLabel="GHI CHÚ">@context.Ghichu</MudTd>
+											</RowTemplate>
+											<PagerContent>
+												<MudTablePager PageSizeOptions="new int[] { 50, 100 }" />
+											</PagerContent>
+										</MudTable>
+									</MudGrid>
+								</MudPaper>
+							</MudItem>
+						</MudGrid>
+					</MudTabPanel>
+					@if (isAdmin)
+				{
+					<MudTabPanel Icon="@Icons.Material.Filled.Menu" Text="MENU">
+						<br />
+						<MudGrid>
+							<MudItem xs="12" sm="12" md="6">
+								<MudPaper Class="pa-4" Elevation="4">
+									<MudGrid Spacing=1>
+										<MudItem xs="12" sm="12" md="12">
+											<MudExGradientText Typo="Typo.body1"
+															   style="color:var(--mud-palette-primary); font-weight: bold;">
+												TỔNG HỢP MENU
+											</MudExGradientText>
+										</MudItem>
+										<MudTable Items="@MenuAllList"
+												  Hover="true"
+												  Dense="true"
+												  Striped="true"
+												  Bordered="true"
+												  RowsPerPage="50"
+												  LoadingProgressColor="Color.Primary">
+											<HeaderContent>
+												<MudTh>TÊN MENU</MudTh>
+												<MudTh>LINK</MudTh>
+												<MudTh>THỨ TỰ</MudTh>
+												<MudTh>THAO TÁC</MudTh>
+											</HeaderContent>
+											<RowTemplate Context="GrantMenu">
+												<MudTd DataLabel="TÊN MENU">@GrantMenu.name</MudTd>
+													<MudTd DataLabel="LINK">@GrantMenu.link</MudTd>
+													<MudTd DataLabel="THỨ TỰ">@GrantMenu.order</MudTd>
+													<MudTd DataLabel="THAO TÁC">
+														<MudButtonGroup Color="Color.Success" Variant="Variant.Outlined" OverrideStyles=false>
+															<MudIconButton Icon="@Icons.Material.Filled.SkipNext"
+																		   Variant="Variant.Filled"
+																		   @onclick="@(() => OnGrantMenuButtonClick(GrantMenu))"
+																		   Color="Color.Success" Size="Size.Medium" />
+														</MudButtonGroup>
+													</MudTd>
+												</RowTemplate>
+												<PagerContent>
+													<MudTablePager PageSizeOptions="new int[] { 50, 100 }" />
+												</PagerContent>
+											</MudTable>
+										</MudGrid>
+									</MudPaper>
+								</MudItem>
+								<MudItem xs="12" sm="12" md="6">
+									<MudPaper Class="pa-4" Elevation="4">
+										<MudGrid Spacing=1>
+											<MudItem xs="12" sm="12" md="12">
+												<MudExGradientText Typo="Typo.body1"
+																   style="color:var(--mud-palette-primary); font-weight: bold;">
+													@string.Format("MENU CHO CÔNG TY '{0}'", @_Company.Name.ToUpper())
+											</MudExGradientText>
+										</MudItem>
+										<MudTable Items="@MenuCompany"
+												  Hover="true"
+												  Dense="true"
+												  Striped="true"
+												  Bordered="true"
+												  RowsPerPage="50"
+												  LoadingProgressColor="Color.Primary">
+											<HeaderContent>
+												<MudTh>THAO TÁC</MudTh>
+												<MudTh>TÊN MENU</MudTh>
+												<MudTh>LINK</MudTh>
+												<MudTh>THỨ TỰ</MudTh>
+											</HeaderContent>
+											<RowTemplate>
+												<MudTd DataLabel="THAO TÁC">
+													<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+														<MudIconButton @onclick="@(() => OnConfirmUnGrantMenu(context))"
+																	   Icon="@Icons.Material.Filled.Delete"
+																	   Variant="Variant.Filled"
+																	   Color="Color.Error" Size="Size.Medium" />
+													</MudButtonGroup>
+												</MudTd>
+												<MudTd DataLabel="TÊN MENU">@context.name</MudTd>
+													<MudTd DataLabel="LINK">@context.link</MudTd>
+													<MudTd DataLabel="THỨ TỰ">@context.ordermenu</MudTd>
+												</RowTemplate>
+												<PagerContent>
+													<MudTablePager PageSizeOptions="new int[] { 50, 100 }" />
+												</PagerContent>
+											</MudTable>
+										</MudGrid>
+									</MudPaper>
+								</MudItem>
+							</MudGrid>
+						</MudTabPanel>
+				}
+			</MudTabs>
+		</MudItem>
+	</MudGrid>
+</div>
+@code {
+
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public List<MTL_GetAllUserCompanyResult>? ListUser { get; set; }
+	[Parameter]
+	public Company _Company { get; set; } = new Company();
+	[Parameter]
+	public UserSession userSession { get; set; }
+	[Parameter]
+	public bool isNew { get; set; } = true;
+	[Parameter]
+	public bool isAdmin { get; set; } = false;
+	[Parameter]
+	public bool isAdminConfig { get; set; } = false;
+
+
+
+	int ActiveTabIndex { get; set; } = 0;
+	private string? image_company = "/images/logo.png";
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	List<Role> RoleList { get; set; }
+	MTL_GetAllUserCompanyResult _MTL_GetAllUserCompany = new MTL_GetAllUserCompanyResult();
+	User _User = new User();
+	UserPopupInfo userPopupInfo = new UserPopupInfo();
+	UserPopupInfo GanuserPopupInfo = new UserPopupInfo();
+	MTL_GetAllUserCompanyResult _CurrentUserSelect { get; set; }
+	bool PopupVisible_ChangePass { get; set; }
+	bool PopupVisible_DeleteUser { get; set; }
+	User _userdelete = new User();
+	string Header_ChangePass { get; set; }
+	string newpass { get; set; }
+	User returnedUser { get; set; }
+
+	List<MTL_GetMenuByRolesResult>? MenuList { get; set; }
+	List<MTL_GetMenuAllResult>? MenuAllList { get; set; }
+	List<MTL_GetMenuByCompanyResult>? MenuCompany { get; set; }
+	MTL_GetMenuAllResult Grant_Menu { get; set; } = new MTL_GetMenuAllResult();
+	MTL_GetMenuByCompanyResult UnGrant_Menu { get; set; } = new MTL_GetMenuByCompanyResult();
+	int idvaitro = 0;//16; // Cộng tác viên.
+
+
+	DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.ExtraExtraLarge,
+			MaximizeButton = true,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+			 
+		};
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			idvaitro = (int)userSession.user.RoleId;
+			RoleList = await userService.GetAllRoleAsync(); //("Roles/GetAllRoleAsync/");
+			MenuAllList = await userService.GetMenuAllResultAsync();
+			if (_Company.Id != 0) // có data
+			{
+				MenuList = await userService.GetMenuByRolesResultAsync(_Company.Id, idvaitro, isAdminConfig);
+				MenuCompany = await userService.GetMenuByCompanyAsync(_Company.Id);
+			}
+			else
+				_Company.IsActiveSpao = false;
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	async Task KichHoatAPI_CheckedChanged(bool value)
+	{
+		_Company.IsActiveApi = value;
+	}
+
+	async Task KichHoatSPAo_CheckedChanged(bool? value)
+	{
+		_Company.IsActiveSpao = value;
+	}
+
+	async Task KichHoatBaoHanh_CheckedChanged(bool? value)
+	{
+		_Company.IsBaoHanh = value;
+	}
+
+	async Task KichHoatKhoHang_CheckedChanged(bool? value)
+	{
+		_Company.IsKhoHang = value;
+	}
+
+	async Task KichHoatThuongHieu_CheckedChanged(bool? value)
+	{
+		_Company.IsThuongHieu = value;
+	}
+
+	async Task SaveCompanyAsync()
+	{
+		await userService.SaveCompanyAsync(_Company, isNew);
+		string mess = $"LƯU THÀNH CÔNG CÔNG TY [{_Company.Name.ToUpper()}]";
+		_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+		MudDialog.Close();
+	}
+
+	string _searchStringMenu = "";
+	private Func<MTL_GetMenuByRolesResult, bool> _quickFilterMenu => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchStringMenu))
+			return true;
+		return x.name?.Contains(_searchStringMenu, StringComparison.OrdinalIgnoreCase) == true
+			|| x.link?.Contains(_searchStringMenu, StringComparison.OrdinalIgnoreCase) == true;
+	};
+
+	string GetRowClassMenu(MTL_GetMenuByRolesResult item, int index)
+	{
+		var classes = "highlighted-item rowheight";
+		if (index % 2 == 1) classes += " alt-item";
+		return classes;
+	}
+
+	void GridPhanQuyen_StartedEditingItem(MTL_GetMenuByRolesResult item)
+	{
+		// Row click triggers edit mode via EditTrigger="EditTrigger.RowClick"
+	}
+
+	void GridPhanQuyen_CanceledEditingItem(MTL_GetMenuByRolesResult item)
+	{
+		// Reset the item if needed, or just let MudBlazor handle it
+	}
+
+	async Task GridPhanQuyen_CommittedItemChanges(MTL_GetMenuByRolesResult item)
+	{
+		RoleOfMenu ROM = new RoleOfMenu();
+		ROM.Idcompany = _Company.Id;
+		ROM.Enable = item.active;
+		ROM.Idmenu = item.id;
+		ROM.Idrole = (int)item.idrole;
+		await userService.UpdateRoleWithMenuAsync(_Company.Id, ROM);
+		MenuList = await userService.GetMenuByRolesResultAsync(_Company.Id, idvaitro, isAdminConfig);
+	}
+
+	async Task OnDeleteUserCompany(MTL_GetAllUserCompanyResult context)
+	{
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, $"NHÂN VIÊN: {context.Fullname}");
+		string tieude = $"XÓA NHÂN VIÊN CÔNG TY [{_Company.Name}]";
+		var dialog = await DialogService.ShowEx<DeleteDialog>(tieude, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			User _userdelete = new User();
+			_userdelete.UserId = context.userid;
+			await userService.DeleteUserFromCompanyAsync(_userdelete, _Company.Id);
+			string mess = $"XÓA NHÂN VIÊN [{_userdelete.Fullname}] CÔNG TY [{_Company.Name}] THÀNH CÔNG";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			ListUser = await userService.GetAllUserSettingAsync(_Company.Id);
+		}
+	}
+
+	async Task OnChangePassWordNhanVienClick(MTL_GetAllUserCompanyResult context)
+	{
+		User UserInfo = new User
+			{
+				Fullname = context.Fullname,
+				Phone = context.Phone,
+				UserId = context.userid,
+				Diachi = context.Diachi,
+				EmailAddress = context.Email,
+				Isactive = context.IsActive,
+				RoleId = context.Roleid
+			};
+
+		var parameters = new DialogParameters<ConfigChangePass>();
+		parameters.Add(x => x.curentUser, UserInfo);
+		string headerText = $"ĐẶT MẬT KHẨU MỚI CHO [{context.Fullname}]";
+		var dialog = await DialogService.ShowEx<ConfigChangePass>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			// Load user in company
+			ListUser = await userService.GetAllUserCompanyAsync(_Company.Id);
+		}
+	}
+
+	async Task OnEditUserCompany(MTL_GetAllUserCompanyResult context)
+	{
+		User UserInfo = new User
+			{
+				Fullname = context.Fullname,
+				Phone = context.Phone,
+				UserId = context.userid,
+				Diachi = context.Diachi,
+				EmailAddress = context.Email,
+				Isactive = context.IsActive,
+				RoleId = context.Roleid
+			};
+
+		var parameters = new DialogParameters<AddUser>();
+		parameters.Add(x => x.RoleList, RoleList);
+		parameters.Add(x => x.Idcompany, _Company.Id);
+		parameters.Add(x => x.UserInfo, UserInfo);
+		parameters.Add(x => x.isNew, false);
+		string headerText = $"SỬA NHÂN VIÊN CÔNG TY [{_Company.Name}]";
+		var dialog = await DialogService.ShowEx<AddUser>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			// Load user in company
+			ListUser = await userService.GetAllUserCompanyAsync(_Company.Id);
+		}
+	}
+
+	async Task GanNhanVienPopup()
+	{
+		GanuserPopupInfo.PopupVisible = true;
+		GanuserPopupInfo.HeaderText = "GÁN NHÂN VIÊN !";
+	}
+
+	async Task OnCreateNhanVienClick()
+	{
+		var parameters = new DialogParameters<AddUser>();
+		parameters.Add(x => x.RoleList, RoleList);
+		parameters.Add(x => x.Idcompany, _Company.Id);
+		parameters.Add(x => x.UserInfo, userPopupInfo.UserInfo);
+		parameters.Add(x => x.isNew, true);
+		string headerText = string.Format("THÊM NHÂN VIÊN MỚI");
+		var dialog = await DialogService.ShowEx<AddUser>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			// Load user in company
+			ListUser = await userService.GetAllUserCompanyAsync(_Company.Id);
+		}
+	}
+
+	async Task VaiTro_ValueChangedHandler(int newValue)
+	{
+		idvaitro = newValue;
+		MenuList = await userService.GetMenuByRolesResultAsync(_Company.Id, idvaitro, isAdminConfig);
+	}
+
+	async Task OnGrantMenuButtonClick(MTL_GetMenuAllResult context)
+	{
+		Grant_Menu = context;
+		MenuOfCompany MOC = new MenuOfCompany();
+		MOC = await userService.UpdateCompanyMenuAsync(_Company.Id, Grant_Menu.id);
+		MenuCompany = await userService.GetMenuByCompanyAsync(_Company.Id);
+		string mess = $"Cấp quyền cho menu [{Grant_Menu._name}] của [{_Company.Name}] thành công";
+		_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+	}
+
+	async Task OnConfirmUnGrantMenu(MTL_GetMenuByCompanyResult context)
+	{
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, $"Menu: {context._name}");
+		string tieude = $"XÓA MENU CẤP CHO CÔNG TY [{_Company.Name}]";
+		var dialog = await DialogService.ShowEx<DeleteDialog>(tieude, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			UnGrant_Menu = context;
+			MenuOfCompany MOC = new MenuOfCompany();
+			MOC.Idmenu = UnGrant_Menu.id;
+			MOC.Idcompany = _Company.Id;
+			MOC.Enable = true;
+			MOC = await userService.DeleteMenuCompanyAsync(MOC);
+			MenuCompany = await userService.GetMenuByCompanyAsync(_Company.Id);
+			string mess = $"Xóa menu [{UnGrant_Menu._name}] của [{_Company.Name}] thành công";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+		}
+	}
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+
+}

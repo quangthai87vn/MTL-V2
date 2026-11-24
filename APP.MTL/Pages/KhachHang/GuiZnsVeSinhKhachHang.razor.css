@@ -1,0 +1,30 @@
+/* Bước 2 — khung xem trước mẫu ZNS vệ sinh */
+.mtl-zns-step2-preview-wrap {
+    position: sticky;
+    top: 8px;
+}
+
+.mtl-zns-preview-template-wrap {
+    border: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+    border-radius: 12px;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.mtl-zns-preview-template-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    vertical-align: middle;
+}
+
+@media (max-width: 960px) {
+    .mtl-zns-step2-preview-wrap {
+        position: static;
+    }
+}
+
+.mtl-zns-btn-xem-hd {
+    white-space: nowrap;
+}

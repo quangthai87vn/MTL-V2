@@ -1,0 +1,145 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using System.ComponentModel.DataAnnotations
+@using FluentValidation;
+@inject KhachHangService khachHangService
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface mtl-themdon-dialog-actions">
+	<DialogContent>
+		<SpinLoader IsLoading="IsLoading" Spinner="SpinnerType.Chase">
+			<LoadingTemplate>
+				<Loading />
+			</LoadingTemplate>
+			<ContentTemplate>
+				<MudForm @ref="form">
+					<MudPaper Class="pa-4" Elevation="4">
+						<MudGrid Spacing=1>
+							@foreach (var item in ListTag)
+							{
+								<MudItem xs="6" sm="6" md="3">
+									<MudButton Variant="Variant.Filled" FullWidth=true Size="Size.Large"
+											   StartIcon="@item.Icon"
+											   Style="@($"color:{@item.Textcolor}; background:{@item.Backgroundcolor};")"
+											   Disabled=IsLoading
+											   @onclick="@(() => SelectNoiDung(item))"
+											   Color="Color.Primary">@item.Name.ToUpper()</MudButton>
+								</MudItem>
+							}
+						</MudGrid>
+						<MudGrid Spacing=1>							
+							<MudItem xs="12" sm="12" md="12">
+								<MudTextField T="string"  @bind-Text="@NoiDungChon" Label="Dịch vụ cần xữ lý" />
+							</MudItem>
+							<MudItem xs="12" sm="12" md="12">
+								<MudTextField T="string" @bind-Text="@ModelLaptop" Label="Nhập model, dòng máy, hàng hóa cần xữ lý" />
+							</MudItem>
+							<MudItem xs="12" sm="12" md="12">
+								<MudTextField T="string" @bind-Text="@TinhTrang" Label="Tình trạng lúc nhận" />
+							</MudItem>
+							<MudItem xs="12" sm="12" md="6">
+								<MudNumericField HideSpinButtons="true"
+												 Label="Đơn giá" @bind-Value=@DonGia
+												 Class="mud-input-emphasis"
+												 Format="N0" />
+							</MudItem>
+							<MudItem xs="12" sm="12" md="6">
+								<MudSelect Label="Bảo hành" T="int"
+										   Class="mud-input-emphasis"
+										   @bind-SelectedValues=id_baohanh
+										   @bind-Value=v_baohanh
+										   AnchorOrigin="Origin.BottomCenter" Required="true">
+									@foreach (var item in BaoHanhList)
+									{
+										<MudSelectItem T="int" Value="@item.Id">@item.Baohanh</MudSelectItem>
+									}
+								</MudSelect>
+							</MudItem>
+						</MudGrid>
+					</MudPaper>
+				</MudForm>
+			</ContentTemplate>
+		</SpinLoader>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="SaveAsync" Color="Color.Success">THÊM DỊCH VỤ</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public List<MTL.APP.Models.Tag>? ListTag { get; set; }
+	[Parameter]
+	public List<TblBaoHanh>? BaoHanhList { get; set; }
+	[Parameter]
+	public EventCallback<TblHoaDonBanHangChiTiet> OnThemDVCallback { get; set; }
+	TblHoaDonBanHangChiTiet model = new TblHoaDonBanHangChiTiet();
+	bool IsLoading = true;
+	MudForm form;
+	string NoiDungChon = "";
+	string ModelLaptop = "";
+	string TinhTrang = "";	
+
+	double DonGia = 0;
+	public int v_baohanh { get; set; } = 1; // Là : BH
+	IEnumerable<int> id_baohanh = new List<int>() { 1 }.AsEnumerable();
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+
+	async Task SaveAsync()
+	{		
+		model.Sl=1;
+		model.Thanhtien = DonGia;
+		model.Dongia = DonGia;
+		model.Idbaohanh = v_baohanh;
+		model.Issanphamao = true;
+		model.Tensp = $"{NoiDungChon} - {ModelLaptop} - {TinhTrang} ";
+		model.Idsanpham = 0;
+		await OnThemDVCallback.InvokeAsync(model);
+		MudDialog.Close(DialogResult.Ok(true));
+		
+	}
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+	async Task SelectNoiDung(MTL.APP.Models.Tag _tag)
+	{
+		NoiDungChon = _tag.Mota;
+		DonGia = (double)_tag.Dongia;
+		v_baohanh = BaoHanhList.Find(p => p.Id == _tag.Idbaohanh).Id;
+	}
+}

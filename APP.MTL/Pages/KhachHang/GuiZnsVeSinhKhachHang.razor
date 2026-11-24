@@ -1,0 +1,1280 @@
+@page "/KhachHang/zns-vesinh"
+@using Microsoft.AspNetCore.Components
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+@inject Configs configs
+@inject InvoiceService invoiceService
+@inject HangHoaService hangHoaService
+@inject ContentService contentService
+@inject ZnsVeSinhCampaignService znsCampaignService
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<AuthorizeView>
+	<Authorized>
+		<div class="card-body">
+			<PageStandardHeader Icon="@Icons.Material.Filled.Send" Title="GỬI ZNS CHO KHÁCH HÀNG">
+				<Actions>
+					<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+						<MudText Typo="Typo.caption" Class="mud-text-secondary">Chiến dịch theo mẫu Zalo ZNS · ~200đ/lần</MudText>
+						<MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" Class="mtl-header-action-btn"
+								   StartIcon="@Icons.Material.Filled.History"
+								   OnClick="OpenZnsHistoryDialogAsync"
+								   Disabled="_pageLoading">
+							LỊCH SỬ ZNS
+						</MudButton>
+					</MudStack>
+				</Actions>
+				<ChildContent>
+					<MudPaper Elevation="0" Class="pa-2 rounded-lg mb-2" Style="border:1px solid var(--mud-palette-lines-default);">
+						<MudStack Row="true" Spacing="1" Class="flex-wrap" AlignItems="AlignItems.Center">
+							@for (var s = 0; s < 4; s++)
+							{
+								var idx = s;
+								<MudButton Variant="@(_wizardStep == idx ? Variant.Filled : Variant.Outlined)"
+										   Color="@StepColor(idx)"
+										   Size="Size.Small"
+										   OnClick="@(() => GoToStep(idx))"
+										   Disabled="@(!CanNavigateToStep(idx))">
+									@StepTitle(idx)
+								</MudButton>
+							}
+						</MudStack>
+						<MudText Typo="Typo.caption" Class="mud-text-secondary mt-1">@StepHint(_wizardStep)</MudText>
+					</MudPaper>
+					@if (_wizardStep == 1)
+					{
+						<MudTextField Value="@_gridSearchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+									  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+									  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search"
+									  ValueChanged="EventCallback.Factory.Create<string>(this, OnGridSearchChanged)" />
+					}
+				</ChildContent>
+			</PageStandardHeader>
+
+			@if (_pageLoading)
+			{
+				<Loading IsFullPage="true" PageName="GỬI ZNS CHO KHÁCH HÀNG" />
+			}
+			else
+			{
+					@switch (_wizardStep)
+					{
+						case 0:
+							<MudPaper Elevation="3" Class="pa-4 rounded-lg mb-3">
+								<MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-2">Bước 1 — Chọn template ZNS</MudText>
+								<MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">Bước sau sẽ lọc HĐ; hệ thống khóa chọn những HĐ đã gửi <strong>cùng mẫu này</strong> thành công trong @MinMonthsBeforeResend tháng gần đây.</MudText>
+								<MudSelect T="int" Label="Mẫu ZNS" Value="_selectedTemplateId" ValueChanged="OnSelectedTemplateIdChanged" AnchorOrigin="Origin.BottomCenter">
+									@foreach (var t in ZnsTemplates ?? Enumerable.Empty<TblZnztemplate>())
+									{
+										<MudSelectItem T="int" Value="@t.Id">@t.Mota (ID @t.Id)</MudSelectItem>
+									}
+								</MudSelect>
+								@if (_selectedTemplateId == TemplateVeSinhId)
+								{
+									<MudGrid Spacing="3" Class="mt-3">
+										<MudItem xs="12" md="6">
+											<MudText Typo="Typo.caption" Class="mud-text-secondary">Ghi đè nội dung «đã [loại dịch vụ]» trong tin (mặc định: suy ra từ thẻ trên HĐ).</MudText>
+											<MudRadioGroup T="string" @bind-Value="_manualLoaiVeSinh" Class="mt-2" Color="Color.Primary">
+												<MudRadio T="string" Value="@AutoLoaiToken" Color="Color.Default">Tự động theo thẻ HĐ</MudRadio>
+												<MudRadio T="string" Value="@("Mua Laptop")" Color="Color.Primary">Mua Laptop</MudRadio>
+												<MudRadio T="string" Value="@("Mua PC")" Color="Color.Secondary">Mua PC</MudRadio>
+												<MudRadio T="string" Value="@("Sử dụng dịch vụ")" Color="Color.Success">Sử dụng dịch vụ</MudRadio>
+												<MudRadio T="string" Value="@("Vệ sinh")" Color="Color.Primary">Vệ sinh</MudRadio>
+											</MudRadioGroup>
+										</MudItem>
+										<MudItem xs="12" md="6">
+											<div class="mtl-zns-step2-preview-wrap">
+												<MudStack Spacing="1">
+													<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+														<MudIcon Icon="@Icons.Material.Filled.PhoneAndroid" Size="Size.Small" Class="mud-text-secondary" />
+														<MudText Typo="Typo.subtitle2" Class="mud-text-primary">Giao diện mẫu ZNS (nhắc vệ sinh máy)</MudText>
+													</MudStack>
+													<MudText Typo="Typo.caption" Class="mud-text-secondary">Hình minh họa tin hiển thị trên Zalo — logo MTL, nội dung biến &amp; nút CSKH.</MudText>
+													<MudPaper Elevation="2" Class="pa-2 rounded-lg mtl-zns-preview-template-wrap">
+														<img src="/images/zns-template-vesinh.png"
+															 alt="Mẫu thông báo ZNS vệ sinh máy tính Mỹ Tho Laptop"
+															 class="mtl-zns-preview-template-img"
+															 loading="lazy" />
+													</MudPaper>
+												</MudStack>
+											</div>
+										</MudItem>
+									</MudGrid>
+								}
+								else if (_selectedTemplateId == TemplateXacNhanDonHangId)
+								{
+									<MudGrid Spacing="3" Class="mt-3">
+										<MudItem xs="12" md="6">
+											<MudText Typo="Typo.body2" Class="mud-text-secondary">
+												Mẫu <strong style="color:var(--mud-palette-text-primary);">Xác nhận đơn hàng</strong> trên Zalo ZNS: logo MTL, tiêu đề xác nhận, đoạn cảm ơn kèm tên khách, bảng chi tiết (mã đơn, điện thoại, giá, trạng thái, ngày mua) và nút quan tâm OA.
+											</MudText>
+											<MudText Typo="Typo.caption" Class="mud-text-secondary mt-2">
+												Cùng luồng mẫu với gửi ZNS từ hóa đơn (DialogAddZNS, template ID @TemplateXacNhanDonHangId).
+											</MudText>
+										</MudItem>
+										<MudItem xs="12" md="6">
+											<div class="mtl-zns-step2-preview-wrap">
+												<MudStack Spacing="1">
+													<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+														<MudIcon Icon="@Icons.Material.Filled.PhoneAndroid" Size="Size.Small" Class="mud-text-secondary" />
+														<MudText Typo="Typo.subtitle2" Class="mud-text-primary">Giao diện mẫu ZNS (xác nhận đơn hàng)</MudText>
+													</MudStack>
+													<MudText Typo="Typo.caption" Class="mud-text-secondary">Hình minh họa tin trên Zalo — biến &lt;name&gt;, &lt;order_code&gt;, …</MudText>
+													<MudPaper Elevation="2" Class="pa-2 rounded-lg mtl-zns-preview-template-wrap">
+														<img src="/images/zns-template-xacnhan-don.png"
+															 alt="Mẫu ZNS xác nhận đơn hàng Mỹ Tho Laptop"
+															 class="mtl-zns-preview-template-img"
+															 loading="lazy" />
+													</MudPaper>
+												</MudStack>
+											</div>
+										</MudItem>
+									</MudGrid>
+								}
+							</MudPaper>
+							<MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-3">
+								<MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.NavigateNext"
+										   Disabled="@(!CanGoFromTemplateStep)" OnClick="@(() => SetStep(1))">
+									TIẾP: LỌC &amp; CHỌN HĐ
+								</MudButton>
+							</MudStack>
+							break;
+
+						case 1:
+							<MudPaper Elevation="3" Class="pa-4 rounded-lg mb-3">
+								<MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-2">Bước 2 — Lọc hóa đơn &amp; chọn gửi</MudText>
+								<MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">Mẫu đang dùng: <strong>ID @_selectedTemplateId</strong> — ô chọn bị ẩn nếu HĐ đã gửi thành công cùng mẫu trong @MinMonthsBeforeResend tháng.</MudText>
+								<MudStack Spacing="2">
+									<MudRadioGroup T="string" @bind-Value="_filterMode" Class="mt-1">
+										<MudRadio T="string" Value="@("auto")" Color="Color.Primary">Tự động: HĐ đã xử lý, thẻ Laptop / PC / Vệ sinh, ngày trả HĐ trong khoảng ~10–13 tháng trước.</MudRadio>
+										<MudRadio T="string" Value="@("custom")" Color="Color.Primary">Tùy chỉnh</MudRadio>
+									</MudRadioGroup>
+
+									@if (_filterMode == "custom")
+									{
+										<MudGrid Spacing="2">
+											<MudItem xs="12" sm="6" md="4">
+												<MudDatePicker @bind-Date="_tuNgay" Label="Từ ngày (ngày HĐ)" OpenTo="OpenTo.Year" />
+											</MudItem>
+											<MudItem xs="12" sm="6" md="4">
+												<MudDatePicker @bind-Date="_denNgay" Label="Đến ngày" OpenTo="OpenTo.Year" />
+											</MudItem>
+											<MudItem xs="12" md="12">
+												<MudExChipSelect Label="Thẻ định danh trên hóa đơn"
+																 ChipSize="Size.Medium"
+																 SearchBoxAutoFocus="false"
+																 AvailableItems="@ListTag"
+																 SelectedValues="SelectedFilterTags"
+																 T="Tag"
+																 SelectedValuesChanged="OnFilterTagsChanged"
+																 ToStringFunc="@(e => e == null ? null : e.Name)" />
+											</MudItem>
+										</MudGrid>
+									}
+
+									<MudStack Row="true" Spacing="2" Class="flex-wrap">
+										<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterList"
+												   OnClick="ApplyFilterAsync" Disabled="_tableLoading">
+											ÁP DỤNG LỌC
+										</MudButton>
+										<MudText Typo="Typo.caption" Class="mud-text-secondary align-self-center">
+											Tìm thấy: @_gridItemsForBinding.Count hóa đơn · Đã chọn: @_selectedMahd.Count
+										</MudText>
+									</MudStack>
+								</MudStack>
+							</MudPaper>
+
+							<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+								@if (_tableLoading)
+								{
+									<Loading IsFullPage="false" HideText="true" />
+								}
+								else
+								{
+									<MudTable Items="@_gridItemsForBinding"
+											  Hover="true"
+											  Striped="true"
+											  Dense="true"
+											  Bordered="true"
+											  RowsPerPage="50"
+											  HorizontalScrollbar="true"
+											  RowClassFunc="@ZnsInvoiceRowClassFunc"
+											  Class="mudtable-center-header mtl-standard-grid mtl-invoice-table mtl-hide-table-toolbar-xs mtl-invoice-master-table">
+										<ToolBarContent>
+											<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+												<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+												<MudText Typo="Typo.subtitle2" Style="font-weight:600">Danh sách hóa đơn</MudText>
+												<MudText Typo="Typo.caption" Class="mud-text-secondary">(@_gridItemsForBinding.Count hóa đơn) — mẫu ID @_selectedTemplateId · ô chọn ẩn nếu đã gửi cùng mẫu &lt; @MinMonthsBeforeResend tháng</MudText>
+												<MudSpacer />
+											</MudStack>
+										</ToolBarContent>
+										<HeaderContent>
+											<MudTh Style="width:44px; min-width:44px; text-align:center;" Class="mud-text-secondary">
+												<MudIcon Icon="@Icons.Material.Filled.UnfoldMore" Size="Size.Small" title="Mở nhật ký ZNS" />
+											</MudTh>
+											<MudTh Style="width:48px; min-width:48px; text-align:center;">
+												<MudIconButton Icon="@Icons.Material.Filled.DoneAll" Color="Color.Primary" Size="Size.Small"
+															   title="Chọn / bỏ tất cả HĐ được phép gửi (đủ điều kiện theo mẫu đang chọn)"
+															   OnClick="ToggleSelectAllAsync" />
+											</MudTh>
+											<MudTh Class="mtl-invoice-th-actions" Style="width:108px; min-width:100px; text-align:center;">XEM HĐ</MudTh>
+											<MudTh Style="width:220px; min-width:180px; text-align:center;">KHÁCH HÀNG</MudTh>
+											<MudTh Style="width:100px; min-width:100px; text-align:center;"><MudTableSortLabel SortBy="new Func<MTL_GetAllInvoiceResult, object>(x => x.ngaylapphieu)">N.LẬP</MudTableSortLabel></MudTh>
+											<MudTh Style="width:100px; min-width:100px; text-align:center;"><MudTableSortLabel SortBy="new Func<MTL_GetAllInvoiceResult, object>(x => x.ngaytraphieu)">N.HĐ</MudTableSortLabel></MudTh>
+											<MudTh Style="text-align:center;">ĐƠN HÀNG</MudTh>
+											<MudTh Style="width:130px; min-width:130px; text-align:right;"><MudTableSortLabel SortBy="new Func<MTL_GetAllInvoiceResult, object>(x => x.thanhtoan)">T.TOÁN</MudTableSortLabel></MudTh>
+										</HeaderContent>
+										<RowTemplate Context="inv">
+											@{
+												var rowStyle = GetRowStyle(inv);
+												var maHdRow = inv.mahd ?? "";
+											}
+											<MudTd DataLabel="MỞ RỘNG" Style="@rowStyle" Class="mtl-invoice-td-expand">
+												<MudIconButton Icon="@(IsZnsRowExpanded(maHdRow) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+															   Color="Color.Default"
+															   Size="Size.Small"
+															   title="@(IsZnsRowExpanded(maHdRow) ? "Thu gọn" : "Nhật ký ZNS")"
+															   OnClick="@(() => ToggleZnsRowExpand(maHdRow))" />
+											</MudTd>
+											<MudTd DataLabel="CHỌN" Style="@rowStyle" Class="text-center">
+												@if (CanSelectInvoiceForZns(inv.mahd))
+												{
+													<MudCheckBox T="bool" Value="@_selectedMahd.Contains(inv.mahd)" ValueChanged="@(v => ToggleMahd(inv.mahd, v))" Dense="true" Color="Color.Primary" />
+												}
+												else
+												{
+													<MudTooltip Text="@GetZnsRowStatus(inv.mahd).StatusLabel">
+														<MudIcon Icon="@Icons.Material.Filled.Block" Size="Size.Small" Class="mud-text-secondary" Style="opacity:0.65;" title="Không chọn được" />
+													</MudTooltip>
+												}
+											</MudTd>
+											<MudTd DataLabel="XEM HĐ" Style="@rowStyle" Class="mtl-invoice-td-actions">
+												<MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Secondary"
+														   Class="mtl-header-action-btn mtl-zns-btn-xem-hd"
+														   StartIcon="@Icons.Material.Filled.Description"
+														   OnClick="@(() => OpenInvoiceA4Async(inv.mahd))">
+													Xem
+												</MudButton>
+											</MudTd>
+											<MudTd DataLabel="KHÁCH HÀNG" Style="@rowStyle" Class="mtl-invoice-td-customer">
+												<div class="mtl-invoice-customer-row">
+													<div class="mtl-invoice-customer-main">
+														<MudText Typo="Typo.body2" Style="font-weight:600;">
+															@(inv.SoLanMuaHang?.ToString() ?? "0") - @(inv.tenkh ?? "")
+														</MudText>
+														<MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Dense="true"
+																   OnClick="@(() => UpdateGridSearchFromPhone(inv.sodienthoai ?? ""))"
+																   Style="font-weight:600; padding:0; height:auto; text-transform:none;">
+															@(inv.sodienthoai ?? "")
+														</MudButton>
+													</div>
+													<span class="mtl-invoice-loai-pill" style="@GetLoaiPhieuPillStyle(inv.idLoaiPhieu)" title="@GetLoaiPhieuTagLabel(inv.idLoaiPhieu)">
+														@GetLoaiPhieuTagLabel(inv.idLoaiPhieu)
+													</span>
+												</div>
+											</MudTd>
+											<MudTd DataLabel="N.LẬP" Style="@($"{rowStyle}text-align:center;")">@(inv.ngaylapphieu?.ToString("dd/MM/yyyy") ?? "")</MudTd>
+											<MudTd DataLabel="N.HĐ" Style="@($"{rowStyle}text-align:center;")">@(inv.ngaytraphieu?.ToString("dd/MM/yyyy") ?? "")</MudTd>
+											<MudTd DataLabel="ĐƠN HÀNG" Style="@rowStyle" Class="mtl-invoice-td-order">
+												<MudStack Spacing="1">
+													<MudText Typo="Typo.body2" Class="mtl-invoice-order-title">@(inv.ghichukohienbill ?? "")</MudText>
+													@if (HasInvoiceOrderMetaLine(inv))
+													{
+														<MudStack Row="true" Spacing="1" Class="flex-wrap mtl-invoice-order-meta" AlignItems="AlignItems.Center">
+															<MudText Typo="Typo.caption" Class="mud-text-secondary mtl-invoice-order-model-label">@InvoiceModelLabel(inv) :</MudText>
+															@if (!string.IsNullOrWhiteSpace(inv.ListIDTag))
+															{
+																@RenderTagChips(inv.ListIDTag)
+															}
+														</MudStack>
+													}
+												</MudStack>
+											</MudTd>
+											<MudTd DataLabel="T.TOÁN" Style="@($"{rowStyle}text-align:right;")">
+												<MudText Typo="Typo.body2" Style="font-weight:700; color:var(--mud-palette-error);">
+													@FormatCurrency(inv.thanhtoan)
+												</MudText>
+												<MudText Typo="Typo.caption" Class="mud-text-secondary" Style="line-height:1.25; display:block; max-width:200px; margin-left:auto;">
+													@FormatPaymentOneLine(inv)
+												</MudText>
+											</MudTd>
+										</RowTemplate>
+										<ChildRowContent Context="inv">
+											@if (IsZnsRowExpanded(inv.mahd))
+											{
+												<MudTr Class="mtl-invoice-detail-tr">
+													<MudTd ColSpan="8" Style="padding:0; vertical-align:top;">
+														<MudPaper Elevation="0" Class="pa-3 mx-2 mb-2 rounded-lg mtl-invoice-detail-paper">
+															<MudStack Spacing="2">
+																<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="flex-wrap">
+																	<MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" Class="mud-text-secondary" />
+																	<MudText Typo="Typo.subtitle2" Class="mud-text-primary" Style="font-weight:600">Nhật ký gửi ZNS — @(inv.mahd ?? "")</MudText>
+																</MudStack>
+																@if (_znsLastLogByMahd.TryGetValue(inv.mahd ?? "", out var zlog))
+																{
+																	<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+																		@if (zlog.Thanhcong)
+																		{
+																			<MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Đã gửi thành công</MudChip>
+																		}
+																		else
+																		{
+																			<MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">Gửi thất bại</MudChip>
+																		}
+																		<MudText Typo="Typo.caption" Class="mud-text-secondary">@FormatZnsLogNgayGui(zlog.Ngaygui)</MudText>
+																		<MudText Typo="Typo.caption" Class="mud-text-secondary">HTTP @(zlog.HttpStatus?.ToString() ?? "—")</MudText>
+																	</MudStack>
+																	<MudText Typo="Typo.caption"><strong>Mẫu:</strong> @(zlog.Tenmau ?? "—") · <strong>ID template:</strong> @(zlog.Idtemplate?.ToString() ?? "—")</MudText>
+																	@if (!string.IsNullOrWhiteSpace(zlog.Loaidichvu))
+																	{
+																		<MudText Typo="Typo.caption"><strong>Loại / tham số:</strong> @zlog.Loaidichvu</MudText>
+																	}
+																	@if (!string.IsNullOrWhiteSpace(zlog.Ghichu))
+																	{
+																		<MudText Typo="Typo.caption" Class="mud-text-secondary"><strong>Ghi chú / phản hồi:</strong> @Truncate(zlog.Ghichu, 400)</MudText>
+																	}
+																	@if (!string.IsNullOrWhiteSpace(zlog.Noidungxemtruoc))
+																	{
+																		<MudDivider Class="my-1" />
+																		<MudText Typo="Typo.caption" Style="font-weight:600">Nội dung xem trước (theo HĐ)</MudText>
+																		<MudText Typo="Typo.caption" Style="white-space:pre-wrap; line-height:1.45;">@Truncate(zlog.Noidungxemtruoc, 600)</MudText>
+																	}
+																}
+																else
+																{
+																	<MudText Typo="Typo.body2" Class="mud-text-secondary">Chưa có bản ghi gửi ZNS trong hệ thống cho mã hóa đơn này (bảng tbl_ZnsGuiNhatKy).</MudText>
+																}
+																@{
+																	var stInv = GetZnsRowStatus(inv.mahd);
+																}
+																@if (!stInv.CanResend)
+																{
+																	<MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" Variant="Variant.Outlined">
+																		<strong>Mẫu đang chọn (ID @_selectedTemplateId):</strong> @stInv.StatusLabel — ô chọn HĐ bị ẩn ở bước này.
+																	</MudAlert>
+																}
+															</MudStack>
+														</MudPaper>
+													</MudTd>
+												</MudTr>
+											}
+										</ChildRowContent>
+										<FooterContent>
+											<MudTd ColSpan="5" Style="text-align:right; font-weight:bold;">Số HĐ: @_gridItemsForBinding.Count</MudTd>
+											<MudTd ColSpan="2" Style="text-align:right; font-weight:bold;">Tổng cộng:</MudTd>
+											<MudTd Style="text-align:right; font-weight:bold;" Class="mtl-cell-total">@FormatCurrency(_gridItemsForBinding.Sum(x => x.thanhtoan))</MudTd>
+										</FooterContent>
+										<NoRecordsContent>
+											<MudText>Chưa có dữ liệu. Chọn chế độ lọc và bấm «Áp dụng lọc».</MudText>
+										</NoRecordsContent>
+										<LoadingContent>
+											<MudText>Đang tải dữ liệu...</MudText>
+										</LoadingContent>
+										<PagerContent>
+											<MudTablePager PageSizeOptions="new int[] { 25, 50, 100 }" />
+										</PagerContent>
+									</MudTable>
+								}
+							</MudPaper>
+
+							<MudStack Row="true" Spacing="2" Justify="Justify.SpaceBetween" Class="flex-wrap mt-3">
+								<MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NavigateBefore" OnClick="@(() => SetStep(0))">QUAY: CHỌN MẪU</MudButton>
+								<MudButton Variant="Variant.Filled" Color="Color.Success" EndIcon="@Icons.Material.Filled.NavigateNext"
+										   Disabled="@(!CanGoPreviewStep)" OnClick="@(() => SetStep(2))">
+									TIẾP: XEM TRƯỚC
+								</MudButton>
+							</MudStack>
+							break;
+
+						case 2:
+							<MudPaper Elevation="3" Class="pa-4 rounded-lg mb-3">
+								<MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-2">Bước 3 — Xem trước nội dung (1 hóa đơn mẫu)</MudText>
+								<MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">
+									Các hóa đơn đã chọn (@_selectedMahd.Count) sẽ dùng cùng cấu trúc tin; thông tin từng khách thay thế tương ứng.
+								</MudText>
+								<MudPaper Elevation="0" Class="pa-4 rounded-lg mtl-zns-preview-phone" Style="border:1px solid var(--mud-palette-lines-default); max-width:420px;">
+									<MudText Typo="Typo.caption" Class="mud-text-secondary">Zalo · ZNS</MudText>
+									<MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mt-1">@_previewTitle</MudText>
+									<MudDivider Class="my-2" />
+									<MudText Typo="Typo.body2" Style="white-space:pre-wrap; line-height:1.45;">@_previewBody</MudText>
+								</MudPaper>
+							</MudPaper>
+							<MudStack Row="true" Spacing="2" Justify="Justify.SpaceBetween" Class="flex-wrap mt-2">
+								<MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NavigateBefore" OnClick="@(() => SetStep(1))">QUAY LẠI</MudButton>
+								<MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Send"
+										   Disabled="_sending" OnClick="@(() => SetStep(3))">
+									TIẾP: GỬI TIN
+								</MudButton>
+							</MudStack>
+							break;
+
+						case 3:
+							<MudPaper Elevation="3" Class="pa-4 rounded-lg mb-3">
+								<MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-2">Bước 4 — Gửi &amp; kết quả</MudText>
+								@if (!_sendStarted)
+								{
+									<MudText Class="mb-2">Sẽ gửi @_selectedMahd.Count tin. Bấm nút bên dưới để thực hiện.</MudText>
+									<MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Send"
+											   Disabled="_sending" OnClick="ExecuteSendAsync">
+										GỬI ZNS NGAY
+									</MudButton>
+								}
+								else
+								{
+									@* Bảng danh sách hiển thị ngay (Chờ gửi → Đang gửi → Thành công / Thất bại) *@
+									@if (_results.Count > 0)
+									{
+										<MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">
+											@(_sending ? "Đang gửi tuần tự từng tin; theo dõi cột trạng thái." : "Đã xử lý xong danh sách bên dưới.")
+										</MudText>
+										<MudTable Items="@_results" Dense="true" Hover="true" Bordered="true" Class="mudtable-center-header mtl-zns-send-progress-table"
+												  FixedHeader="true" Height="480px" Style="max-height:55vh;">
+											<HeaderContent>
+												<MudTh Style="min-width:110px;">MÃ HĐ</MudTh>
+												<MudTh Style="min-width:140px;">KHÁCH</MudTh>
+												<MudTh Style="min-width:168px;">NGÀY GIỜ GỬI</MudTh>
+												<MudTh Style="width:72px;">HTTP</MudTh>
+												<MudTh Style="min-width:130px;">TRẠNG THÁI</MudTh>
+												<MudTh>GHI CHÚ / MÃ</MudTh>
+											</HeaderContent>
+											<RowTemplate Context="r">
+												<MudTd DataLabel="MÃ HĐ">@r.Mahd</MudTd>
+												<MudTd DataLabel="KHÁCH">@r.TenKh</MudTd>
+												<MudTd DataLabel="NGÀY GIỜ">
+													@if (r.SentAt.HasValue)
+													{
+														<MudText Typo="Typo.caption" Style="font-weight:600;">@r.SentAt.Value.ToString("dd/MM/yyyy HH:mm:ss")</MudText>
+													}
+													else
+													{
+														<MudText Typo="Typo.caption" Class="mud-text-secondary">—</MudText>
+													}
+												</MudTd>
+												<MudTd DataLabel="HTTP">
+													@if (r.LineStatus == ZnsSendLineStatus.Done)
+													{
+														@r.HttpStatus
+													}
+													else
+													{
+														<text>—</text>
+													}
+												</MudTd>
+												<MudTd DataLabel="TRẠNG THÁI">
+													@switch (r.LineStatus)
+													{
+														case ZnsSendLineStatus.Queued:
+															<MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Chờ gửi</MudChip>
+															break;
+														case ZnsSendLineStatus.Sending:
+															<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+																<MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Warning" />
+																<MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">Đang gửi</MudChip>
+															</MudStack>
+															break;
+														case ZnsSendLineStatus.Done:
+															@if (r.Success)
+															{
+																<MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Thành công</MudChip>
+															}
+															else
+															{
+																<MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">Thất bại</MudChip>
+															}
+															break;
+													}
+												</MudTd>
+												<MudTd DataLabel="CHI TIẾT" Style="max-width:280px; word-break:break-word;">
+													@if (r.LineStatus == ZnsSendLineStatus.Done)
+													{
+														<MudText Typo="Typo.caption">@Truncate(r.Detail, 200)</MudText>
+													}
+													else if (r.LineStatus == ZnsSendLineStatus.Sending)
+													{
+														<MudText Typo="Typo.caption" Class="mud-text-secondary">Đang gọi webhook…</MudText>
+													}
+													else
+													{
+														<MudText Typo="Typo.caption" Class="mud-text-secondary">—</MudText>
+													}
+												</MudTd>
+											</RowTemplate>
+										</MudTable>
+									}
+									@if (_sending)
+									{
+										<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mt-3 mb-2 flex-wrap">
+											<MudText Typo="Typo.body2" Style="font-weight:600;">Tiến độ: @SendProgressDone / @SendProgressTotal</MudText>
+											<MudText Typo="Typo.caption" Class="mud-text-secondary">Gửi lần lượt từng dòng.</MudText>
+										</MudStack>
+										@if (SendProgressTotal > 0)
+										{
+											<MudProgressLinear Color="Color.Primary" Class="mb-1" Indeterminate="false" Value="@SendProgressPercent" Max="100" />
+										}
+										else
+										{
+											<MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-1" />
+										}
+									}
+									else if (_sendStarted && _results.Count > 0)
+									{
+										<MudText Typo="Typo.body2" Class="mt-3 mb-1">
+											Hoàn tất: <strong style="color:var(--mud-palette-success);">@_results.Count(r => r.LineStatus == ZnsSendLineStatus.Done && r.Success)</strong> thành công,
+											<strong style="color:var(--mud-palette-error);">@_results.Count(r => r.LineStatus == ZnsSendLineStatus.Done && !r.Success)</strong> thất bại.
+										</MudText>
+									}
+								}
+							</MudPaper>
+							<MudStack Row="true" Spacing="2" Class="flex-wrap mt-2">
+								<MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NavigateBefore" OnClick="@(() => SetStep(2))" Disabled="_sending">QUAY XEM TRƯỚC</MudButton>
+								<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ResetWizardAsync">LÀM MỚI CHIẾN DỊCH</MudButton>
+							</MudStack>
+							break;
+					}
+				}
+		</div>
+	</Authorized>
+</AuthorizeView>
+
+@code {
+	const int TemplateVeSinhId = 483386;
+	/// <summary>Cùng ID mẫu «Xác nhận đơn hàng» trong DialogAddZNS.</summary>
+	const int TemplateXacNhanDonHangId = 471645;
+	const string AutoLoaiToken = "__AUTO__";
+
+	/// <summary>Số tháng tối thiểu giữa hai lần gửi <strong>thành công</strong> cùng một mẫu ZNS cho một HĐ.</summary>
+	const int MinMonthsBeforeResend = 10;
+
+	static readonly DialogOptionsEx A4PreviewDialogOptions = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.ExtraExtraLarge,
+		FullWidth = true,
+		FullHeight = true,
+		CloseButton = true,
+		MaximizeButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	static readonly DialogOptionsEx ZnsHistoryDialogOptions = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.ExtraExtraLarge,
+		FullWidth = true,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+		FullScreen = false
+	};
+
+	UserSession _session = new();
+	int _idcompany;
+	int _iduser;
+	string _filterMode = "auto";
+	DateTime? _tuNgay = DateTime.Today.AddMonths(-12);
+	DateTime? _denNgay = DateTime.Today;
+	List<Tag> ListTag { get; set; } = new();
+	IEnumerable<Tag> SelectedFilterTags { get; set; } = Array.Empty<Tag>();
+	List<int> _defaultVeSinhTagIds = new();
+	Dictionary<int, Tag> _tagById = new();
+
+	bool _pageLoading = true;
+	bool _tableLoading;
+	int _wizardStep;
+	List<MTL_GetAllInvoiceResult> _filteredRows = new();
+	List<MTL_GetAllInvoiceResult> _gridItemsForBinding = new();
+	string _gridSearchString = "";
+	List<TblBank> BankList { get; set; } = new();
+	Dictionary<int, string> _bankNameById = new();
+	Dictionary<string, InvoicePaymentBreakdownDto> _paymentBreakdownByMahd = new(StringComparer.OrdinalIgnoreCase);
+	readonly HashSet<string> _selectedMahd = new(StringComparer.OrdinalIgnoreCase);
+
+	List<TblZnztemplate> ZnsTemplates { get; set; } = new();
+	int _selectedTemplateId = TemplateVeSinhId;
+	string _manualLoaiVeSinh = AutoLoaiToken;
+	string _previewTitle = "";
+	string _previewBody = "";
+	Dictionary<string, TblZnsGuiNhatKy> _znsLastLogByMahd = new(StringComparer.OrdinalIgnoreCase);
+	/// <summary>Nhật ký mới nhất theo đúng <see cref="_selectedTemplateId"/> (không gộp mẫu khác).</summary>
+	Dictionary<string, TblZnsGuiNhatKy> _znsLastLogForSelectedTemplate = new(StringComparer.OrdinalIgnoreCase);
+	readonly HashSet<string> _expandedZnsMahd = new(StringComparer.OrdinalIgnoreCase);
+
+	bool _sending;
+	bool _sendStarted;
+	List<ZnsSendRowResult> _results = new();
+
+	protected override async Task OnInitializedAsync()
+	{
+		_session = await configs.LoadAllConfig();
+		_idcompany = _session.company?.Id ?? 0;
+		_iduser = _session.UserId;
+		ListTag = await hangHoaService.GetTagAsync(_idcompany) ?? new();
+		BankList = await hangHoaService.GetBankAsync(_idcompany) ?? new();
+		_bankNameById = BankList.ToDictionary(b => b.Id, b => $"{b.BankingName} {b.AccountName}".Trim());
+		_tagById = ListTag.ToDictionary(t => t.Id, t => t);
+		_defaultVeSinhTagIds = ZnsVeSinhCampaignService.ResolveDefaultVeSinhTagIds(ListTag);
+		ZnsTemplates = await contentService.GetZnzTemplateAsync(_idcompany) ?? new();
+		if (ZnsTemplates.Any(t => t.Id == TemplateVeSinhId))
+			_selectedTemplateId = TemplateVeSinhId;
+		else if (ZnsTemplates.Count > 0)
+			_selectedTemplateId = ZnsTemplates[0].Id;
+		_pageLoading = false;
+	}
+
+	Task OnFilterTagsChanged(IEnumerable<Tag> tags)
+	{
+		SelectedFilterTags = tags ?? Array.Empty<Tag>();
+		return Task.CompletedTask;
+	}
+
+	/// <summary>Đã chọn ít nhất một HĐ được phép gửi (bước 2 → 3).</summary>
+	bool CanGoPreviewStep => _selectedMahd.Count > 0;
+
+	bool CanGoFromTemplateStep => ZnsTemplates.Any();
+
+	/// <summary>Chỉ cho phép nhảy tới bước sau khi đủ điều kiện; luôn cho phép lùi bước.</summary>
+	bool CanNavigateToStep(int s)
+	{
+		if (s == _wizardStep) return true;
+		if (s < _wizardStep) return true;
+		if (s == 1) return CanGoFromTemplateStep;
+		if (s == 2) return CanGoPreviewStep && _wizardStep >= 1;
+		if (s == 3) return CanGoPreviewStep && _wizardStep >= 1;
+		return false;
+	}
+
+	void GoToStep(int s)
+	{
+		if (!CanNavigateToStep(s)) return;
+		SetStep(s);
+	}
+
+	void SetStep(int s)
+	{
+		var prev = _wizardStep;
+		_wizardStep = Math.Clamp(s, 0, 3);
+		if (_wizardStep == 2)
+			RebuildPreview();
+		if (_wizardStep == 1 && prev != 1 && _filteredRows.Count > 0)
+			_ = ReloadZnsLogsAndPruneAsync();
+		StateHasChanged();
+	}
+
+	static string StepTitle(int i) => i switch
+	{
+		0 => "1. Template",
+		1 => "2. Lọc & chọn HĐ",
+		2 => "3. Xem trước",
+		_ => "4. Gửi & kết quả"
+	};
+
+	static Color StepColor(int i) => i switch
+	{
+		0 => Color.Primary,
+		1 => Color.Info,
+		2 => Color.Warning,
+		_ => Color.Error
+	};
+
+	static string StepHint(int i) => i switch
+	{
+		0 => "Chọn mẫu ZNS trước; khóa chọn HĐ ở bước sau theo đúng mẫu & thời gian đã gửi.",
+		1 => "Lọc hóa đơn, xem nhật ký từng HĐ. Chỉ HĐ chưa gửi cùng mẫu (hoặc đã quá thời gian cho phép) mới chọn được.",
+		2 => "Kiểm tra nội dung thay thế biến template trước khi gửi hàng loạt.",
+		_ => "Gửi qua webhook n8n; mỗi lần ghi nhật ký vào bảng tbl_ZnsGuiNhatKy."
+	};
+
+	async Task ApplyFilterAsync()
+	{
+		_tableLoading = true;
+		StateHasChanged();
+		try
+		{
+			if (_filterMode == "auto")
+			{
+				var tagIds = _defaultVeSinhTagIds;
+				if (tagIds.Count == 0)
+				{
+					SnackbarService.Add("Chưa cấu hình thẻ Laptop / PC / Vệ sinh trong danh mục Tag.", Severity.Warning);
+					_filteredRows = new();
+				}
+				else
+				{
+					_filteredRows = await invoiceService.GetInvoicesForZnsVeSinhCampaignAsync(_idcompany, true, null, null, tagIds);
+					_selectedMahd.Clear();
+					SnackbarService.Add($"Đã lọc {_filteredRows.Count} hóa đơn.", Severity.Info);
+				}
+			}
+			else
+			{
+				var tagIds = SelectedFilterTags?.Select(t => t.Id).Distinct().ToList() ?? new();
+				if (tagIds.Count == 0)
+				{
+					SnackbarService.Add("Vui lòng chọn ít nhất một thẻ định danh.", Severity.Warning);
+					_filteredRows = new();
+				}
+				else if (_tuNgay == null || _denNgay == null)
+				{
+					SnackbarService.Add("Chọn đủ từ ngày và đến ngày.", Severity.Warning);
+					_filteredRows = new();
+				}
+				else
+				{
+					_filteredRows = await invoiceService.GetInvoicesForZnsVeSinhCampaignAsync(_idcompany, false, _tuNgay, _denNgay, tagIds);
+					_selectedMahd.Clear();
+					SnackbarService.Add($"Đã lọc {_filteredRows.Count} hóa đơn.", Severity.Info);
+				}
+			}
+		}
+		finally
+		{
+			_tableLoading = false;
+		}
+		await RefreshPaymentAndRebuildGridAsync();
+	}
+
+	async Task RefreshPaymentAndRebuildGridAsync()
+	{
+		_expandedZnsMahd.Clear();
+		_paymentBreakdownByMahd.Clear();
+		if (_filteredRows.Count > 0)
+		{
+			var map = await invoiceService.GetInvoicePaymentBreakdownsAsync(_idcompany, _filteredRows.Select(x => x.mahd));
+			foreach (var kv in map)
+				_paymentBreakdownByMahd[kv.Key] = kv.Value;
+		}
+		RebuildGridItems();
+		await LoadZnsLogsAsync();
+	}
+
+	async Task LoadZnsLogsAsync()
+	{
+		if (_filteredRows.Count == 0)
+		{
+			_znsLastLogByMahd.Clear();
+			_znsLastLogForSelectedTemplate.Clear();
+			return;
+		}
+		var mahds = _filteredRows.Select(x => x.mahd);
+		_znsLastLogByMahd = await znsCampaignService.GetLatestZnsLogByMahdAsync(_idcompany, mahds);
+		_znsLastLogForSelectedTemplate = await znsCampaignService.GetLatestZnsLogByMahdAndTemplateAsync(
+			_idcompany, _selectedTemplateId, mahds);
+	}
+
+	async Task ReloadZnsLogsAndPruneAsync()
+	{
+		await LoadZnsLogsAsync();
+		PruneInvalidZnsSelections();
+		await InvokeAsync(StateHasChanged);
+	}
+
+	Task OnSelectedTemplateIdChanged(int newId)
+	{
+		_selectedTemplateId = newId;
+		return OnTemplateSelectionChangedAsync();
+	}
+
+	async Task OnTemplateSelectionChangedAsync()
+	{
+		if (_filteredRows.Count > 0)
+			await ReloadZnsLogsAndPruneAsync();
+		else
+			PruneInvalidZnsSelections();
+		await InvokeAsync(StateHasChanged);
+	}
+
+	void PruneInvalidZnsSelections()
+	{
+		foreach (var m in _selectedMahd.ToList())
+		{
+			if (!CanSelectInvoiceForZns(m))
+				_selectedMahd.Remove(m);
+		}
+	}
+
+	bool CanSelectInvoiceForZns(string? mahd) => GetZnsRowStatus(mahd).CanResend;
+
+	bool IsZnsRowExpanded(string? mahd) =>
+		!string.IsNullOrEmpty(mahd) && _expandedZnsMahd.Contains(mahd);
+
+	void ToggleZnsRowExpand(string? mahd)
+	{
+		if (string.IsNullOrEmpty(mahd)) return;
+		if (!_expandedZnsMahd.Add(mahd))
+			_expandedZnsMahd.Remove(mahd);
+		StateHasChanged();
+	}
+
+	string ZnsInvoiceRowClassFunc(MTL_GetAllInvoiceResult row, int index) =>
+		IsZnsRowExpanded(row.mahd) ? "mtl-invoice-row-expanded" : "";
+
+	void RebuildGridItems()
+	{
+		if (string.IsNullOrWhiteSpace(_gridSearchString))
+			_gridItemsForBinding = _filteredRows.ToList();
+		else
+		{
+			var lower = _gridSearchString.ToLowerInvariant();
+			_gridItemsForBinding = _filteredRows.Where(inv => MatchGridSearch(inv, lower)).ToList();
+		}
+	}
+
+	void OnGridSearchChanged(string? value)
+	{
+		_gridSearchString = value ?? "";
+		RebuildGridItems();
+		StateHasChanged();
+	}
+
+	void UpdateGridSearchFromPhone(string phone)
+	{
+		_gridSearchString = phone ?? "";
+		RebuildGridItems();
+		StateHasChanged();
+	}
+
+	static bool MatchGridSearch(MTL_GetAllInvoiceResult inv, string lower)
+	{
+		if (inv.mahd?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.sodienthoai?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.tenkh?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.Model?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.ghichukohienbill?.Contains(lower, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (inv.ngaytraphieu.HasValue &&
+			inv.ngaytraphieu.Value.ToString("dd/MM/yyyy").Contains(lower, StringComparison.OrdinalIgnoreCase)) return true;
+		if (inv.ngaylapphieu.HasValue &&
+			inv.ngaylapphieu.Value.ToString("dd/MM/yyyy").Contains(lower, StringComparison.OrdinalIgnoreCase)) return true;
+		return false;
+	}
+
+	string FormatCurrency(double? amount) => string.Format("{0:n0}", amount);
+
+	string GetLoaiPhieuText(int? id)
+	{
+		if (id == null) return "";
+		return MTLEnum.GetListLoaiPhieu().FirstOrDefault(p => p.Id == id)?.Loaiphieu ?? "";
+	}
+
+	string GetLoaiPhieuTagLabel(int? id)
+	{
+		var t = GetLoaiPhieuText(id);
+		return string.IsNullOrEmpty(t) ? "Khác" : t;
+	}
+
+	string GetLoaiPhieuPillStyle(int? id) => id switch
+	{
+		MTLEnum.LoaiPhieu.HoaDon => "color:var(--mud-palette-primary);border-color:var(--mud-palette-primary);",
+		MTLEnum.LoaiPhieu.DichVu => "color:var(--mud-palette-info);border-color:var(--mud-palette-info);",
+		MTLEnum.LoaiPhieu.BaoGia => "color:var(--mud-palette-tertiary);border-color:var(--mud-palette-tertiary);",
+		MTLEnum.LoaiPhieu.DatHang => "color:var(--mud-palette-success);border-color:var(--mud-palette-success);",
+		_ => "color:var(--mud-palette-text-secondary);border-color:var(--mud-palette-lines-default);"
+	};
+
+	string GetRowStyle(MTL_GetAllInvoiceResult inv)
+	{
+		if (inv.idLoaiPhieu == 4)
+			return "background-color:#e0f7fa;border-left:4px solid #26a69a;";
+		if (inv.isDichVuDaXuLy != true)
+			return "background-color:#ffebee;border-left:4px solid #e57373;";
+		return "";
+	}
+
+	(string tenLoaiPhieu, string maHD, string httt, string tenNH) GetInvoiceMeta(MTL_GetAllInvoiceResult inv)
+	{
+		var idLp = inv.idLoaiPhieu ?? 0;
+		var lpRow = MTLEnum.GetListLoaiPhieu().FirstOrDefault(p => p.Id == idLp);
+		var tenLP = (lpRow?.Loaiphieu ?? "").ToUpperInvariant();
+		var ma = (inv.mahd ?? "").ToUpperInvariant();
+
+		var htttStr = "";
+		var tenNHStr = "";
+		int? httId = inv.idhinhthucthanhtoan;
+		if (httId == null && !string.IsNullOrEmpty(inv.mahd) && _paymentBreakdownByMahd.TryGetValue(inv.mahd!, out var brInfer))
+		{
+			var tmI = brInfer.Tienmat ?? 0;
+			var ckI = brInfer.Tienchuyenkhoan ?? 0;
+			var dkI = brInfer.Tienchuyenkhoandukien ?? 0;
+			if (dkI >= 0.01) httId = MTLEnum.HinhThucThanhToan.Tragop;
+			else if (tmI >= 0.01 && ckI >= 0.01) httId = MTLEnum.HinhThucThanhToan.TienMatVaChuyenKhoan;
+			else if (ckI >= 0.01) httId = MTLEnum.HinhThucThanhToan.ChuyenKhoan;
+			else if (tmI >= 0.01) httId = MTLEnum.HinhThucThanhToan.TienMat;
+		}
+		if (httId != null)
+		{
+			var htttRow = MTLEnum.GetListHinhThucThanhToan().FirstOrDefault(p => p.Id == httId);
+			htttStr = (htttRow?.Mota ?? "").ToUpperInvariant();
+			if (inv.idbank != null && (httId == 2 || httId == 3 || httId == 4 || httId == 5))
+				_bankNameById.TryGetValue(inv.idbank.Value, out tenNHStr);
+		}
+		return (tenLP, ma, htttStr, (tenNHStr ?? "").ToUpperInvariant());
+	}
+
+	(double tm, double ck, double ckDuKien) ResolvePaymentAmounts(MTL_GetAllInvoiceResult inv)
+	{
+		var tt = inv.thanhtoan ?? 0;
+		var cl = inv.conlai ?? 0;
+
+		if (!string.IsNullOrEmpty(inv.mahd) && _paymentBreakdownByMahd.TryGetValue(inv.mahd!, out var br))
+		{
+			var tmB = br.Tienmat ?? 0;
+			var ckB = br.Tienchuyenkhoan ?? 0;
+			var dkB = br.Tienchuyenkhoandukien ?? 0;
+			if (tmB >= 0.01 || ckB >= 0.01 || dkB >= 0.01)
+				return (tmB, ckB, dkB);
+		}
+
+		if (tt < 0.01 && cl < 0.01)
+			return (0, 0, 0);
+
+		var htt = inv.idhinhthucthanhtoan ?? MTLEnum.HinhThucThanhToan.TienMat;
+		if (htt == MTLEnum.HinhThucThanhToan.Quetthe)
+			htt = MTLEnum.HinhThucThanhToan.ChuyenKhoan;
+
+		if (htt == MTLEnum.HinhThucThanhToan.TienMat)
+			return (tt, 0, 0);
+		if (htt == MTLEnum.HinhThucThanhToan.ChuyenKhoan)
+			return (0, tt, 0);
+		if (htt == MTLEnum.HinhThucThanhToan.Tragop)
+			return (tt, 0, cl >= 0.01 ? cl : 0);
+		return (0, 0, 0);
+	}
+
+	string FormatPaymentOneLine(MTL_GetAllInvoiceResult inv)
+	{
+		var m = GetInvoiceMeta(inv);
+		var nh = string.IsNullOrWhiteSpace(m.tenNH) ? "" : m.tenNH;
+		var (tm, ck, dk) = ResolvePaymentAmounts(inv);
+		var htt = inv.idhinhthucthanhtoan ?? 0;
+		if (htt == MTLEnum.HinhThucThanhToan.Quetthe)
+			htt = MTLEnum.HinhThucThanhToan.ChuyenKhoan;
+
+		if (htt == MTLEnum.HinhThucThanhToan.TienMatVaChuyenKhoan && tm < 0.01 && ck < 0.01 && dk < 0.01)
+			return string.IsNullOrEmpty(nh) ? m.httt : $"{m.httt} · {nh}";
+
+		var parts = new List<string>();
+		if (tm >= 0.01) parts.Add($"TM {FormatCurrency(tm)}");
+		if (ck >= 0.01) parts.Add($"CK {FormatCurrency(ck)}");
+		if (dk >= 0.01)
+			parts.Add(htt == MTLEnum.HinhThucThanhToan.Tragop
+				? $"Còn lại trả góp (theo TK) {FormatCurrency(dk)}"
+				: $"CK dự kiến {FormatCurrency(dk)}");
+		if ((ck >= 0.01 || dk >= 0.01) && !string.IsNullOrEmpty(nh))
+			parts.Add(nh);
+		if (parts.Count > 0)
+			return string.Join(" · ", parts);
+		return string.IsNullOrWhiteSpace(m.httt) ? "—" : m.httt;
+	}
+
+	/// <summary>Theo mẫu ZNS đang chọn: chặn trùng nếu đã gửi thành công cùng template trong khoảng thời gian tối thiểu.</summary>
+	(bool CanResend, int MonthsAgo, string StatusLabel) GetZnsRowStatus(string? mahd)
+	{
+		if (string.IsNullOrEmpty(mahd)) return (false, -1, "—");
+
+		if (!_znsLastLogForSelectedTemplate.TryGetValue(mahd, out var log))
+			return (true, -1, $"Chưa gửi mẫu ZNS ID {_selectedTemplateId} cho HĐ này.");
+
+		if (log.Ngaygui.Year < 1900)
+			return (true, -1, $"Chưa có ngày gửi hợp lệ cho mẫu ID {_selectedTemplateId}.");
+
+		var monthsAgo = (int)Math.Round((DateTime.Now - log.Ngaygui).TotalDays / 30.0);
+
+		if (!log.Thanhcong)
+			return (true, monthsAgo, $"Lần gửi mẫu ID {_selectedTemplateId} trước đó thất bại — có thể thử lại.");
+
+		if (monthsAgo < MinMonthsBeforeResend)
+			return (false, monthsAgo,
+				$"Đã gửi thành công mẫu ID {_selectedTemplateId} cách đây ~{monthsAgo} tháng — chờ đủ {MinMonthsBeforeResend} tháng mới chọn lại.");
+
+		return (true, monthsAgo,
+			$"Đã gửi thành công mẫu ID {_selectedTemplateId} cách đây ~{monthsAgo} tháng — được phép gửi lại.");
+	}
+
+	void ToggleMahd(string? mahd, bool sel)
+	{
+		if (string.IsNullOrEmpty(mahd)) return;
+		if (sel)
+		{
+			var (canResend, _, statusLabel) = GetZnsRowStatus(mahd);
+			if (!canResend)
+			{
+				SnackbarService.Add($"Mã HĐ {mahd}: {statusLabel}", Severity.Warning);
+				return;
+			}
+			_selectedMahd.Add(mahd);
+		}
+		else
+		{
+			_selectedMahd.Remove(mahd);
+		}
+	}
+
+	Task ToggleSelectAllAsync()
+	{
+		if (_gridItemsForBinding.Count == 0) return Task.CompletedTask;
+		var selectable = _gridItemsForBinding.Where(r => !string.IsNullOrEmpty(r.mahd) && CanSelectInvoiceForZns(r.mahd)).ToList();
+		if (selectable.Count == 0) return Task.CompletedTask;
+		var allSelectableSelected = selectable.All(r => _selectedMahd.Contains(r.mahd));
+		if (allSelectableSelected)
+		{
+			foreach (var r in selectable)
+				_selectedMahd.Remove(r.mahd!);
+		}
+		else
+		{
+			foreach (var r in selectable)
+				_selectedMahd.Add(r.mahd!);
+		}
+		StateHasChanged();
+		return Task.CompletedTask;
+	}
+
+	MTL_GetAllInvoiceResult? GetSampleInvoice()
+	{
+		foreach (var r in _filteredRows)
+			if (!string.IsNullOrEmpty(r.mahd) && _selectedMahd.Contains(r.mahd))
+				return r;
+		return null;
+	}
+
+	void RebuildPreview()
+	{
+		var inv = GetSampleInvoice();
+		if (inv == null)
+		{
+			_previewTitle = "—";
+			_previewBody = "(Không có hóa đơn mẫu)";
+			return;
+		}
+		if (_selectedTemplateId == TemplateXacNhanDonHangId)
+		{
+			_previewTitle = "XÁC NHẬN ĐƠN HÀNG";
+			var ngay = inv.ngaytraphieu?.ToString("dd/MM/yyyy") ?? "";
+			_previewBody =
+				$"Cảm ơn quý khách {inv.tenkh} đã mua hàng tại MỸ THO LAPTOP. Đơn hàng của bạn đã được xác nhận với chi tiết như sau:\r\n\r\n" +
+				$"Mã đơn: {inv.mahd}\r\nĐiện thoại: {inv.sodienthoai}\r\nGiá tiền: {FormatCurrency(inv.thanhtoan)}\r\nTrạng thái: Giao dịch thành công\r\nNgày mua hàng: {ngay}";
+			return;
+		}
+		_previewTitle = "THÔNG BÁO VỆ SINH MÁY TÍNH ĐẾN HẠN";
+		var loai = ResolveLoaiFor(inv);
+		var tenMay = TenMayTinh(inv);
+		_previewBody = ZnsVeSinhCampaignService.BuildVeSinhPreviewBody(
+			inv.tenkh ?? "", inv.sodienthoai ?? "", loai, inv.mahd ?? "", tenMay, inv.ngaytraphieu);
+	}
+
+	string ResolveLoaiFor(MTL_GetAllInvoiceResult inv)
+	{
+		if (_selectedTemplateId == TemplateVeSinhId && _manualLoaiVeSinh != AutoLoaiToken)
+			return _manualLoaiVeSinh;
+		return ZnsVeSinhCampaignService.ResolveSudungdichvu(inv.ListIDTag, _tagById);
+	}
+
+	static string TenMayTinh(MTL_GetAllInvoiceResult inv)
+	{
+		if (!string.IsNullOrWhiteSpace(inv.Model))
+			return inv.Model.Trim();
+		return Truncate(inv.ghichukohienbill ?? "", 200);
+	}
+
+	static string Truncate(string? s, int max)
+	{
+		if (string.IsNullOrEmpty(s)) return "";
+		var t = s.Trim();
+		return t.Length <= max ? t : t[..max] + "…";
+	}
+
+	static string FormatZnsLogNgayGui(DateTime ngaygui) =>
+		ngaygui.Year >= 1900 ? ngaygui.ToString("dd/MM/yyyy HH:mm") : "— (chưa ghi đúng ngày)";
+
+	bool HasInvoiceOrderMetaLine(MTL_GetAllInvoiceResult inv) =>
+		!string.IsNullOrWhiteSpace(inv.Model) || !string.IsNullOrWhiteSpace(inv.ListIDTag);
+
+	string InvoiceModelLabel(MTL_GetAllInvoiceResult inv) =>
+		string.IsNullOrWhiteSpace(inv.Model) ? "—" : inv.Model!.Trim();
+
+	RenderFragment RenderTagChips(string? listIdTags)
+	{
+		if (string.IsNullOrWhiteSpace(listIdTags)) return __builder => { };
+
+		RenderFragment rf = chipBuilder =>
+		{
+			var parts = listIdTags.Split(',', StringSplitOptions.RemoveEmptyEntries);
+			var seq = 0;
+			foreach (var part in parts)
+			{
+				if (int.TryParse(part.Trim(), out var tagId) && _tagById.TryGetValue(tagId, out var tag))
+				{
+					var baseSeq = seq * 10;
+					chipBuilder.OpenComponent<MudChip<string>>(baseSeq);
+					chipBuilder.AddAttribute(baseSeq + 1, "Icon", tag.Icon ?? "");
+					chipBuilder.AddAttribute(baseSeq + 2, "Size", Size.Small);
+					chipBuilder.AddAttribute(baseSeq + 3, "T", string.Empty);
+					chipBuilder.AddAttribute(baseSeq + 4, "Style", $"color:{tag.Textcolor};background:{tag.Backgroundcolor};");
+					chipBuilder.AddAttribute(baseSeq + 5, "ChildContent", (RenderFragment)(b => b.AddContent(baseSeq + 6, $" {tag.Name}")));
+					chipBuilder.CloseComponent();
+					seq++;
+				}
+			}
+		};
+		return rf;
+	}
+
+	async Task OpenInvoiceA4Async(string? mahd)
+	{
+		if (string.IsNullOrWhiteSpace(mahd)) return;
+		var parameters = new DialogParameters<DialogInvoiceA4Preview>();
+		parameters.Add(x => x.MaHD, mahd.Trim());
+		await DialogService.ShowEx<DialogInvoiceA4Preview>($"HÓA ĐƠN A4 — {mahd}", parameters, A4PreviewDialogOptions);
+	}
+
+	async Task OpenZnsHistoryDialogAsync()
+	{
+		if (_idcompany <= 0)
+		{
+			SnackbarService.Add("Chưa xác định công ty đăng nhập.", Severity.Warning);
+			return;
+		}
+		var parameters = new DialogParameters<DialogLichSuZNS>();
+		parameters.Add(x => x.Idcompany, _idcompany);
+		await DialogService.ShowEx<DialogLichSuZNS>("LỊCH SỬ GỬI ZNS (THÀNH CÔNG / THẤT BẠI)", parameters, ZnsHistoryDialogOptions);
+	}
+
+	async Task ExecuteSendAsync()
+	{
+		var toSend = _filteredRows.Where(r =>
+			!string.IsNullOrEmpty(r.mahd) && _selectedMahd.Contains(r.mahd!) && CanSelectInvoiceForZns(r.mahd)).ToList();
+		if (toSend.Count == 0)
+		{
+			SnackbarService.Add("Không có hóa đơn nào đủ điều kiện gửi (đã lọc theo mẫu / nhật ký). Kiểm tra lại bước 2.", Severity.Warning);
+			return;
+		}
+
+		_sendStarted = true;
+		_sending = true;
+		_results = toSend.Select(inv => new ZnsSendRowResult(
+			inv.mahd!, inv.tenkh ?? "", ZnsSendLineStatus.Queued, false, 0, "", null)).ToList();
+		await InvokeAsync(StateHasChanged);
+		// Cho UI kịp vẽ bảng đủ dòng «Chờ gửi» trước khi dòng đầu chuyển «Đang gửi»
+		await Task.Yield();
+		await InvokeAsync(StateHasChanged);
+
+		var templateName = ZnsTemplates.FirstOrDefault(t => t.Id == _selectedTemplateId)?.Mota ?? "";
+		var nguoi = _session.FullName ?? _session.user?.Fullname ?? "";
+
+		for (var i = 0; i < toSend.Count; i++)
+		{
+			var inv = toSend[i];
+			var loai = ResolveLoaiFor(inv);
+			var tenMay = TenMayTinh(inv);
+			var preview = ZnsVeSinhCampaignService.BuildVeSinhPreviewBody(
+				inv.tenkh ?? "", inv.sodienthoai ?? "", loai, inv.mahd ?? "", tenMay, inv.ngaytraphieu);
+
+			_results[i] = _results[i] with { LineStatus = ZnsSendLineStatus.Sending };
+			await InvokeAsync(StateHasChanged);
+
+			try
+			{
+				var ngay = inv.ngaytraphieu ?? DateTime.Today;
+				var (ok, code, body, url) = await znsCampaignService.SendVeSinhWebhookAsync(
+					inv.sodienthoai ?? "", inv.tenkh ?? "", "Vệ sinh", ngay,
+					inv.mahd ?? "", inv.ghichukohienbill ?? "", loai, tenMay, nguoi);
+
+				var sentAt = DateTime.Now;
+				await znsCampaignService.InsertLogAsync(new TblZnsGuiNhatKy
+				{
+					Idcompany = _idcompany,
+					Iduser = _iduser,
+					Mahd = inv.mahd,
+					Idkhachhang = inv.idkhachhang,
+					Sodienthoai = inv.sodienthoai,
+					Tenkhachhang = inv.tenkh,
+					Idtemplate = _selectedTemplateId,
+					Tenmau = templateName,
+					Loaidichvu = loai,
+					Noidungxemtruoc = preview,
+					RequestUrl = Truncate(url, 1990),
+					HttpStatus = code,
+					ResponseBody = Truncate(body, 8000),
+					Thanhcong = ok,
+					Ghichu = ok ? null : Truncate(body, 900),
+					Ngaygui = sentAt
+				});
+
+				_results[i] = _results[i] with
+				{
+					LineStatus = ZnsSendLineStatus.Done,
+					Success = ok,
+					HttpStatus = code,
+					Detail = ok ? "Thành công" : body,
+					SentAt = sentAt
+				};
+			}
+			catch (Exception ex)
+			{
+				var sentAt = DateTime.Now;
+				_results[i] = _results[i] with
+				{
+					LineStatus = ZnsSendLineStatus.Done,
+					Success = false,
+					HttpStatus = 0,
+					Detail = ex.Message,
+					SentAt = sentAt
+				};
+				await znsCampaignService.InsertLogAsync(new TblZnsGuiNhatKy
+				{
+					Idcompany = _idcompany,
+					Iduser = _iduser,
+					Mahd = inv.mahd,
+					Idkhachhang = inv.idkhachhang,
+					Sodienthoai = inv.sodienthoai,
+					Tenkhachhang = inv.tenkh,
+					Idtemplate = _selectedTemplateId,
+					Tenmau = templateName,
+					Loaidichvu = loai,
+					Noidungxemtruoc = preview,
+					Thanhcong = false,
+					Ghichu = Truncate(ex.Message, 900),
+					Ngaygui = sentAt
+				});
+			}
+
+			await InvokeAsync(StateHasChanged);
+		}
+
+		_sending = false;
+		await LoadZnsLogsAsync();
+		SnackbarService.Add($"Đã xử lý {_results.Count} tin.", Severity.Success);
+		await InvokeAsync(StateHasChanged);
+	}
+
+	async Task ResetWizardAsync()
+	{
+		_wizardStep = 0;
+		_sendStarted = false;
+		_sending = false;
+		_results.Clear();
+		_selectedMahd.Clear();
+		_manualLoaiVeSinh = AutoLoaiToken;
+		await ApplyFilterAsync();
+	}
+
+	int SendProgressTotal => _results.Count;
+	int SendProgressDone => _results.Count(r => r.LineStatus == ZnsSendLineStatus.Done);
+	double SendProgressPercent => SendProgressTotal <= 0 ? 0 : 100.0 * SendProgressDone / SendProgressTotal;
+
+	enum ZnsSendLineStatus { Queued, Sending, Done }
+
+	sealed record ZnsSendRowResult(
+		string Mahd,
+		string TenKh,
+		ZnsSendLineStatus LineStatus,
+		bool Success,
+		int HttpStatus,
+		string Detail,
+		DateTime? SentAt);
+}

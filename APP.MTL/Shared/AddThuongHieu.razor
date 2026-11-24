@@ -1,0 +1,148 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models
+@using MTL.APP.Services
+@inject HangHoaService hangHoaService
+@inject IToastService toastService
+@inject ISnackbar SnackbarService
+
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		<MudGrid Spacing=1>
+			<MudItem xs="12" sm="12" md="6">
+				<MudTextField T="string" Label="Thương hiệu"
+							  HelperTextOnFocus="true"
+							  @bind-Text=mtl_thuonghieu.thuonghieu />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="6">
+				<MudTextField T="string" Label="Viết tắt"
+							  HelperTextOnFocus="true"
+							  @bind-Text=mtl_thuonghieu.viettat />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="6">
+				<MudNumericField T="int?" Label="Thứ tự"
+								  HelperTextOnFocus="true"
+								  @bind-Value=mtl_thuonghieu.order />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="6">
+				<MudSwitch T="bool" @bind-Checked=mtl_thuonghieu.active Label="Kích hoạt"
+						   Color="Color.Primary" />
+			</MudItem>
+		</MudGrid>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="OnEditModelSaving" Color="Color.Success">LƯU THÔNG TIN</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Color="Color.Error">ĐÓNG</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+
+	private ToastParameters _toastParameters;
+
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+	[Parameter]
+	public bool isNew { get; set; }
+
+	[Parameter]
+	public int Iduserlastcreate { get; set; }
+
+	[Parameter]
+	public int Iduserlastupdate { get; set; }
+
+	[Parameter]
+	public int idcompany { get; set; }
+
+	[Parameter]
+	public bool Visible { get; set; }
+
+	[Parameter]
+	public MTL_GetAllThuongHieuResult mtl_thuonghieu { get; set; } = new MTL_GetAllThuongHieuResult();
+
+	[Parameter]
+	public IEnumerable<MTL_GetAllThuongHieuResult>? ThuongHieuList { get; set; }
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	TblThuonghieu thuonghieu = new TblThuonghieu();
+
+	protected override async Task OnInitializedAsync()
+	{
+		if (mtl_thuonghieu == null)
+		{
+			mtl_thuonghieu = new MTL_GetAllThuongHieuResult();
+			mtl_thuonghieu.active = true;
+		}
+		else
+		{
+			if (mtl_thuonghieu.active == null)
+			{
+				mtl_thuonghieu.active = true;
+			}
+		}
+		await base.OnInitializedAsync();
+	}
+
+	async Task ClosePopup()
+	{
+		Visible = false;
+		MudDialog.Cancel();
+	}
+
+	async Task OnEditModelSaving()
+	{
+		MTL_GetAllThuongHieuResult mtl_edit_ThuongHieu = mtl_thuonghieu;
+		TblThuonghieu edit_ThuongHieu = this.convertMTL(mtl_edit_ThuongHieu);
+		if (isNew)
+		{
+			thuonghieu = await hangHoaService.CreateThuongHieuAsync(edit_ThuongHieu);
+			mtl_thuonghieu.id = thuonghieu.Id;
+			string mess = $"Tạo thành công {edit_ThuongHieu.Thuonghieu} ";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+		}
+		else
+		{
+			thuonghieu = await hangHoaService.UpdateThuongHieuAsync(edit_ThuongHieu);
+			mtl_thuonghieu.id = edit_ThuongHieu.Id;
+			string mess = $"Lưu thành công {edit_ThuongHieu.Thuonghieu} ";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+		}
+		Visible = false;
+		MudDialog.Close(DialogResult.Ok(true));
+	}
+
+	TblThuonghieu convertMTL(MTL_GetAllThuongHieuResult mtl_thuonghieu)
+	{
+		TblThuonghieu _thuonghieu = new TblThuonghieu();
+		_thuonghieu.Thuonghieu = mtl_thuonghieu.thuonghieu;
+		_thuonghieu.Viettat = mtl_thuonghieu.viettat.Replace(" ", "");
+		_thuonghieu.Order = mtl_thuonghieu.order;
+		_thuonghieu.Active = mtl_thuonghieu.active;
+		_thuonghieu.Idcompany = idcompany;
+		if (isNew)
+		{
+			_thuonghieu.Beginupdate = DateTime.Now;
+			_thuonghieu.Lastupdate = DateTime.Now;
+			_thuonghieu.Iduserlastcreate = Iduserlastcreate;
+			_thuonghieu.Iduserlastupdate = Iduserlastupdate;
+		}
+		else
+		{
+			_thuonghieu.Id = mtl_thuonghieu.id;
+			_thuonghieu.Beginupdate = mtl_thuonghieu.beginupdate;
+			_thuonghieu.Lastupdate = DateTime.Now;
+			_thuonghieu.Iduserlastcreate = mtl_thuonghieu.iduserlastcreate;
+			_thuonghieu.Iduserlastupdate = Iduserlastupdate;
+		}
+		return _thuonghieu;
+	}
+
+}

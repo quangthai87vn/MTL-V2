@@ -1,0 +1,226 @@
+@page "/login"
+@layout NoMenuLayout
+@using Blazored.LocalStorage
+@using MTL.APP.Authentication
+@using System.Security.Claims
+@using MTL.APP.Models
+@using MTL.APP.Services
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime js
+@inject NavigationManager navigationManager
+@inject ProtectedLocalStorage ProtectedLocalStorage
+@* @inject ILocalStorageService _browserStorage *@
+@inject UserService userService
+
+<link href="css/login.css" rel="stylesheet" />
+
+<EditForm Model=@model OnInvalidSubmit=@InvalidFormSubmitted>
+	<DataAnnotationsValidator /> <!-- Required for validation -->
+	<div class="container">
+		<input type="checkbox" id="flip">
+		<div class="cover">
+			<div class="front">
+				<img src="images/frontImg.jpg" alt="">
+				<div class="text">
+					<span class="text-1">MTL TECHNOLOGY <br></span>
+					<span class="text-2">GIẢI PHÁP SỐ HÓA DOANH NGHIỆP</span>
+				</div>
+			</div>
+			<div class="back">
+				<img class="backImg" src="images/backImg.jpg" alt="">
+				<div class="text">
+					<span class="text-1">MTL TECHNOLOGY <br></span>
+					<span class="text-2">GIẢI PHÁP SỐ HÓA DOANH NGHIỆP</span>
+				</div>
+			</div>
+		</div>
+		<div class="forms">
+			<div class="form-content">
+				<div class="login-form">
+					<center>
+						<img src="logos/logo.png" width="100px" />
+					</center>
+					<div class="title">ĐĂNG NHẬP</div>
+					<form action="#">
+						<div class="input-boxes">
+							<div class="input-box">
+								<i class="fas fa-envelope"></i>
+								<InputText type="text" @bind-Value=model.EmailAddress class="form-control" placeholder="Nhập Email của bạn" /> <!-- Input validation component -->
+								<ValidationMessage For="() => model.EmailAddress" class="text sign-up-text" />
+							</div>
+							<div class="input-box">
+								<i class="fas fa-lock"></i>
+								<InputText type="password" @bind-Value=model.Password class="form-control" placeholder="Nhập mật khẩu của bạn" />
+								<ValidationMessage For="() => model.Password" class="text sign-up-text" />
+							</div>
+							<br />
+							<div>
+								<MudButton OnClick=@KiemTraCapPhep Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Login" Color="Color.Success" FullWidth="true">KIỂM TRA CẤP PHÉP</MudButton>
+							</div>
+							<br />
+							<SpinLoader IsLoading=@IsLoading Spinner="SpinnerType.Chase">
+								<LoadingTemplate>
+									<Loading />
+								</LoadingTemplate>
+								<ContentTemplate>
+									@if (@ListCompany.Count > 0)
+									{
+										<div class="custom-select" style="width:200px;">
+											<select @onchange=SelectCompanyChange>
+												@foreach (Company com in ListCompany)
+												{
+													<option value="@com.Id">@com.Name</option>
+												}
+											</select>
+										</div>
+										<br />
+										<br />
+										<MudButton OnClick=@KiemTraDangNhap Variant="Variant.Filled"
+												   StartIcon="@Icons.Material.Filled.Login"
+										Color="Color.Success" FullWidth="true">ĐĂNG NHẬP</MudButton>
+										@* <h5 style="color:red; font-weight: bold;">@errorMessLogin</h5> *@
+									}
+									else
+									{
+										<h6 style="color:red; font-weight: bold;">@errorMess</h6>										
+									}
+								</ContentTemplate>
+							</SpinLoader>
+							@* <div class="mb-3">
+							<button class="btn btn-primary">Submit</button> <!-- Validation initially fires when form submitted -->
+							</div> *@
+							<div class="text sign-up-text">Bạn chưa có tài khoản? <label for="flip">Đăng ký</label></div>
+						</div>
+					</form>
+				</div>
+				<div class="signup-form">
+					<center>
+						<img src="logos/logo.png" width="100px" />
+					</center>
+					<div class="title">ĐĂNG KÝ</div>
+					<form action="#">
+						<div class="input-boxes">
+							<div class="input-box">
+								<i class="fas fa-user"></i>
+								<input type="text" placeholder="Nhập tên của bạn" required>
+							</div>
+							<div class="input-box">
+								<i class="fas fa-envelope"></i>
+								<input type="text" placeholder="Nhập Email của bạn" required>
+							</div>
+							<div class="input-box">
+								<i class="fas fa-lock"></i>
+								<input type="password" placeholder="Nhập mật khẩu của bạn" required>
+							</div>
+							<div class="button input-box">
+								<input type="submit" value="ĐĂNG KÝ">
+							</div>
+							<div class="text sign-up-text">Bạn đã có tài khoản? <label for="flip">Đăng nhập</label></div>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	
+
+</EditForm>
+
+@code {
+
+	[Parameter]
+	[SupplyParameterFromQuery(Name = "redirect_url")]
+	public string RedirectUrl { get; set; } = "/";
+	private AddKhachHangModel model = new AddKhachHangModel();
+	string _message { get; set; }
+
+	private UserSession userSession = new UserSession();
+
+	List<Company> ListCompany = new List<Company>();
+	Company company { get; set; } = new Company();
+	bool IsLoading = false;
+	string LastSubmitResult;
+
+	string errorMess = "";
+
+	protected override async Task OnInitializedAsync()
+	{
+		// Nếu đã đăng nhập rồi thì redirect thẳng sang Dashboard
+		var authState = await ((CustomAuthenticationStateProvider)AuthStateProvider).GetAuthenticationStateAsync();
+		if (authState?.User?.Identity?.IsAuthenticated == true)
+		{
+			navigationManager.NavigateTo("/OverviewReport", true);
+			return;
+		}
+	}
+
+	private async Task<bool> ValidateLogin()
+	{
+		return true;
+	}
+
+	private async Task KiemTraCapPhep()
+	{
+		IsLoading = true;
+		User? checkUser = await userService.LoginAsync(model);
+		//UserAccount? checkUser = userAccountService.CheckLogin(model.EmailAddress);
+		if (checkUser != null) //thành công
+		{
+			userSession = new UserSession
+				{
+					UserId = checkUser.UserId,
+					Email = checkUser.EmailAddress,
+					Role = "Administrator",
+					FullName = checkUser.Fullname,
+					idRole = (int)checkUser.RoleId,
+					user = checkUser
+				};
+			await GetCompanyWithUser(checkUser);
+			
+		}
+		else
+		{
+			// ko tồn tại user
+			ListCompany = new List<Company>();
+			errorMess = "Sai thông tin đăng nhập, vui lòng kiểm tra lại !";
+		}
+		IsLoading = false;
+	}
+	private async Task GetCompanyWithUser(User user)
+	{
+		User _user = new User();
+		_user.UserId = user.UserId;
+		_user.RoleId = user.RoleId;
+		ListCompany = await userService.GetCompanyWithUserAsync(_user);
+		await Task.CompletedTask;
+		if (ListCompany.Count > 0)
+		{			
+			company = (Company)ListCompany[0];	
+		}
+	}
+
+	void InvalidFormSubmitted(EditContext editContext)
+	{
+		LastSubmitResult = "OnInvalidSubmit was executed";
+	}
+
+	void SelectCompanyChange(ChangeEventArgs e)
+	{
+		int idcompany = int.Parse(e.Value.ToString());
+		company = (Company)ListCompany.Where(y => y.Id == idcompany).FirstOrDefault();
+	}
+
+	private async Task KiemTraDangNhap()
+	{
+		userSession.CompanyName = company.Name;
+		userSession.idcompany = company.Id;
+		userSession.company = company;
+		await ProtectedLocalStorage.SetAsync("UserSession", userSession);
+		await ProtectedLocalStorage.SetAsync("Company", company);
+		await ((CustomAuthenticationStateProvider)AuthStateProvider).StartUserSession(userSession);
+		navigationManager.NavigateTo(string.IsNullOrWhiteSpace(RedirectUrl) ? "/OverviewReport" : RedirectUrl, true);
+
+	}
+
+}

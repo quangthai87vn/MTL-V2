@@ -1,0 +1,353 @@
+@page "/Content"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+@using MudBlazor
+@using WordPressPCL
+@using WordPressPCL.Models
+
+@inject IJSRuntime JSRuntime
+@inject ContentService contentService
+@inject UserService userService
+@inject IToastService toastService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@inject WordPressRESTAPI wordPressRESTAPI
+@attribute [Authorize]
+
+<style>
+	.my-style {
+		font-weight: bold !important;
+		color: var(--mud-palette-primary);
+	}
+</style>
+
+<AuthorizeView Context="auth">
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.Article" Title="DANH SÁCH NỘI DUNG">
+			<Actions>
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Class="mtl-header-action-btn"
+							   Disabled=IsLoading Href="/AddContent/Add" Color="Color.Primary">THÊM NỘI DUNG</MudButton>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FileDownload" Class="mtl-header-action-btn"
+							   Disabled=IsLoading OnClick="ExportXlsx" Color="Color.Error">XUẤT EXCEL</MudButton>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Web" Class="mtl-header-action-btn"
+							   Disabled=IsLoading Href="/ContentAPI" Target="_blank" Color="Color.Secondary">XEM NỘI DUNG WEB</MudButton>
+				</MudStack>
+			</Actions>
+			<ChildContent>
+				<MudTextField @bind-Value="_searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+							  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" FullWidth="true"
+							  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search" />
+			</ChildContent>
+		</PageStandardHeader>
+
+		<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+			@if (IsLoading)
+			{
+				<Loading IsFullPage="false" PageName="NỘI DUNG" />
+			}
+			else
+			{
+				<MudDivider Class="mud-width-full" />
+				<MudDataGrid T="TimeSheetBaiViet"
+							 Items="@DataList"
+							 Filterable="true"
+							 FilterMode="@DataGridFilterMode.Simple"
+							 QuickFilterFilter="@_quickFilter"
+							 Sortable="true"
+							 Hover="true"
+							 Striped="true"
+							 Bordered="true"
+							 Dense="true"
+							 RowsPerPage="100"
+							 ShowMenuIcon="false"
+							 Hideable="true"
+							 ShowColumnOptions="true"
+							 HorizontalScrollbar="true"
+							 ColumnResizeMode="ResizeMode.Column"
+							 Loading="IsLoading"
+							 Class="MTLGrid mtl-standard-grid">
+					<LoadingContent><MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText></LoadingContent>
+					<ToolBarContent>
+						<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+							<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+							<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+							<MudSpacer />
+						</MudStack>
+					</ToolBarContent>
+							<Columns>
+								<TemplateColumn T="TimeSheetBaiViet" Title="THAO TÁC" HeaderStyle="width:110px; min-width:110px;" Filterable="false" Sortable="false" Hideable="false" StickyLeft="true">
+									<CellTemplate>
+										<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+											@{
+												string link = "/AddContent/" + context.Item.Id;
+											}
+											<MudIconButton Href=@link
+														   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+														   Color="Color.Primary" Size="Size.Medium" Title="Sửa" />
+											<MudIconButton @onclick="@(() => XoaNoiDungDialog(context.Item))"
+														   Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled"
+														   Color="Color.Error" Size="Size.Medium" Title="Xóa" />
+										</MudButtonGroup>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="TimeSheetBaiViet" Title="Site" HeaderStyle="width:70px; min-width:64px;" Filterable="false" Sortable="false" HiddenChanged="OnColumnVisibilityChanged">
+									<CellTemplate>
+<MudSwitch Value="context.Item.Ispublicweb ?? false" ReadOnly="true" T="bool" Color="Color.Primary" />
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="TimeSheetBaiViet" Title="DỰ ÁN" HeaderStyle="min-width:150px; width:170px;" Filterable="true" Sortable="true" SortBy="x => x.Idduan" HiddenChanged="OnColumnVisibilityChanged">
+									<FilterTemplate>
+										<MudSelect T="int?" Value="@_filterDuAn" ValueChanged="v => FilterDuAnChanged(v)" AnchorOrigin="Origin.BottomCenter" Dense="true" Margin="Margin.Dense">
+											<MudSelectItem T="int?" Value="0">Tất cả</MudSelectItem>
+											@if (ListDuAn != null)
+											{
+												@foreach (var ritem in ListDuAn)
+												{
+													<MudSelectItem T="int?" Value="ritem.Id">@ritem.Tenduan</MudSelectItem>
+												}
+											}
+										</MudSelect>
+									</FilterTemplate>
+									<CellTemplate>
+										<MudText Typo="Typo.body2">@GetDuAnText(context.Item.Idduan)</MudText>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="TimeSheetBaiViet" Title="POST" HeaderStyle="width:72px; min-width:64px;" Filterable="false" Sortable="false" HiddenChanged="OnColumnVisibilityChanged">
+									<CellTemplate>
+										<MudText Typo="Typo.body2">@context.Item.ApiPostid</MudText>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="TimeSheetBaiViet" Title="TIÊU ĐỀ BÀI VIẾT" HeaderStyle="min-width:260px; width:360px;" Filterable="true" Sortable="true" SortBy="x => x.Tenbaidang" HiddenChanged="OnColumnVisibilityChanged">
+									<CellTemplate>
+										@{ var webUrl = context.Item.Link; }
+										@if (!string.IsNullOrEmpty(webUrl))
+										{
+											<a target="_blank" href="@webUrl" style="@BindColor(context.Item)">@context.Item.Tenbaidang</a>
+										}
+										else
+										{
+											<MudText>@context.Item.Tenbaidang</MudText>
+										}
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="TimeSheetBaiViet" Title="TRẠNG THÁI" HeaderStyle="min-width:120px; width:140px;" Filterable="true" Sortable="true" SortBy="x => x.Idtrangthai" HiddenChanged="OnColumnVisibilityChanged">
+									<FilterTemplate>
+										<MudSelect T="int?" Value="@_filterTrangThai" ValueChanged="v => FilterTrangThaiChanged(v)" AnchorOrigin="Origin.BottomCenter" Dense="true" Margin="Margin.Dense">
+											<MudSelectItem T="int?" Value="0">Tất cả</MudSelectItem>
+											@foreach (var ritem in MTLEnum.GetListTrangThaiBaiDang())
+											{
+												<MudSelectItem T="int?" Value="ritem.Id">@ritem.TrangThai</MudSelectItem>
+											}
+										</MudSelect>
+									</FilterTemplate>
+									<CellTemplate>
+										<MudText Typo="Typo.body2">@GetTrangThaiText(context.Item.Idtrangthai)</MudText>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="TimeSheetBaiViet" Title="NGÀY LÊN BÀI" HeaderStyle="min-width:168px; width:180px;" Filterable="true" Sortable="true" SortBy="x => x.Ngaylenbai" HiddenChanged="OnColumnVisibilityChanged">
+									<FilterTemplate>
+										<MudDatePicker @bind-Date="_filterNgayLenBai" Dense="true" Margin="Margin.Dense" Placeholder="Lọc ngày" />
+									</FilterTemplate>
+									<CellTemplate>
+										<MudText Typo="Typo.body2">@context.Item.Ngaylenbai?.ToString("dd/MM/yyyy HH:mm:ss")</MudText>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="TimeSheetBaiViet" Title="NGƯỜI ĐĂNG BÀI" HeaderStyle="min-width:160px; width:180px;" Filterable="true" Sortable="true" SortBy="x => x.Idusertask" HiddenChanged="OnColumnVisibilityChanged">
+									<FilterTemplate>
+										<MudSelect T="int?" Value="@_filterNguoiDang" ValueChanged="v => FilterNguoiDangChanged(v)" AnchorOrigin="Origin.BottomCenter" Dense="true" Margin="Margin.Dense">
+											<MudSelectItem T="int?" Value="0">Tất cả</MudSelectItem>
+											@if (UserList != null)
+											{
+												@foreach (var ritem in UserList)
+												{
+													<MudSelectItem T="int?" Value="ritem.userid">@ritem.Fullname</MudSelectItem>
+												}
+											}
+										</MudSelect>
+									</FilterTemplate>
+									<CellTemplate>
+										<MudText Typo="Typo.body2">@GetNguoiDangText(context.Item.Idusertask)</MudText>
+									</CellTemplate>
+								</TemplateColumn>
+
+								<TemplateColumn T="TimeSheetBaiViet" Title="LINK" HeaderStyle="min-width:200px; width:240px;" Filterable="false" Sortable="false" HiddenChanged="OnColumnVisibilityChanged">
+									<CellTemplate>
+										<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+											@if (!string.IsNullOrEmpty(context.Item.Linkthamkhao))
+											{
+												<MudButton Href="@context.Item.Linkthamkhao" Target="_blank" Variant="Variant.Filled" Color="Color.Primary">Tham khảo</MudButton>
+											}
+											@if (!string.IsNullOrEmpty(context.Item.Facebook))
+											{
+												<MudButton Href="@context.Item.Facebook" Target="_blank" Variant="Variant.Filled" Color="Color.Error">Fanpage</MudButton>
+											}
+										</MudButtonGroup>
+									</CellTemplate>
+								</TemplateColumn>
+							</Columns>
+							<NoRecordsContent>
+								<MudText Typo="Typo.body1">Không có dữ liệu nội dung hoặc không tìm thấy theo bộ lọc.</MudText>
+							</NoRecordsContent>
+							<PagerContent>
+								<MudText Typo="Typo.body2" Class="pa-2">
+									Tổng số: <strong>@(DataList?.Count() ?? 0)</strong> bài viết
+								</MudText>
+								<MudDataGridPager T="TimeSheetBaiViet" PageSizeOptions="new int[] { 25, 50, 100, 200 }" />
+							</PagerContent>
+						</MudDataGrid>
+			}
+		</MudPaper>
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+
+	UserSession userSession { get; set; }
+	bool IsLoading = true;
+
+	DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.Medium,
+			MaximizeButton = true,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+		};
+
+	IEnumerable<TimeSheetBaiViet>? DataList { get; set; }
+	IEnumerable<MTL_GetAllUserCompanyResult>? UserList { get; set; }
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	string NoiDungXoa = "";
+
+	List<TimeSheetDuAn>? ListDuAn { get; set; }
+
+	string _searchString = "";
+	private Func<TimeSheetBaiViet, bool> _quickFilter => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchString))
+			return true;
+		if (x.Tenbaidang?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Facebook?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Link?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		return false;
+	};
+
+	int? _filterDuAn = 0;
+	int? _filterTrangThai = 0;
+	int? _filterNguoiDang = 0;
+	DateTime? _filterNgayLenBai = null;
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			userSession = await configs.LoadAllConfig();
+			DataList = await contentService.GetAllNoiDungAsync();
+			ListDuAn = await contentService.GetAllDuAnAsync();
+			UserList = await userService.GetAllUserCompanyAsync(userSession.company.Id);
+			IsLoading = false;
+			StateHasChanged();
+		}
+		await base.OnAfterRenderAsync(firstRender);
+	}
+
+	async Task ExportXlsx()
+	{
+		if (DataList == null || !DataList.Any())
+		{
+			SnackbarService.Add("Không có dữ liệu để xuất.", Severity.Warning);
+			return;
+		}
+		var exportData = DataList.Select(b => new
+		{
+			b.Id,
+			b.Tenbaidang,
+			DuAn = GetDuAnText(b.Idduan),
+			TrangThai = GetTrangThaiText(b.Idtrangthai),
+			NgayLenBai = b.Ngaylenbai?.ToString("dd/MM/yyyy HH:mm:ss"),
+			NguoiDang = GetNguoiDangText(b.Idusertask),
+			b.Facebook,
+			b.Linkthamkhao,
+			b.Link
+		}).ToList();
+
+		await JSRuntime.InvokeVoidAsync("exportToExcel",
+			"DSNoiDung",
+			new[] { "ID", "Tiêu đề", "Dự án", "Trạng thái", "Ngày lên bài", "Người đăng", "Facebook", "Link tham khảo", "Link" },
+			exportData.Select(e => new object[] { e.Id, e.Tenbaidang, e.DuAn, e.TrangThai, e.NgayLenBai, e.NguoiDang, e.Facebook, e.Linkthamkhao, e.Link }).ToList()
+		);
+	}
+
+	void FilterDuAnChanged(int? value) { _filterDuAn = value; }
+	void FilterTrangThaiChanged(int? value) { _filterTrangThai = value; }
+	void FilterNguoiDangChanged(int? value) { _filterNguoiDang = value; }
+	void FilterNgayChanged(DateTime? value) { _filterNgayLenBai = value; }
+
+	string GetDuAnText(int? id)
+	{
+		if (id == null || id == 0 || ListDuAn == null) return string.Empty;
+		return ListDuAn.Where(p => p.Id == id).FirstOrDefault()?.Tenduan ?? string.Empty;
+	}
+
+	string GetTrangThaiText(int? id)
+	{
+		if (id == null || id == 0) return string.Empty;
+		return MTLEnum.GetListTrangThaiBaiDang().Where(p => p.Id == id).FirstOrDefault()?.TrangThai ?? string.Empty;
+	}
+
+	string GetNguoiDangText(int? id)
+	{
+		if (id == null || id == 0 || UserList == null) return string.Empty;
+		return UserList.Where(p => p.userid == id).FirstOrDefault()?.Fullname ?? string.Empty;
+	}
+
+	async Task XoaNoiDungDialog(TimeSheetBaiViet baiviet)
+	{
+		NoiDungXoa = string.Format("Bài viết: {0}", baiviet.Tenbaidang);
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, NoiDungXoa);
+		var dialog = await DialogService.ShowEx<DeleteDialog>("XÓA THÔNG TIN", parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await contentService.DeleteTimeSheetBaiVietAsync(baiviet.Id);
+			string mess = $"Xóa thành công bài viết [{baiviet.Tenbaidang}] ";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			DataList = await contentService.GetAllNoiDungAsync();
+		}
+	}
+
+	string BindColor(TimeSheetBaiViet ts)
+	{
+		if (ts.Idtrangthai == MTLEnum.TrangThaiBaiDang.HoanThanh)
+			return "color: #2e7d32; font-weight: 600;";
+		else if (ts.Idtrangthai == MTLEnum.TrangThaiBaiDang.DaLenLich)
+			return "color: var(--mud-palette-tertiary); font-weight: 600;";
+		else
+			return "color: var(--mud-palette-primary); font-weight: 600;";
+	}
+
+	Task OnColumnVisibilityChanged(bool _)
+		=> InvokeAsync(StateHasChanged);
+}

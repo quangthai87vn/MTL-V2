@@ -1,0 +1,617 @@
+/* =========================================================
+   HÓA ĐƠN A4 — Professional Redesign
+   Phong cách: doanh nghiệp Việt Nam hiện đại
+   ========================================================= */
+
+/* ---------- Toolbar ---------- */
+.invoice-toolbar {
+	position: sticky;
+	top: 0;
+	z-index: 100;
+	background: #f5f5f5;
+	border-bottom: 1px solid #ddd;
+	padding: 8px 12px;
+}
+
+/* ---------- Khung A4 (màn hình) ---------- */
+.invoice-root-a4 {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 210mm;
+	/* Không ép min-height A4: html2pdf chụp DOM — 297mm làm canvas cao hơn nội dung → cắt trang xấu, viền đỏ rớt sang trang 2 */
+	min-height: 0;
+	margin: 16px auto;
+	padding: 0;
+	background: #fff;
+	border: 2px solid #b71c1c;
+	border-radius: 2px;
+	box-shadow: 0 4px 20px rgba(0,0,0,.12);
+	font-family: Roboto, Arial, sans-serif;
+	font-size: 12px;
+	color: #222;
+	display: flex;
+	flex-direction: column;
+	overflow: visible;
+}
+
+/* Khi JS (html2pdf) đang xuất PDF — bỏ đổ bóng, chiều cao = nội dung, bằng chữ nhỏ hơn một chút để ít xuống dòng giữa từ */
+.invoice-root-a4.invoice--pdf-export {
+	box-shadow: none !important;
+	min-height: 0 !important;
+	overflow: visible !important;
+	margin-top: 4px !important;
+	margin-bottom: 4px !important;
+}
+.invoice-root-a4.invoice--pdf-export .invoice-amount-words {
+	font-size: 10px;
+	line-height: 1.35;
+	font-weight: 700;
+}
+.invoice-root-a4.invoice--pdf-export .invoice-a4-signatures {
+	page-break-inside: avoid;
+	break-inside: avoid;
+}
+
+/* ---------- HEADER BAND ---------- */
+/* Dải màu đỏ gradient phía trên — tạo điểm nhấn ngay lập tức */
+.invoice-a4-header-band {
+	width: 100%;
+	height: 5px;
+	background: linear-gradient(90deg, #b71c1c 0%, #e53935 40%, #ef5350 70%, #b71c1c 100%);
+	flex-shrink: 0;
+}
+
+/* Toàn bộ header content */
+.invoice-a4-header {
+	flex-shrink: 0;
+	padding: 8px 14px 6px;
+	border-bottom: 2px solid #b71c1c;
+	background: #fff;
+}
+
+/* Grid header: logo | công ty (luôn canh trái) | hóa đơn — căn giữa dọc cho cân mắt */
+.invoice-a4-hdr-grid {
+	display: grid;
+	grid-template-columns: 148px minmax(0, 1fr) 200px;
+	gap: 12px;
+	align-items: center;
+}
+
+.invoice-a4-cell-logo {
+	display: flex;
+	align-items: flex-start;
+}
+.invoice-a4-logo-img {
+	max-width: 148px;
+	max-height: 88px;
+	width: auto;
+	height: auto;
+	object-fit: contain;
+	display: block;
+}
+
+/* Công ty — canh trái (ghi đè mọi style global như MudBlazor) */
+.invoice-root-a4 .invoice-a4-cell-company {
+	padding: 0 8px 0 0;
+	text-align: left !important;
+	width: 100%;
+	min-width: 0;
+}
+.invoice-root-a4 .invoice-co-name {
+	text-align: left !important;
+	font-size: 17px;
+	font-weight: 800;
+	color: #b71c1c;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	line-height: 1.2;
+	margin: 0 0 4px;
+}
+.invoice-root-a4 .invoice-company-block {
+	line-height: 1.4;
+	font-size: 11px;
+	color: #333;
+	text-align: left !important;
+}
+.invoice-company-block > div {
+	margin: 0;
+}
+
+/* Hóa đơn — khối viền cân đối, không QR */
+.invoice-a4-cell-meta {
+	display: flex;
+	justify-content: flex-end;
+	align-items: flex-start;
+}
+/* Không viền đỏ — chỉ chữ HÓA ĐƠN / Số HĐ / Ngày xuất, gọn bên phải */
+.invoice-hd-box {
+	border: none;
+	border-radius: 0;
+	padding: 2px 0 0;
+	width: 100%;
+	max-width: 220px;
+	margin-left: auto;
+	box-sizing: border-box;
+	background: transparent;
+}
+.invoice-hd-title {
+	font-size: 20px;
+	font-weight: 800;
+	color: #b71c1c;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	line-height: 1.15;
+	margin: 0 0 6px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid #e0e0e0;
+	text-align: right;
+}
+.invoice-hd-meta {
+	font-size: 12px;
+	line-height: 1.45;
+	text-align: right;
+}
+.invoice-hd-line {
+	display: flex;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 6px 10px;
+	margin-top: 3px;
+}
+.invoice-hd-line:first-of-type {
+	margin-top: 0;
+}
+.invoice-hd-lbl {
+	font-weight: 600;
+	color: #555;
+	text-transform: uppercase;
+	font-size: 10.5px;
+	letter-spacing: 0.03em;
+	white-space: nowrap;
+}
+.invoice-hd-val {
+	font-weight: 700;
+	color: #111;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	word-break: break-all;
+}
+
+/* ---------- THÔNG TIN KHÁCH HÀNG ---------- */
+.invoice-a4-customer {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	column-gap: 20px;
+	row-gap: 0;
+	margin: 4px 14px 0;
+	padding: 5px 12px 6px;
+	background: #fef9f9;
+	border: 1px solid #ef9a9a;
+	border-radius: 3px;
+	flex-shrink: 0;
+	align-items: start;
+}
+.invoice-a4-customer-label {
+	font-size: 10px;
+	font-weight: 700;
+	color: #b71c1c;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	margin-bottom: 2px;
+}
+.invoice-a4-customer-info {
+	font-size: 11.5px;
+	line-height: 1.45;
+	color: #222;
+}
+.invoice-a4-customer-meta > div,
+.invoice-a4-customer-right > div {
+	margin: 0;
+}
+
+/* ---------- BẢNG HÀNG HÓA ---------- */
+.invoice-root-a4 .invoice-table {
+	margin: 4px 14px 0;
+	width: calc(100% - 28px);
+	border-collapse: collapse;
+	flex-shrink: 0;
+}
+.invoice-table th,
+.invoice-table td {
+	border: none;
+	border-bottom: 1px solid #e0e0e0;
+	padding: 5px 7px;
+	vertical-align: top;
+	font-size: 11.5px;
+}
+.invoice-table thead {
+	display: table-header-group;
+}
+.invoice-table thead tr th {
+	background: #b71c1c;
+	color: #fff;
+	border: none;
+	border-bottom: none;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	text-align: center;
+	padding: 6px 7px;
+}
+.invoice-table thead tr th:first-child { text-align: center; width: 38px; }
+.invoice-table thead tr th:last-child { text-align: right; }
+.invoice-table tbody tr {
+	page-break-inside: avoid;
+}
+@media (hover: hover) {
+	.invoice-table tbody tr:hover {
+		background: #fafafa;
+	}
+}
+.invoice-table tbody td {
+	color: #222;
+}
+.invoice-table tbody td:nth-child(5),
+.invoice-table tbody td:nth-child(6) {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ---------- BLOCK THANH TOÁN (sát bảng hàng, không spacer) ---------- */
+.invoice-a4-bottom {
+	flex-shrink: 0;
+	padding: 0 14px;
+	margin-top: 2px;
+}
+
+/* Dải tiêu đề thanh toán — nối liền trực quan với bảng */
+.invoice-section-pay {
+	margin: 0;
+	padding: 6px 12px;
+	background: #b71c1c;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	text-align: center;
+	border-radius: 2px 2px 0 0;
+}
+
+/* Body thanh toán — cột cân tỷ lệ */
+.invoice-a4-pay-body {
+	display: grid;
+	grid-template-columns: minmax(108px, 22%) minmax(0, 1.1fr) minmax(0, 1fr);
+	gap: 12px 14px;
+	align-items: start;
+	padding: 8px 0 5px;
+	border-bottom: 1px solid #e0e0e0;
+}
+.invoice-a4-pay-qr {
+	text-align: center;
+}
+.invoice-a4-pay-qr img {
+	width: 110px;
+	height: 110px;
+	border: none;
+	display: block;
+	margin: 0 auto;
+}
+.invoice-a4-pay-bank {
+	font-size: 11.5px;
+	line-height: 1.5;
+}
+.invoice-a4-pay-bank .invoice-bank-name {
+	font-size: 13px;
+	font-weight: 800;
+	color: #b71c1c;
+	margin-bottom: 3px;
+}
+
+.invoice-a4-sum-col {
+	min-width: 0;
+}
+
+/* Bằng chữ: full width, căn trái, nhiều dòng tự xuống (không chật cột phải) */
+.invoice-a4-amount-words-block {
+	grid-column: 1 / -1;
+	width: 100%;
+	margin-top: 6px;
+	padding-top: 8px;
+	border-top: 1px solid #eee;
+	box-sizing: border-box;
+}
+
+/* Bảng tổng tiền — cùng cỡ chữ mọi dòng; chỉ dòng Thanh toán đậm + màu đỏ */
+.invoice-sum-grid {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 15px;
+}
+.invoice-sum-grid td {
+	padding: 4px 0 4px 8px;
+	vertical-align: baseline;
+	font-size: 15px;
+}
+.invoice-sum-grid td:first-child {
+	padding-left: 0;
+}
+.invoice-sum-grid .invoice-sum-value {
+	font-weight: 700;
+	text-align: right;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+	font-size: 15px;
+}
+.invoice-sum-total-row td {
+	color: #b71c1c;
+	font-weight: 800;
+	font-size: 15px;
+}
+.invoice-sum-total-row .invoice-sum-value {
+	font-size: 15px;
+	font-weight: 800;
+}
+
+/* Số tiền bằng chữ — căn trái, xuống dòng tự nhiên */
+.invoice-amount-words {
+	margin: 0;
+	font-size: 11.5px;
+	font-weight: 700;
+	color: #b71c1c;
+	text-transform: uppercase;
+	line-height: 1.45;
+	font-style: italic;
+	text-align: left;
+	width: 100%;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+	hyphens: manual;
+}
+
+/* ---------- CHỮ KÝ ---------- */
+.invoice-a4-signatures {
+	width: 100%;
+	border-collapse: collapse;
+	margin-top: 8px;
+	table-layout: fixed;
+}
+.invoice-a4-signatures td {
+	padding: 8px 6px;
+	text-align: center;
+	vertical-align: top;
+	font-size: 11px;
+	border: 1px solid #e0e0e0;
+}
+.invoice-a4-signatures td:first-child { border-left: none; }
+.invoice-a4-signatures td:last-child { border-right: none; }
+.invoice-sig-title {
+	font-size: 11.5px;
+	font-weight: 700;
+	color: #333;
+	display: block;
+	margin-bottom: 2px;
+}
+.invoice-sig-sub {
+	font-size: 10px;
+	font-weight: 400;
+	color: #888;
+	display: block;
+}
+.invoice-a4-sig-space {
+	display: block;
+	min-height: 48px;
+}
+
+/* ---------- FOOTER ---------- */
+.invoice-a4-footer {
+	margin-top: 8px;
+	padding: 6px 0 8px;
+	font-size: 10px;
+	color: #999;
+	text-align: center;
+	font-style: italic;
+	border-top: 1px solid #eee;
+}
+
+/* ---------- BILL (giữ nguyên, chỉ thu gọn) ---------- */
+.invoice-root-bill {
+	max-width: 80mm;
+	margin: 16px auto;
+	padding: 4mm 3mm;
+	background: #fff;
+	border: 1px solid #ccc;
+	font-family: Roboto, Arial, sans-serif;
+	font-size: 11px;
+	color: #111;
+}
+
+/* Tiêu đề đỏ dùng chung */
+.invoice-title-red {
+	color: #b71c1c;
+	font-weight: 700;
+}
+
+/* Tiện ích */
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.fw-bold { font-weight: 700; }
+
+/* =========================================================
+   IN — KHI IN / PDF / PNG
+   ========================================================= */
+@media print {
+	.no-print { display: none !important; }
+
+	html, body {
+		background: #fff !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+
+	@page {
+		size: 210mm 297mm;
+		margin: 0;
+	}
+
+	.invoice-root-a4 {
+		display: block;
+		min-height: 0;
+		max-height: none;
+		max-width: 210mm;
+		width: 210mm;
+		min-width: 210mm;
+		margin: 0 auto;
+		padding: 0;
+		box-shadow: none;
+		border: 1px solid #b71c1c;
+		border-radius: 0;
+		font-size: 11px;
+	}
+
+	.invoice-a4-header-band {
+		height: 4px;
+	}
+	.invoice-a4-header {
+		padding: 6px 10px 5px;
+	}
+	.invoice-a4-hdr-grid {
+		grid-template-columns: 128px minmax(0, 1fr) 178px;
+		gap: 8px;
+		align-items: center;
+	}
+	.invoice-a4-logo-img {
+		max-width: 128px;
+		max-height: 76px;
+	}
+	.invoice-co-name {
+		font-size: 15px;
+	}
+	.invoice-root-a4 .invoice-company-block {
+		font-size: 10px;
+		line-height: 1.3;
+	}
+	.invoice-hd-box {
+		padding: 1px 0 0;
+		max-width: 200px;
+	}
+	.invoice-hd-title {
+		font-size: 17px;
+		margin-bottom: 4px;
+		padding-bottom: 5px;
+	}
+	.invoice-hd-meta {
+		font-size: 11px;
+		line-height: 1.4;
+	}
+	.invoice-hd-lbl {
+		font-size: 9.5px;
+	}
+
+	.invoice-a4-customer {
+		margin: 3px 10px 0;
+		padding: 4px 10px 5px;
+		column-gap: 14px;
+		font-size: 10.5px;
+	}
+	.invoice-a4-customer-label {
+		font-size: 9.5px;
+		margin-bottom: 1px;
+	}
+	.invoice-a4-customer-info {
+		font-size: 10.5px;
+		line-height: 1.35;
+	}
+
+	.invoice-root-a4 .invoice-table {
+		margin: 3px 10px 0;
+		width: calc(100% - 20px);
+	}
+	.invoice-table th,
+	.invoice-table td {
+		padding: 3px 5px;
+		font-size: 10.5px;
+	}
+	.invoice-table thead tr th {
+		padding: 4px 5px;
+		font-size: 10px;
+	}
+	.invoice-table thead tr th:first-child { width: 34px; }
+
+	.invoice-a4-bottom {
+		padding: 0 10px;
+		margin-top: 1px;
+	}
+	.invoice-section-pay {
+		padding: 5px 10px;
+		font-size: 11px;
+	}
+	.invoice-a4-pay-body {
+		grid-template-columns: minmax(96px, 22%) minmax(0, 1.1fr) minmax(0, 1fr);
+		gap: 8px 10px;
+		padding: 6px 0 3px;
+	}
+	.invoice-a4-pay-qr img {
+		width: 95px;
+		height: 95px;
+	}
+	.invoice-a4-pay-bank {
+		font-size: 10.5px;
+	}
+	.invoice-a4-pay-bank .invoice-bank-name {
+		font-size: 12px;
+	}
+	.invoice-sum-grid {
+		font-size: 14px;
+	}
+	.invoice-sum-grid td {
+		padding: 2px 0 2px 6px;
+		font-size: 14px;
+	}
+	.invoice-sum-grid .invoice-sum-value {
+		font-size: 14px;
+	}
+	.invoice-sum-total-row td {
+		font-size: 14px;
+	}
+	.invoice-sum-total-row .invoice-sum-value {
+		font-size: 14px;
+	}
+	.invoice-a4-amount-words-block {
+		margin-top: 4px;
+		padding-top: 6px;
+	}
+	.invoice-amount-words {
+		font-size: 10.5px;
+		line-height: 1.4;
+		margin: 0;
+		text-align: left;
+	}
+
+	.invoice-a4-signatures {
+		margin-top: 8px;
+	}
+	.invoice-a4-signatures td {
+		padding: 5px 4px;
+		font-size: 10px;
+	}
+	.invoice-sig-title {
+		font-size: 10.5px;
+	}
+	.invoice-sig-sub {
+		font-size: 9.5px;
+	}
+	.invoice-a4-sig-space {
+		min-height: 36px;
+	}
+
+	.invoice-a4-footer {
+		margin-top: 5px;
+		padding: 4px 0 5px;
+		font-size: 9px;
+	}
+}

@@ -1,0 +1,183 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using MTL.DEV.Handlers;
+@inject KhachHangService khachHangService
+@inject UserService userService
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		<MudGrid Spacing=1>
+			<MudItem xs="12" sm="12" md="6">
+				<MudTextField T="string" Label="Nhập tên nhân viên ..."
+							  HelperTextOnFocus="true"
+							  @bind-Text=@UserInfo.Fullname />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="6">
+				<MudTextField T="string" Label="Nhập điện thoại nhân viên ..."
+							  HelperTextOnFocus="true"
+							  @bind-Text=@UserInfo.Phone />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudTextField T="string" Label="Nhập địa chỉ nhân viên ..."
+							  HelperTextOnFocus="true"
+							  @bind-Text=@UserInfo.Diachi />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudTextField T="string"
+							  Label="Email"
+							  @bind-Text=@UserInfo.EmailAddress />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">				
+				<MudSelect Label="Chọn vai trò ..." 
+						   T="int?"
+						   @bind-Value=UserInfo.RoleId
+						   AnchorOrigin="Origin.BottomCenter">
+					@if (RoleList != null)
+					{
+						foreach (var item in RoleList)
+						{
+							<MudSelectItem T="int?" Value="@item.RoleId">@item.RoleDesc</MudSelectItem>
+						}
+					}
+				</MudSelect>
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudSwitch @bind-Checked=@UserInfo.Isactive Label="Kích hoạt"
+						   T="bool?" Color="Color.Primary" />
+			</MudItem>
+		</MudGrid>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="ThemNhanVienClick" Color="Color.Success">ĐỒNG Ý</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	// [Parameter]
+	// public int Id { get; set; }
+	[Parameter]
+	public int Idcompany { get; set; }
+	// [Parameter]
+	// public bool Visible { get; set; }	
+	[Parameter]
+	public bool isNew { get; set; }
+	[Parameter]
+	public User UserInfo { get; set; } = new User();
+	[Parameter]
+	public List<Role>? RoleList { get; set; }
+
+	private ToastParameters _toastParameters;
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	// UserSession userSession { get; set; }
+	// string _tmpDienThoai = "";
+	TblUser khach = new TblUser();
+
+	// string EmailMask { get; set; } = @"(\w|[.-])+@(\w|-)+\.(\w|-){2,4}";
+	// bool isActive { get; set; } = true;
+
+	// void isActive_CheckedChanged(bool? value)
+	// {
+	// 	UserInfo.Isactive = value;
+	// }
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			if (isNew)
+			{
+				UserInfo = new User();
+				UserInfo.UserId = 0;
+				UserInfo.Isactive = true;
+				UserInfo.Fullname = "";
+				UserInfo.RoleId = 16;// mặc định là Cộng tác viên
+			}
+			else
+			{
+
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	// void OnCancel_ThemKH()
+	// {
+	// 	Visible = false;
+	// }
+
+	User GetData()
+	{
+		User us = new User();
+		us.Isactive = UserInfo.Isactive;
+		us.Fullname = UserInfo.Fullname;
+		us.RoleId = UserInfo.RoleId;
+		us.Phone = UserInfo.Phone;
+		us.Diachi = UserInfo.Diachi;
+		us.EmailAddress = UserInfo.EmailAddress;
+		if (!isNew) // update
+		{
+			us.UserId = UserInfo.UserId;
+		}
+		else
+		{
+
+		}
+		return us;
+	}
+
+	async Task ThemNhanVienClick()
+	{
+		try
+		{
+			if (isNew)
+			{
+				User us = this.GetData();
+				us = await userService.InsertTaiKhoanAsync(us, Idcompany);
+				// Visible = false;
+				string mess = $"Tạo nhân viên [{us.Fullname}] thành công";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+
+			}
+			else
+			{
+				User us = this.GetData();
+				us = await userService.UpdateTaiKhoanAsync(us, false);
+				// Visible = false;
+				string mess = $"Lưu nhân viên [{us.Fullname}] thành công";
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			}
+			MudDialog.Close();
+			//MyEditPopup.CloseAsync();
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	async Task ClosePopup()
+	{
+		MudDialog.Cancel();
+	}
+
+
+
+}
+
+

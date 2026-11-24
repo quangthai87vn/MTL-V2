@@ -1,0 +1,97 @@
+@using MTL.APP.Models
+@using MTL.APP.Services
+@inject InvoiceService InvoiceService
+
+@if (_loading)
+{
+	<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="py-2">
+		<MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+		<MudText Typo="Typo.body2" Class="mud-text-secondary">Đang tải chi tiết dòng hàng…</MudText>
+	</MudStack>
+}
+else if (_error != null)
+{
+	<MudText Typo="Typo.body2" Color="Color.Error">@_error</MudText>
+}
+else if (_lines == null || _lines.Count == 0)
+{
+	<MudText Typo="Typo.body2" Class="mud-text-secondary">Không có dòng chi tiết.</MudText>
+}
+else
+{
+	<div class="mud-table-container mtl-invoice-chitiet-scroll">
+		<table class="mud-table-root mtl-simple-table-standard" style="width:100%; min-width:520px;">
+			<thead class="mud-table-head">
+				<tr class="mud-table-row">
+					<th class="mud-table-cell" style="font-weight:700;">TÊN SP/DV</th>
+					<th class="mud-table-cell" style="font-weight:700;">MÃ</th>
+					<th class="mud-table-cell" style="font-weight:700; text-align:right;">SL</th>
+					<th class="mud-table-cell" style="font-weight:700; text-align:right;">ĐƠN GIÁ</th>
+					<th class="mud-table-cell" style="font-weight:700; text-align:right;">THÀNH TIỀN</th>
+					<th class="mud-table-cell" style="font-weight:700;">GHI CHÚ</th>
+				</tr>
+			</thead>
+			<tbody class="mud-table-body">
+				@foreach (var line in _lines)
+				{
+					<tr class="mud-table-row">
+						<td class="mud-table-cell" data-label="TÊN">@(line.tensp ?? "—")</td>
+						<td class="mud-table-cell" data-label="MÃ">@(line.masp ?? "—")</td>
+						<td class="mud-table-cell mtl-cell-total" data-label="SL" style="text-align:right;">@(line.sl?.ToString() ?? "—")</td>
+						<td class="mud-table-cell mtl-cell-total" data-label="ĐƠN GIÁ" style="text-align:right;">@FormatInt(line.dongia)</td>
+						<td class="mud-table-cell mtl-cell-total" data-label="THÀNH TIỀN" style="text-align:right; font-weight:600;">@FormatDouble(line.thanhtien)</td>
+						<td class="mud-table-cell" data-label="GHI CHÚ">@(line.ghichu ?? "—")</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+@code {
+	[Parameter]
+	public string MaHD { get; set; } = "";
+
+	string? _lastLoadedMa;
+	bool _loading;
+	string? _error;
+	List<MTL_GetHoaDonChiTietResult>? _lines;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (string.IsNullOrWhiteSpace(MaHD))
+		{
+			_lines = null;
+			_error = null;
+			_loading = false;
+			return;
+		}
+
+		if (string.Equals(_lastLoadedMa, MaHD, StringComparison.OrdinalIgnoreCase) && _lines != null)
+			return;
+
+		_lastLoadedMa = MaHD;
+		_loading = true;
+		_error = null;
+		_lines = null;
+		StateHasChanged();
+
+		try
+		{
+			_lines = await InvoiceService.GetHoaDonChiTiet_MaHDAsync(MaHD) ?? new List<MTL_GetHoaDonChiTietResult>();
+		}
+		catch (Exception ex)
+		{
+			_error = "Không tải được chi tiết: " + ex.Message;
+			_lines = null;
+		}
+		finally
+		{
+			_loading = false;
+		}
+	}
+
+	static string FormatInt(int? v) => v.HasValue ? string.Format("{0:n0}", v.Value) : "—";
+
+	static string FormatDouble(double? v) => v.HasValue ? string.Format("{0:n0}", v.Value) : "—";
+}

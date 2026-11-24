@@ -1,0 +1,13 @@
+**/bin
+**/obj
+**/node_modules
+**/dist
+.git
+.env
+.idea
+.vs
+.vscode
+data
+backups
+TestResults
+

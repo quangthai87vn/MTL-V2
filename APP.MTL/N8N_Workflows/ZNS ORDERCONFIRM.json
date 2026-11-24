@@ -1,0 +1,2227 @@
+{
+  "name": "ZNS ORDERCONFIRM",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zalo-mytholaptop-zns",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1280,
+        176
+      ],
+      "id": "f3f05efa-a347-4072-8272-40bd9c4e827b",
+      "name": "Webhook",
+      "webhookId": "YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "Zalo-AccessToken",
+              "value": "={{ $json['access_token'] ?? '' }}",
+              "type": "string",
+              "id": "1679fe2f-3b83-4cbc-b705-97a305777d8c"
+            },
+            {
+              "id": "582c7c06-b8e0-4082-852c-6b4484752390",
+              "name": "Zalo-RefreshToken",
+              "value": "={{ $json['refresh_token'] ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "fbb6e581-9e66-4a39-9962-646bb144dbbd",
+              "name": "Zalo-expires_in",
+              "value": "={{ $json.expires_in }}",
+              "type": "string"
+            },
+            {
+              "id": "f2648333-6d2e-48da-8c34-72c630b14b65",
+              "name": "Zalo-fetched_at",
+              "value": "={{ $json.fetched_at }}",
+              "type": "string"
+            },
+            {
+              "name": "ZNS-id",
+              "value": "={{ $json['ZNS-id-00']}}",
+              "type": "string",
+              "id": "0bf69c6f-df86-4a7a-a0f8-d98fecb1e95e"
+            },
+            {
+              "name": "zns-tenkhachhang",
+              "value": "={{ $('Webhook').item.json.query['zns-tenkhachhang'] }}",
+              "type": "string",
+              "id": "e83a9041-5809-4514-9357-179ec763ca47"
+            },
+            {
+              "name": "zns-status",
+              "value": "={{ $('Webhook').item.json.query['zns-status'] }}",
+              "type": "string",
+              "id": "810f4cec-d571-400d-bc32-c80ff8416c36"
+            },
+            {
+              "name": "zns-phone",
+              "value": "={{ $('Webhook').item.json.query['zns-phone'].replace(/\\D/g, '').replace(/^0/, '+84') }}",
+              "type": "string",
+              "id": "310db49d-9738-4603-a78b-29d8721cce80"
+            },
+            {
+              "name": "zns-price",
+              "value": "={{ $('Webhook').item.json.query['zns-price'] }}",
+              "type": "number",
+              "id": "691a7130-219d-40ad-ad1b-332f99af01c5"
+            },
+            {
+              "name": "zns-ngaygiaodich",
+              "value": "={{ $('Webhook').item.json.query['zns-ngaygiaodich'] }}",
+              "type": "string",
+              "id": "af2507b1-8e58-4835-96a0-bcb9f6fed85c"
+            },
+            {
+              "name": "zns-order-code",
+              "value": "={{ $('Webhook').item.json.query['zns-order-code'] }}",
+              "type": "string",
+              "id": "7ab08cb5-cd87-459b-9db1-0d22afa26aa6"
+            },
+            {
+              "id": "c1646311-7960-4a95-a17d-2a88746f1589",
+              "name": "zns-nguoiguitin-mtl",
+              "value": "={{ $('Webhook').item.json.query['zns-nguoiguitin-mtl'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -768,
+        176
+      ],
+      "id": "96a27123-9c7d-441c-bfd0-aea493b59143",
+      "name": "Map Input"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://business.openapi.zalo.me/message/template",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $json['Zalo-AccessToken'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone\": \"{{ $json['zns-phone'] }}\",\n  \"template_id\": \"{{ $json['ZNS-id'] }}\",\n  \"template_data\": {\n    \"order_code\": \"{{ $json['zns-order-code'] }}\",\n    \"phone_number\": \"{{ $json['zns-phone'] }}\",\n    \"price\": {{ $json['zns-price'] }},\n    \"status\": \"{{ $json['zns-status'] }}\",\n    \"date\": \"{{ $json['zns-ngaygiaodich'] }}\",\n    \"name\": \"{{ $json['zns-tenkhachhang'] }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -528,
+        176
+      ],
+      "id": "5a084721-fc7f-475c-96f0-f5d8032752cc",
+      "name": "Send ZNS"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "timestamp_iso",
+              "value": "={{ $now }}",
+              "type": "string",
+              "id": "34e572cd-ad78-4fad-8e50-f926a1ca5413"
+            },
+            {
+              "name": "customer_name",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-tenkhachhang'] }}",
+              "type": "string",
+              "id": "52e5e9fa-ec9e-4722-8d3b-df87c58ba7bd"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-phone'] }}",
+              "type": "string",
+              "id": "55d51ad2-f9ae-4d84-ae5f-87063cacc4e8"
+            },
+            {
+              "name": "order_code",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-order-code'] }}",
+              "type": "string",
+              "id": "a30c8ec0-2281-4881-bf1e-6f60f6190689"
+            },
+            {
+              "name": "price",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-price'] }}",
+              "type": "string",
+              "id": "502d1430-00b5-4a03-a6a2-ddd290bdb1ec"
+            },
+            {
+              "name": "status",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-status'] }}",
+              "type": "string",
+              "id": "74bf7742-8b1a-4cd0-b207-d7e681a97a8e"
+            },
+            {
+              "name": "txn_date",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-ngaygiaodich'] }}",
+              "type": "string",
+              "id": "1008cd75-d4f1-4128-92d8-7b6794c80ef8"
+            },
+            {
+              "name": "template_id",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-id'] }}",
+              "type": "string",
+              "id": "d671f28b-ca1c-4821-9427-170e388f3f23"
+            },
+            {
+              "name": "msg_id",
+              "value": "={{ $json['data']?.['msg_id'] ?? '' }}",
+              "type": "string",
+              "id": "fce2ce77-09f0-4dd8-90e4-b4167cec7076"
+            },
+            {
+              "name": "sending_mode",
+              "value": "={{ $json['data']?.['sending_mode'] ?? '' }}",
+              "type": "string",
+              "id": "a209f53b-7ef3-4bfb-84cd-1074a4c8bf16"
+            },
+            {
+              "name": "sent_time",
+              "value": "={{ $json['data']?.['sent_time'] ?? '' }}",
+              "type": "string",
+              "id": "195c536c-c030-4180-897b-88742a87a281"
+            },
+            {
+              "name": "error_code",
+              "value": "={{ $json['error'] ?? 0 }}",
+              "type": "string",
+              "id": "b7dbc0a7-c16f-44b9-93b7-798ce2ff9928"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json['message'] ?? 'Success' }}",
+              "type": "string",
+              "id": "39dbe7d7-20e9-49c0-bcd9-447e37960421"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        16
+      ],
+      "id": "09b45ffd-d625-441b-a694-f6eb47023ddf",
+      "name": "Build Row (OK)"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "timestamp_iso",
+              "value": "={{ $now }}",
+              "type": "string",
+              "id": "433fc6c8-da19-4cef-9839-40413a2666ff"
+            },
+            {
+              "name": "customer_name",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-tenkhachhang'] }}",
+              "type": "string",
+              "id": "c85e05b2-f78f-48a1-b952-fe3b175a5fc5"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-phone'] }}",
+              "type": "string",
+              "id": "5a13d464-34ba-47f1-857f-3ebb5f69fe99"
+            },
+            {
+              "name": "order_code",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-order-code'] }}",
+              "type": "string",
+              "id": "f2341fa3-7c86-4159-b978-def42a6c5ea5"
+            },
+            {
+              "name": "price",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-price'] }}",
+              "type": "string",
+              "id": "d0a11961-24ae-4591-91d1-ef029842a2fe"
+            },
+            {
+              "name": "status",
+              "value": "={{ $json.message }}",
+              "type": "string",
+              "id": "a6a66d6d-083f-48c5-aebe-f5c38aab4f24"
+            },
+            {
+              "name": "txn_date",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-ngaygiaodich'] }}",
+              "type": "string",
+              "id": "66de1085-71d6-454b-8ed4-f6610ef0f0f1"
+            },
+            {
+              "name": "template_id",
+              "value": "={{ $item(0).$node['Map Input'].json['zns-id'] }}",
+              "type": "string",
+              "id": "9f5da795-914b-47cc-9671-fe46ec58c2b8"
+            },
+            {
+              "name": "msg_id",
+              "value": "={{ $json['data']?.['msg_id'] ?? '' }}",
+              "type": "string",
+              "id": "6b721ce1-6d5d-4541-a3b4-82522af77178"
+            },
+            {
+              "name": "sending_mode",
+              "value": "={{ $json['data']?.['sending_mode'] ?? '' }}",
+              "type": "string",
+              "id": "c295593d-97d2-4f33-a22e-9ec7bac78634"
+            },
+            {
+              "name": "sent_time",
+              "value": "={{ $json['data']?.['sent_time'] ?? '' }}",
+              "type": "string",
+              "id": "7905ce14-a71a-4469-b84a-76af4c772f59"
+            },
+            {
+              "name": "error_code",
+              "value": "={{ $json['error'] ?? -1 }}",
+              "type": "string",
+              "id": "077b50b5-c009-4a92-b647-f13862634de9"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json['message'] ?? 'Failed' }}",
+              "type": "string",
+              "id": "99a55094-9725-4669-9c30-5e866566b13a"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        176
+      ],
+      "id": "0c3a1e72-c13d-46fa-8bb6-595e53c03cb6",
+      "name": "Build Row (Fail)"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4",
+          "mode": "list",
+          "cachedResultName": "zalo-zns"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "ZNS-logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp_iso": "={{ $json.timestamp_iso }}",
+            "phone": "={{ $json.phone }}",
+            "customer_name": "={{ $json.customer_name }}",
+            "order_code": "={{ $json.order_code }}",
+            "price": "={{ $json.price }}",
+            "status": "={{ $json.status }}",
+            "txn_date": "={{ $json.txn_date }}",
+            "template_id": "={{ $json.template_id }}",
+            "msg_id": "={{ $json.msg_id }}",
+            "sending_mode": "={{ $json.sending_mode }}",
+            "error_code": "={{ $json.error_code }}",
+            "sent_time": "={{ $json.sent_time }}",
+            "message": "={{ $json.message }}",
+            "category": "={{ $('Webhook').item.json.query['zns-loaidichvu'] }}",
+            "Note": "={{ $('Webhook').item.json.query['zns-ghichu'] }}",
+            "zns_nguoiguitin": "={{ $('Webhook').item.json.query['zns-nguoiguitin-mtl'] }}",
+            "order_date": "={{$now.format(\"dd/MM/yyyy HH:mm:ss\")}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "order",
+              "displayName": "order",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_date",
+              "displayName": "order_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp_iso",
+              "displayName": "timestamp_iso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "price",
+              "displayName": "price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_code",
+              "displayName": "order_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "zns_nguoiguitin",
+              "displayName": "zns_nguoiguitin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "txn_date",
+              "displayName": "txn_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "template_id",
+              "displayName": "template_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "msg_id",
+              "displayName": "msg_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sending_mode",
+              "displayName": "sending_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sent_time",
+              "displayName": "sent_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_code",
+              "displayName": "error_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        864,
+        -480
+      ],
+      "id": "c3859d85-406f-4572-b7a4-7fc74cd10697",
+      "name": "Append to Sheets (Fail)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        176
+      ],
+      "id": "bea9dccf-8b55-407b-bd3d-75ea4f76b105",
+      "name": "Return to caller"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n\n// Parse chuỗi JSON về object\nconst t = JSON.parse($json.data);\n\nreturn [{\n  json: {\n    refresh_token: t.refresh_token,\n    access_token: t.access_token,\n    // gợi ý thêm để lưu log:\n    expires_in: t.expires_in,                  // giây\n    fetched_at: new Date().toISOString(),      // dấu thời gian ghi\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        336
+      ],
+      "id": "56805c6c-03b2-441a-8be7-a942b76c0bdc",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4",
+          "mode": "list",
+          "cachedResultName": "zalo-zns",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 577440755,
+          "mode": "list",
+          "cachedResultName": "ZNS-configs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4/edit#gid=577440755"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "row_number",
+              "lookupValue": "3"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -1088,
+        176
+      ],
+      "id": "999857fe-71e8-4e01-a798-2a7486df7c7e",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "familyName": "=MTL -  {{ $json.customer_name }}",
+        "givenName": "=",
+        "additionalFields": {
+          "phoneUi": {
+            "phoneValues": [
+              {
+                "type": "home",
+                "value": "={{ $json.phone }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleContacts",
+      "typeVersion": 1,
+      "position": [
+        848,
+        176
+      ],
+      "id": "4fa9aff7-106f-4bbb-a4ee-d21a39446ac4",
+      "name": "Create a contact",
+      "credentials": {
+        "googleContactsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "67a7c378-ba09-4c10-a5d9-159eab5679f3",
+              "name": "refresh_token",
+              "value": "={{ $json.refresh_token }}",
+              "type": "string"
+            },
+            {
+              "id": "623000e7-875d-48b0-ad08-541bf6ec8d1b",
+              "name": "access_token",
+              "value": "={{ $json.access_token }}",
+              "type": "string"
+            },
+            {
+              "id": "f6bf1538-b449-478b-b3ae-bcc0f17d84c9",
+              "name": "expires_in",
+              "value": "={{ $json.expires_in }}",
+              "type": "string"
+            },
+            {
+              "id": "366bef5d-a51d-4490-b7d1-32ac9797d65e",
+              "name": "fetched_at",
+              "value": "={{ $json.fetched_at }}",
+              "type": "string"
+            },
+            {
+              "id": "05b423f9-55e0-4aeb-aa39-8bc937d75956",
+              "name": "ZNS-id-00",
+              "value": "471645",
+              "type": "string"
+            },
+            {
+              "id": "879e17bc-e637-446a-b230-3805fcff662d",
+              "name": "ZNS-LinkAPI",
+              "value": "https://developers.zalo.me/tools/explorer/2099106038566356072",
+              "type": "string"
+            },
+            {
+              "id": "9f1bd541-342e-4f72-8d31-2fe76b815fe8",
+              "name": "zalo_group_id",
+              "value": "31ed2afd6b9a82c4db8b",
+              "type": "string"
+            },
+            {
+              "id": "ec408b61-5027-43c9-8b55-0dc2ea7a4dd2",
+              "name": "zns-loaidichvu",
+              "value": "={{ $('Webhook').item.json.query['zns-loaidichvu'] }}",
+              "type": "string"
+            },
+            {
+              "id": "e6ac9bbb-f638-4e44-96bf-85790a7db92a",
+              "name": "zns-ghichu",
+              "value": "={{ $('Webhook').item.json.query['zns-ghichu'].replace(/\\r?\\n|\\r/g, \" \")}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -928,
+        176
+      ],
+      "id": "93b91061-261e-43ba-a8f7-f46ef07e3591",
+      "name": "Initialize Variable"
+    },
+    {
+      "parameters": {
+        "content": "## MTL TECHNOLOGY - AUTOMATION FLOW SALE\n** SEND ZALO ZNS  ---> UPDATE CONTACT IN CRM - NOTICE ADMINISTRATOR\n",
+        "height": 96,
+        "width": 576
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -560,
+        544
+      ],
+      "typeVersion": 1,
+      "id": "fc56ce13-f30e-41dd-9e50-5b19e62ed19c",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -384,
+        64
+      ],
+      "id": "4023fadf-814a-442d-b00e-abf65d59a505",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4",
+          "mode": "list",
+          "cachedResultName": "zalo-zns",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 577440755,
+          "mode": "list",
+          "cachedResultName": "ZNS-configs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4/edit#gid=577440755"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": 2,
+            "refresh_token": "={{ $json.refresh_token }}",
+            "access_token": "={{ $json.access_token }}",
+            "expires_in": "={{ $json.expires_in }}",
+            "fetched_at": "={{ $json.fetched_at }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "refresh_token",
+              "displayName": "refresh_token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "access_token",
+              "displayName": "access_token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "expires_in",
+              "displayName": "expires_in",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fetched_at",
+              "displayName": "fetched_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        272,
+        336
+      ],
+      "id": "7410c711-7c11-40a9-82d2-d7257ca20add",
+      "name": "Update old Token",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth.zaloapp.com/v4/oa/access_token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            },
+            {
+              "name": "secret_key",
+              "value": "H3WqZYKN3sPM2H2fSsDL"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "refresh_token",
+              "value": "={{ $json.refresh_token }}"
+            },
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            },
+            {
+              "name": "app_id",
+              "value": "2099106038566356072"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        464,
+        336
+      ],
+      "id": "2bee440d-a196-426f-9cc4-2e749b373b36",
+      "name": "Get new token",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4",
+          "mode": "list",
+          "cachedResultName": "zalo-zns",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 577440755,
+          "mode": "list",
+          "cachedResultName": "ZNS-configs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4/edit#gid=577440755"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": 3,
+            "refresh_token": "={{ $json.refresh_token }}",
+            "access_token": "={{ $json.access_token }}",
+            "expires_in": "={{ $json.expires_in }}",
+            "fetched_at": "={{ $json.fetched_at }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "refresh_token",
+              "displayName": "refresh_token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "access_token",
+              "displayName": "access_token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "expires_in",
+              "displayName": "expires_in",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fetched_at",
+              "displayName": "fetched_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        848,
+        336
+      ],
+      "id": "eb6b308c-367c-40ea-8f13-a2921b8df31b",
+      "name": "Update new token",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message }}",
+                    "rightValue": "Success",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7d76e07c-4186-47b2-88fe-bdcf40da406e"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "12afa435-3147-46e8-ac0d-eb108bd71308",
+                    "leftValue": "={{ $json.message }}",
+                    "rightValue": "ZCA charge failure",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "da9be5da-b2a6-4753-9fcb-1e609114169e",
+                    "leftValue": "={{ $json.message }}",
+                    "rightValue": "Zalo account not existed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "87949a72-2293-4e3e-b2e2-977140081ece",
+                    "leftValue": "={{ $json.message }}",
+                    "rightValue": "ZBS Account charge failure",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        16,
+        32
+      ],
+      "id": "2c88cec8-d3ca-4c40-89e5-a1ba880ff3f9",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openapi.zalo.me/v3.0/oa/group/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $('Map Input').item.json['Zalo-AccessToken'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": {\n    \"group_id\": \"{{ $('Map Input').item.json.zalo_group_id }}\"\n  },\n  \"message\": {\n    \"text\": \"TRẠNG THÁI GỬI ZNS LÚC  {{$now.format(\"dd/MM/yyyy HH:mm:ss\")}}\\n👉Mã phản hồi máy chủ: {{ $json.message }}\\n👉Người gửi tin: {{ $('Webhook').item.json.query['zns-nguoiguitin-mtl'] }} \\n👉Khách hàng: {{ $('Map Input').item.json['zns-tenkhachhang'] }} \\n🧾Mã hóa đơn: {{ $('Webhook').item.json.query['zns-order-code'] }} \\n📅Ngày lập phiếu: {{ $('Webhook').item.json.query['zns-ngaygiaodich'] }}  \\n📞Số điện thoại: {{ $('Map Input').item.json['zns-phone'] }} \\n💵 Giá trị hóa đơn: {{ $('Map Input').item.json['zns-price'].toLocaleString(\"vi-VN\") + \" VNĐ\" }} \\n👉Loại dịch vụ: {{ $('Webhook').item.json.query['zns-loaidichvu'] }} \\n📝Ghi chú hóa đơn: {{ $('Webhook').item.json.query['zns-ghichu'].replace(/\\r?\\n|\\r/g, \" \")  }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1072,
+        176
+      ],
+      "id": "2fe3cace-4df2-4ead-9723-c11a604f105e",
+      "name": "Send Zalo Group"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "98d91823-c1c6-47bd-9548-6be2e50e0b71",
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "=Access token invalid",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        64
+      ],
+      "id": "e6f4bbb8-42ba-4f89-8784-e104ab47d518",
+      "name": "Check Token Expired"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4",
+          "mode": "list",
+          "cachedResultName": "zalo-zns"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "ZNS-logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_name": "={{ $('Build Row (OK)').item.json.customer_name }}",
+            "phone": "={{ $('Build Row (OK)').item.json.phone }}",
+            "price": "={{ $('Build Row (OK)').item.json.price }}",
+            "order_code": "={{ $('Build Row (OK)').item.json.order_code }}",
+            "status": "={{ $('Build Row (OK)').item.json.status }}",
+            "template_id": "={{ $json['ZNS-id'] ?? '' }}",
+            "sending_mode": "={{ $('Build Row (OK)').item.json.sending_mode }}",
+            "error_code": "={{ $('Build Row (OK)').item.json.error_code }}",
+            "message": "={{ $('Build Row (OK)').item.json.message }}",
+            "sent_time": "={{ $('Build Row (OK)').item.json.sent_time }}",
+            "msg_id": "={{ $('Build Row (OK)').item.json.msg_id }}",
+            "txn_date": "={{ $('Build Row (OK)').item.json.txn_date }}",
+            "timestamp_iso": "={{ $('Build Row (OK)').item.json.timestamp_iso }}",
+            "category": "={{ $('Webhook').item.json.query['zns-loaidichvu'] }}",
+            "Note": "={{ $('Webhook').item.json.query['zns-ghichu'] }}",
+            "zns_nguoiguitin": "={{ $('Webhook').item.json.query['zns-nguoiguitin-mtl'] }}",
+            "order_date": "={{$now.format(\"dd/MM/yyyy HH:mm:ss\")}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "order",
+              "displayName": "order",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_date",
+              "displayName": "order_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp_iso",
+              "displayName": "timestamp_iso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "price",
+              "displayName": "price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_code",
+              "displayName": "order_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "zns_nguoiguitin",
+              "displayName": "zns_nguoiguitin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "txn_date",
+              "displayName": "txn_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "template_id",
+              "displayName": "template_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "msg_id",
+              "displayName": "msg_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sending_mode",
+              "displayName": "sending_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sent_time",
+              "displayName": "sent_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_code",
+              "displayName": "error_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        32,
+        -480
+      ],
+      "id": "7fe1c429-955c-40f1-92ba-2a60a356da6c",
+      "name": "Append to Sheets (OK)1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4",
+          "mode": "list",
+          "cachedResultName": "zalo-zns"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "ZNS-logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp_iso": "={{ $json.timestamp_iso }}",
+            "phone": "={{ $json.phone }}",
+            "customer_name": "={{ $json.customer_name }}",
+            "order_code": "={{ $json.order_code }}",
+            "price": "={{ $json.price }}",
+            "status": "={{ $json.status }}",
+            "txn_date": "={{ $json.txn_date }}",
+            "template_id": "={{ $json.template_id }}",
+            "msg_id": "={{ $json.msg_id }}",
+            "sending_mode": "={{ $json.sending_mode }}",
+            "error_code": "={{ $json.error_code }}",
+            "sent_time": "={{ $json.sent_time }}",
+            "message": "={{ $json.message }}",
+            "category": "={{ $('Webhook').item.json.query['zns-loaidichvu'] }}",
+            "Note": "={{ $('Webhook').item.json.query['zns-ghichu'] }}",
+            "zns_nguoiguitin": "={{ $('Webhook').item.json.query['zns-nguoiguitin-mtl'] }}",
+            "order_date": "={{$now.format(\"dd/MM/yyyy HH:mm:ss\")}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "order",
+              "displayName": "order",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_date",
+              "displayName": "order_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp_iso",
+              "displayName": "timestamp_iso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "price",
+              "displayName": "price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_code",
+              "displayName": "order_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "zns_nguoiguitin",
+              "displayName": "zns_nguoiguitin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "txn_date",
+              "displayName": "txn_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "template_id",
+              "displayName": "template_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "msg_id",
+              "displayName": "msg_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sending_mode",
+              "displayName": "sending_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sent_time",
+              "displayName": "sent_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_code",
+              "displayName": "error_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        256,
+        -464
+      ],
+      "id": "1ad773dc-823f-4fe9-ba66-1f9d3958cea8",
+      "name": "Append to Sheets (Fail)1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "67a7c378-ba09-4c10-a5d9-159eab5679f3",
+              "name": "message",
+              "value": "={{ $('Build Row (OK)').item.json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "af41cdce-700e-4359-b5b0-8445c84fec93",
+              "name": "sent_time",
+              "value": "={{ $('Build Row (OK)').item.json.sent_time }}",
+              "type": "string"
+            },
+            {
+              "id": "d5d42a8c-8a37-4f3c-9a42-0d64ea66f74d",
+              "name": "sending_mode",
+              "value": "={{ $('Build Row (OK)').item.json.sending_mode }}",
+              "type": "string"
+            },
+            {
+              "id": "3ba22b28-d4fa-4aaa-b693-aa28a9304ea7",
+              "name": "txn_date",
+              "value": "={{ $('Build Row (OK)').item.json.txn_date }}",
+              "type": "string"
+            },
+            {
+              "id": "2b414f93-75a0-419a-bfeb-225182f81579",
+              "name": "timestamp_iso",
+              "value": "={{ $('Build Row (OK)').item.json.timestamp_iso }}",
+              "type": "string"
+            },
+            {
+              "id": "e4948cf9-957b-44ea-a312-443f72da5356",
+              "name": "error_code",
+              "value": "={{ $('Build Row (OK)').item.json.error_code }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        16
+      ],
+      "id": "a4a70876-885e-4e95-b339-f0ec4af9c6e5",
+      "name": "set var ok"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "19xo_UX2G8MgunEL-sSU-TKd_oOFj1dexb5scLy3MrE4",
+          "mode": "list",
+          "cachedResultName": "zalo-zns"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "ZNS-logs"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_name": "={{ $('Map Input').item.json['zns-tenkhachhang'] }}",
+            "phone": "={{ $('Map Input').item.json['zns-phone'] }}",
+            "price": "={{ $('Map Input').item.json['zns-price'] }}",
+            "order_code": "={{ $('Map Input').item.json['zns-order-code'] }}",
+            "status": "={{ $('Build Row (OK)').item.json.status }}",
+            "template_id": "={{ $('Initialize Variable').item.json['ZNS-id-00'] ?? ''}}",
+            "sending_mode": "={{ $json.sending_mode }}",
+            "error_code": "={{ $json.error_code }}",
+            "message": "={{ $json.message }}",
+            "sent_time": "={{ $json.sent_time }}",
+            "msg_id": "={{ $('Build Row (OK)').item.json.msg_id }}",
+            "txn_date": "={{ $json.txn_date}}",
+            "timestamp_iso": "={{ $json.timestamp_iso}}",
+            "category": "={{ $('Webhook').item.json.query['zns-loaidichvu'] }}",
+            "Note": "={{ $('Webhook').item.json.query['zns-ghichu'] }}",
+            "zns_nguoiguitin": "={{ $('Map Input').item.json['zns-nguoiguitin-mtl'] }}",
+            "order_date": "={{$now.format(\"dd/MM/yyyy HH:mm:ss\")}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "order",
+              "displayName": "order",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_date",
+              "displayName": "order_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timestamp_iso",
+              "displayName": "timestamp_iso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "price",
+              "displayName": "price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "order_code",
+              "displayName": "order_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "zns_nguoiguitin",
+              "displayName": "zns_nguoiguitin",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "txn_date",
+              "displayName": "txn_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "template_id",
+              "displayName": "template_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "msg_id",
+              "displayName": "msg_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sending_mode",
+              "displayName": "sending_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sent_time",
+              "displayName": "sent_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error_code",
+              "displayName": "error_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        672,
+        176
+      ],
+      "id": "f7625d3b-743d-4760-bf78-da602c038507",
+      "name": "Append to Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR_CREDENTIAL_NAME"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Input": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send ZNS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send ZNS": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Build Row (OK)": {
+      "main": [
+        [
+          {
+            "node": "set var ok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Row (Fail)": {
+      "main": [
+        [
+          {
+            "node": "Append to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Sheets (Fail)": {
+      "main": [
+        []
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Update new token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Initialize Variable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Variable": {
+      "main": [
+        [
+          {
+            "node": "Map Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a contact": {
+      "main": [
+        [
+          {
+            "node": "Send Zalo Group",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Check Token Expired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update old Token": {
+      "main": [
+        [
+          {
+            "node": "Get new token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get new token": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update new token": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Build Row (OK)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Row (Fail)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Row (Fail)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send Zalo Group": {
+      "main": [
+        [
+          {
+            "node": "Return to caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Token Expired": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update old Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set var ok": {
+      "main": [
+        [
+          {
+            "node": "Append to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Create a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2854b806-29fe-4ffa-b9cb-32c3c3b4ae2d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c4ab0e4644dcb78d149d4da8a6d2d3f2f80109e42206d175a4f79e023b9174e0"
+  },
+  "id": "OR9onTxX9ACKYNBj",
+  "tags": []
+}

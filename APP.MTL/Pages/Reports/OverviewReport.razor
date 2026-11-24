@@ -1,0 +1,2004 @@
+@page "/OverviewReport"
+@using MTL.APP.Models;
+@using Blazored.LocalStorage
+@using System.Security.Claims
+@using System.Globalization
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MTL.APP.Shared
+@inject ReportService reportService
+@inject ThuHangHoaService thuHangHoaService
+@inject IAuthorizationService authorizationService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JSRuntime
+@inject ProtectedLocalStorage BrowserStorage
+@inject Configs configs
+@inject AppThemeService AppTheme
+@attribute [Authorize]
+@implements IDisposable
+
+<style>
+    .stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: default; }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+    .spark-bar { height: 6px; border-radius: 3px; background: #e0e0e0; overflow: hidden; }
+    .spark-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .metric-value { font-size: 1.6rem; font-weight: 800; line-height: 1.2; }
+    .metric-delta { font-size: 0.75rem; font-weight: 600; }
+    .metric-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mud-palette-text-secondary); }
+
+    /* KPI 4 cột: cùng chiều cao hàng, footer (spark / %) căn đáy */
+    .mtl-kpi-grid .mud-grid-item {
+        display: flex;
+    }
+    .mtl-kpi-grid .mtl-kpi-card {
+        flex: 1;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    .mtl-kpi-grid .mtl-kpi-card .mud-card-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    .mtl-kpi-card-spacer {
+        flex: 1 1 auto;
+        min-height: 6px;
+    }
+    .mtl-kpi-grid-row1 .mtl-kpi-card-footer {
+        flex: 0 0 auto;
+        min-height: 3.35rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 6px;
+    }
+    .mtl-kpi-grid-row2 .mtl-kpi-card-footer {
+        flex: 0 0 auto;
+        min-height: 1.35rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 4px;
+    }
+    .table-barchart { height: 22px; border-radius: 4px; }
+    .section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--mud-palette-text-secondary); }
+
+    /* ── Month selector: card nhỏ, grid 12 cột desktop, cuộn ngang mobile ── */
+    .month-strip-wrap {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 6px 2px 10px;
+        margin-bottom: 0;
+        scrollbar-width: thin;
+    }
+    .month-strip {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+    }
+    .month-btn {
+        position: relative;
+        flex: none;
+        min-width: 0;
+        border-radius: 14px;
+        padding: 8px 4px 7px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.38);
+        cursor: pointer;
+        transition: background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, transform 0.18s ease;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    /* 12 tháng với 12 màu solid khác nhau */
+    .month-btn[data-month="1"] { background: #5c6bc0; } /* Tím xanh */
+    .month-btn[data-month="2"] { background: #ec407a; } /* Hồng đậm */
+    .month-btn[data-month="3"] { background: #ff7043; } /* Cam đỏ */
+    .month-btn[data-month="4"] { background: #26a69a; } /* Xanh ngọc */
+    .month-btn[data-month="5"] { background: #66bb6a; } /* Xanh lá nhạt */
+    .month-btn[data-month="6"] { background: #ab47bc; } /* Tím lavender */
+    .month-btn[data-month="7"] { background: #42a5f5; } /* Xanh dương */
+    .month-btn[data-month="8"] { background: #ffa726; } /* Cam */
+    .month-btn[data-month="9"] { background: #7e57c2; } /* Tím đậm */
+    .month-btn[data-month="10"] { background: #ef5350; } /* Đỏ */
+    .month-btn[data-month="11"] { background: #29b6f6; } /* Xanh biển */
+    .month-btn[data-month="12"] { background: #9ccc65; } /* Xanh lá */
+
+/* Hover: nhấn sáng hơn */
+.month-btn:hover:not(.month-btn--selected):not(.month-btn--disabled) {
+    filter: brightness(1.15);
+    border-color: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+    .month-btn:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+    }
+    .month-btn:hover:not(.month-btn--selected):not(.month-btn--disabled) {
+        border-color: rgba(255, 255, 255, 0.7);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+        transform: translateY(-2px);
+    }
+    .month-btn--selected {
+        background: var(--mtl-month-sel-bg-top, #ffffff) !important;
+        border-color: rgba(255, 255, 255, 0.95) !important;
+        color: var(--mtl-month-sel-fg, #1b5e20) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        transform: translateY(-2px);
+    }
+    .month-btn--selected .month-label { color: #263238 !important; font-weight: 800; }
+    .month-btn--selected .month-revenue { color: #37474f !important; }
+    .month-btn--disabled { pointer-events: none; opacity: 0.5; }
+    .month-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        line-height: 1.15;
+        color: rgba(255, 255, 255, 0.95);
+        transition: color 0.2s;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .month-revenue {
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: rgba(255, 255, 255, 0.98);
+        margin-top: 6px;
+        line-height: 1.2;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .month-bar { height: 4px; border-radius: 3px; background: rgba(255, 255, 255, 0.3); margin-top: 6px; overflow: hidden; }
+    .month-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.85) 100%); transition: width 0.5s ease; }
+    .month-btn--selected .month-bar { background: var(--mtl-month-sel-bar-track, rgba(27, 94, 32, 0.12)); }
+    .month-btn--selected .month-bar-fill { background: linear-gradient(90deg, var(--mtl-month-sel-bar-a, #43a047), var(--mtl-month-sel-bar-b, #2e7d32)); }
+
+    .overview-bottom-grid .mtl-pie-card {
+        min-height: 420px;
+    }
+
+    .mtl-nguon-tien-bar-card {
+        min-height: 400px;
+    }
+    .mtl-nguon-tien-bar-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+    /* Biểu đồ SVG tùy chỉnh: cột rect dày, mỗi cột một màu */
+    .mtl-nguon-tien-custom .mtl-nguon-tien-svg {
+        width: 100%;
+        height: 360px;
+        display: block;
+    }
+    .mtl-nguon-tien-svg__grid {
+        stroke: var(--mud-palette-lines-default);
+        stroke-width: 1;
+        opacity: 0.85;
+    }
+    .mtl-nguon-tien-svg__bar {
+        rx: 10;
+        ry: 10;
+        cursor: pointer;
+        transition: opacity 0.15s ease, filter 0.15s ease;
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.18));
+    }
+    .mtl-nguon-tien-svg__bar:hover {
+        filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.24));
+    }
+    .mtl-nguon-tien-svg__bar--dim {
+        opacity: 0.35;
+    }
+    .mtl-nguon-tien-svg__bar--selected {
+        stroke: var(--mud-palette-text-primary);
+        stroke-width: 2;
+    }
+    .mtl-nguon-tien-svg__axis {
+        fill: var(--mud-palette-text-secondary);
+        font-size: 11px;
+    }
+    .mtl-nguon-tien-svg__axis-title {
+        fill: var(--mud-palette-text-primary);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    /* Bố cục: 2 cột (nguồn tiền + 2 pie trên, ngày + quý dưới) */
+    .mtl-overview-bottom-split {
+        align-items: stretch;
+    }
+    .mtl-daily-fill {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    /* Nội dung giữa (ChildContent) co giãn, bảng cuộn trong khung cao */
+    .mtl-daily-fill > :nth-child(2) {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+    }
+    .mtl-nguon-theo-ngay-table .mtl-nguon-stack-bar {
+        display: block;
+        width: 100% !important;
+        height: 24px;
+        border-radius: 4px;
+        overflow: hidden !important;
+        background: rgba(0, 0, 0, 0.06);
+    }
+    .mtl-nguon-theo-ngay-table .mtl-nguon-stack-bar__seg {
+        display: block;
+        height: 24px;
+        float: left;
+        cursor: help;
+        transition: opacity 0.15s ease;
+    }
+    .mtl-nguon-theo-ngay-table .mtl-nguon-stack-bar__seg:hover {
+        opacity: 0.85;
+    }
+    /* TM / NGÂN HÀNG: hiển thị đủ tên TK, không rút gọn / ellipsis */
+    .mtl-nguon-theo-ngay-table .mtl-nguon-tm-nh-chip.mud-chip {
+        max-width: none !important;
+        width: auto !important;
+        height: auto !important;
+        min-height: 0;
+    }
+    .mtl-nguon-theo-ngay-table .mtl-nguon-tm-nh-chip .mud-chip-content {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        flex-wrap: wrap !important;
+        align-items: center;
+        row-gap: 2px;
+        column-gap: 6px;
+    }
+    .mtl-overview-pies-row .mtl-pie-card {
+        min-height: 380px;
+    }
+
+    /* Block cuối: nguồn tiền theo ngày | nguồn tiền theo quý */
+    .mtl-nguon-bottom-split {
+        align-items: stretch;
+    }
+    .mtl-nguon-theo-quy-card .mtl-nguon-quy-svg {
+        width: 100%;
+        height: 300px;
+        display: block;
+    }
+    .mtl-nguon-quy-svg__grid {
+        stroke: var(--mud-palette-lines-default);
+        stroke-width: 1;
+        opacity: 0.85;
+    }
+    .mtl-nguon-quy-svg__seg {
+        rx: 6;
+        ry: 6;
+        cursor: help;
+        transition: opacity 0.15s ease, filter 0.15s ease;
+        stroke: var(--mud-palette-surface);
+        stroke-width: 1;
+    }
+    .mtl-nguon-quy-svg__seg:hover {
+        filter: brightness(1.06);
+        opacity: 0.98;
+    }
+    .mtl-nguon-quy-legend {
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .mtl-nguon-quy-quarter-chips .mtl-nguon-tm-nh-chip.mud-chip {
+        max-width: none !important;
+        width: auto !important;
+        height: auto !important;
+        min-height: 0;
+    }
+    .mtl-nguon-quy-quarter-chips .mtl-nguon-tm-nh-chip .mud-chip-content {
+        white-space: normal !important;
+        overflow: visible !important;
+        flex-wrap: wrap !important;
+        row-gap: 2px;
+        column-gap: 4px;
+    }
+
+    /* ── Top sản phẩm bán chạy ── */
+    .mtl-top-prod-chart-svg {
+        width: 100%;
+        height: 280px;
+        display: block;
+    }
+    .mtl-top-prod-chart-svg__grid {
+        stroke: var(--mud-palette-lines-default);
+        stroke-width: 1;
+        opacity: 0.85;
+    }
+    .mtl-top-prod-chart-svg__bar {
+        rx: 8;
+        ry: 8;
+        cursor: help;
+        transition: opacity 0.15s ease, filter 0.15s ease;
+        filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.14));
+    }
+    .mtl-top-prod-chart-svg__bar:hover {
+        filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.2));
+        opacity: 0.9;
+    }
+    .mtl-top-prod-chart-svg__axis {
+        fill: var(--mud-palette-text-secondary);
+        font-size: 10px;
+    }
+    .mtl-top-prod-chart-svg__axis-title {
+        fill: var(--mud-palette-text-primary);
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .mtl-top-prod-chart-svg__axis-label {
+        fill: var(--mud-palette-text-secondary);
+        font-size: 10px;
+    }
+    .mtl-top-prod-chart-svg svg {
+        max-width: none !important;
+        width: auto !important;
+        height: auto !important;
+        min-height: 0;
+    }
+    .mtl-nguon-quy-quarter-chips .mtl-nguon-tm-nh-chip .mud-chip-content {
+        white-space: normal !important;
+        overflow: visible !important;
+        flex-wrap: wrap !important;
+        row-gap: 2px;
+        column-gap: 4px;
+    }
+    .mtl-nguon-quy-svg__axis {
+        fill: var(--mud-palette-text-secondary);
+        font-size: 11px;
+    }
+    .mtl-nguon-quy-svg__axis-title {
+        fill: var(--mud-palette-text-primary);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .mtl-monthly-pie-wrap .mud-chart-pie path {
+        cursor: pointer;
+        transition: opacity 0.15s ease, filter 0.15s ease;
+    }
+    .mtl-monthly-pie-wrap .mud-chart-pie path:hover {
+        opacity: 0.92;
+        filter: brightness(1.08);
+    }
+
+    /* Custom Pie Chart */
+    .mtl-custom-pie-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .mtl-pie-seg {
+        cursor: pointer;
+        transition: opacity 0.15s ease, filter 0.15s ease, transform 0.15s ease;
+        transform-origin: center;
+    }
+    .mtl-pie-seg:hover {
+        opacity: 0.85;
+        filter: brightness(1.1);
+    }
+    .mtl-pie-legend .mud-stack-item:hover,
+    .pie-legend-hover {
+        background: rgba(0, 0, 0, 0.06);
+        border-radius: 4px;
+    }
+    .pie-legend-item {
+        cursor: pointer;
+    }
+
+    /* ── Side-by-side Pie Chart Layout ── */
+    .mtl-side-pie-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+    .mtl-donut-chart-container {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .mtl-donut-svg {
+        overflow: visible;
+        filter: drop-shadow(0 4px 10px rgba(0,0,0,0.12));
+    }
+    .mtl-donut-slice {
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        transform-origin: center;
+    }
+    .mtl-donut-slice:hover {
+        filter: brightness(1.12);
+    }
+    .mtl-donut-slice--exploded {
+        transform: translate(var(--explode-x, 0px), var(--explode-y, 0px));
+        filter: brightness(1.15) drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+    }
+    .mtl-donut-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        pointer-events: none;
+        min-width: 80px;
+    }
+    .mtl-donut-center-label {
+        font-size: 0.6rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--mud-palette-text-secondary);
+    }
+    .mtl-donut-center-value {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: var(--mud-palette-text-primary);
+        white-space: nowrap;
+    }
+    .mtl-donut-center-month {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--mud-palette-primary);
+    }
+
+    /* Month chips row below pie */
+    .mtl-pie-months-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+        max-width: 100%;
+    }
+    .mtl-pie-month-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 36px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 2px 4px;
+        border: 2px solid transparent;
+    }
+    .mtl-pie-month-btn:hover {
+        transform: scale(1.1);
+        filter: brightness(1.15);
+    }
+    .mtl-pie-month-btn--active {
+        transform: scale(1.15);
+        border-color: #fff !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        z-index: 1;
+    }
+    .mtl-pie-month-num {
+        font-size: 0.7rem;
+        font-weight: 800;
+        color: #fff;
+        line-height: 1;
+    }
+    .mtl-pie-month-pct {
+        font-size: 0.55rem;
+        font-weight: 600;
+        color: rgba(255,255,255,0.9);
+        line-height: 1;
+        margin-top: 1px;
+    }
+
+    /* Month strip below donut */
+    .mtl-donut-months-strip {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 12px;
+        max-width: 320px;
+    }
+    .mtl-donut-month-chip {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        opacity: 0.75;
+        border: 1px solid transparent;
+    }
+    .mtl-donut-month-chip:hover,
+    .mtl-donut-month-chip--active {
+        opacity: 1;
+        transform: scale(1.05);
+        border-color: currentColor;
+    }
+    .mtl-donut-month-chip--active {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .mtl-donut-month-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .mtl-donut-month-value {
+        font-size: 0.6rem;
+        opacity: 0.85;
+    }
+
+    @@media (max-width: 960px) {
+        .month-strip {
+            display: flex;
+            flex-wrap: nowrap;
+            width: max-content;
+            min-width: 100%;
+            gap: 8px;
+        }
+        .month-btn { flex: 0 0 auto; min-width: 76px; padding: 8px 6px 7px; }
+        .month-label { font-size: 0.62rem; }
+        .month-revenue { font-size: 0.62rem; margin-top: 5px; }
+    }
+    @@media (max-width: 600px) {
+        .month-btn { min-width: 68px; padding: 7px 4px 6px; }
+        .month-label { font-size: 0.58rem; }
+        .month-revenue { font-size: 0.56rem; margin-top: 4px; }
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-3">
+
+    @* ── Header chuẩn (dùng lại trên các trang khác qua PageStandardHeader) ── *@
+    <PageStandardHeader Icon="@Icons.Material.Filled.BarChart" Title="BÁO CÁO TỔNG QUAN">
+        <Actions>
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+                <MudSelect Label="Năm" T="int" Value="YearSelect"
+                           Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                           AnchorOrigin="Origin.BottomCenter"
+                           ValueChanged="OnYearChanged">
+                    @for (int y = DateTime.Now.Year; y >= 2023; y--)
+                    {
+                        int yearItem = y;
+                        <MudSelectItem T="int" Value="@yearItem">@yearItem</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+        </Actions>
+        <ChildContent>
+            @* ── Tháng selector: một hàng (cuộn ngang trên màn hẹp) ── *@
+            <div class="month-strip-wrap">
+                <div class="month-strip">
+                @for (int m = 1; m <= 12; m++)
+                {
+                    int month = m;
+                    bool selected = MonthSelect == month;
+                    double? rev = MonthRevenues.GetValueOrDefault(month, 0);
+                    var revN = rev ?? 0;
+                    double maxRev = MonthRevenues.Values.Where(v => v.HasValue).Select(v => v!.Value).DefaultIfEmpty(0).Max();
+                    int barW = maxRev > 0 && revN > 0 ? (int)(100.0 * revN / maxRev) : 0;
+                    <div class="month-btn @(selected ? "month-btn--selected" : "") @(IsLoading ? "month-btn--disabled" : "")"
+                         @onclick="@(() => SelectMonth(month))"
+                         data-month="@month"
+                         title="Tháng @month — @FormatVND(revN)">
+                        <div class="month-label">@MonthLabels[m - 1]</div>
+                        <div class="month-revenue">@FormatShortVND(revN)</div>
+                        <div class="month-bar"><div class="month-bar-fill" style="width:@barW%"></div></div>
+                    </div>
+                }
+                </div>
+            </div>
+        </ChildContent>
+    </PageStandardHeader>
+
+    @* ── Loading ── *@
+    @if (IsLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-3" Rounded="true" />
+    }
+
+    @* ── KPI Summary Cards ── *@
+    @if (!IsLoading && data_doanhthucoban != null && data_doanhthucoban.Any())
+    {
+        var item = data_doanhthucoban.First();
+
+
+
+
+        @* Row 1: 4 main KPIs (cùng chiều cao — footer spark/% căn đáy) *@
+        <MudGrid Spacing="2" Class="mb-2 mtl-kpi-grid mtl-kpi-grid-row1">
+            <MudItem xs="6" sm="3">
+                <MudCard Class="stat-card mtl-kpi-card" Outlined="true" Style="border-left:5px solid var(--mud-palette-primary); border-radius:8px">
+                    <MudCardContent Class="pa-3">
+                        <div class="metric-label">HÔM NAY</div>
+                        <div class="metric-value" style="color:var(--mud-palette-primary)">@FormatVND(item.homnay)</div>
+                        <div class="mtl-kpi-card-spacer"></div>
+                        <div class="mtl-kpi-card-footer">
+                            <div class="spark-bar">
+                                <div class="spark-bar-fill" style="width:@SparkPct(item.homnay, MaxDayRevenue)%; background:var(--mud-palette-primary)"></div>
+                            </div>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudCard Class="stat-card mtl-kpi-card" Outlined="true" Style="border-left:5px solid #00897b; border-radius:8px">
+                    <MudCardContent Class="pa-3">
+                        <div class="metric-label">TUẦN NÀY</div>
+                        <div class="metric-value" style="color:#00897b">@FormatVND(item.tuannay)</div>
+                        <div class="mtl-kpi-card-spacer"></div>
+                        <div class="mtl-kpi-card-footer">
+                            @{
+                                var wkDelta = item.tuannay - item.tuantruoc;
+                                var wkPct = item.tuantruoc > 0 ? (wkDelta / item.tuantruoc * 100) : 0;
+                            }
+                            <div class="metric-delta" style="color:@(wkDelta >= 0 ? "#2e7d32" : "#c62828")">
+                                @(wkDelta >= 0 ? "▲" : "▼") @Math.Abs(wkPct ?? 0).ToString("0.0")% so với tuần trước
+                            </div>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudCard Class="stat-card mtl-kpi-card" Outlined="true" Style="border-left:5px solid #7b1fa2; border-radius:8px">
+                    <MudCardContent Class="pa-3">
+                        <div class="metric-label">THÁNG NÀY</div>
+                        <div class="metric-value" style="color:#7b1fa2">@FormatVND(item.thangnay)</div>
+                        <div class="mtl-kpi-card-spacer"></div>
+                        <div class="mtl-kpi-card-footer">
+                            @{
+                                var mtDelta = item.thangnay - item.thangtruoc;
+                                var mtPct = item.thangtruoc > 0 ? (mtDelta / item.thangtruoc * 100) : 0;
+                            }
+                            <div class="metric-delta" style="color:@(mtDelta >= 0 ? "#2e7d32" : "#c62828")">
+                                @(mtDelta >= 0 ? "▲" : "▼") @Math.Abs(mtPct ?? 0).ToString("0.0")% so với tháng trước
+                            </div>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudCard Class="stat-card mtl-kpi-card" Outlined="true" Style="border-left:5px solid #e65100; border-radius:8px">
+                    <MudCardContent Class="pa-3">
+                        <div class="metric-label">TỔNG THÁNG @MonthSelect.ToString("D2")</div>
+                        <div class="metric-value" style="color:#e65100">@FormatVND(DoanhThuThang)</div>
+                        <div class="mtl-kpi-card-spacer"></div>
+                        <div class="mtl-kpi-card-footer">
+                            @{
+                                var barW = DoanhThuThang > 0 && (item.thangtruoc ?? 0) > 0
+                                    ? (int)(100.0 * DoanhThuThang / (item.thangtruoc ?? 1)) : 0;
+                            }
+                            <div class="spark-bar">
+                                <div class="spark-bar-fill" style="width:@(Math.Min(barW,100))%; background:#e65100"></div>
+                            </div>
+                            <div class="metric-delta" style="color:var(--mud-palette-text-secondary)">vs T=@FormatVND(item.thangtruoc)</div>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+       
+        @* Row 2: Comparison metrics (cùng chiều cao) *@
+        <MudGrid Spacing="2" Class="mb-3 mtl-kpi-grid mtl-kpi-grid-row2">
+            <MudItem xs="6" sm="3">
+                <MudCard Class="mtl-kpi-card" Outlined="true" Style="border-left:5px solid #455a64; border-radius:8px">
+                    <MudCardContent Class="pa-3">
+                        <div class="metric-label">HÔM QUA</div>
+                        <div class="metric-value" style="color:#455a64">@FormatVND(item.homqua)</div>
+                        <div class="mtl-kpi-card-spacer"></div>
+                        <div class="mtl-kpi-card-footer"></div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudCard Class="mtl-kpi-card" Outlined="true" Style="border-left:5px solid #78909c; border-radius:8px">
+                    <MudCardContent Class="pa-3">
+                        <div class="metric-label">TUẦN TRƯỚC</div>
+                        <div class="metric-value" style="color:#78909c">@FormatVND(item.tuantruoc)</div>
+                        <div class="mtl-kpi-card-spacer"></div>
+                        <div class="mtl-kpi-card-footer"></div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudCard Class="mtl-kpi-card" Outlined="true" Style="border-left:5px solid #90a4ae; border-radius:8px">
+                    <MudCardContent Class="pa-3">
+                        <div class="metric-label">THÁNG TRƯỚC</div>
+                        <div class="metric-value" style="color:#90a4ae">@FormatVND(item.thangtruoc)</div>
+                        <div class="mtl-kpi-card-spacer"></div>
+                        <div class="mtl-kpi-card-footer"></div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <MudCard Class="mtl-kpi-card" Outlined="true" Style="border-left:5px solid #f44336; border-radius:8px">
+                    <MudCardContent Class="pa-3">
+                        <div class="metric-label">CHÊNH LỆCH THÁNG</div>
+                        @{
+                            var diff = item.thangnay - item.thangtruoc;
+                            var pct = item.thangtruoc > 0 ? (diff / item.thangtruoc * 100) : 0;
+                        }
+                        <div class="metric-value" style="color:@(diff >= 0 ? "#2e7d32" : "#c62828")">
+                            @(diff >= 0 ? "+" : "")@FormatVND(diff)
+                        </div>
+                        <div class="mtl-kpi-card-spacer"></div>
+                        <div class="mtl-kpi-card-footer">
+                            <div class="metric-delta" style="color:@(diff >= 0 ? "#2e7d32" : "#c62828")">
+                                @(diff >= 0 ? "▲" : "▼") @Math.Abs(pct ?? 0).ToString("0.0")%
+                            </div>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+
+
+    @* Revenue Pie Chart Section - above NGUỒN TIỀN *@
+    @if (!IsLoading && RevenuePieDtSegments.Count > 0)
+    {
+        <MudGrid Spacing="3" Class="mt-2">
+            <MudItem xs="12" md="6">
+                <RevenuePieChart Title="@($"DOANH THU {YearSelect}")"
+                                 PeriodText="@($"Tháng 1 - Tháng {LastComparisonMonth}/{YearSelect}")"
+                                 TotalAmount="@RevenuePieDtTotal"
+                                 CenterValue="@RevenuePieDtCenterValue"
+                                 CenterLabel="TỔNG DOANH THU"
+                                 Segments="@RevenuePieDtSegments" />
+            </MudItem>
+            @if (RevenuePieThSegments.Count > 0)
+            {
+                <MudItem xs="12" md="6">
+                    <RevenuePieChart Title="@($"NHẬP HÀNG {YearSelect}")"
+                                     PeriodText="@($"Tháng 1 - Tháng {LastComparisonMonth}/{YearSelect}")"
+                                     TotalAmount="@RevenuePieThTotal"
+                                     CenterValue="@RevenuePieThCenterValue"
+                                     CenterLabel="TỔNG NHẬP HÀNG"
+                                     Segments="@RevenuePieThSegments" />
+                </MudItem>
+            }
+        </MudGrid>
+    }
+
+    @* Bottom layout *@
+    <MudGrid Class="overview-bottom-grid mtl-overview-bottom-split" Spacing="3">
+        <MudItem xs="12" lg="6">
+            <MudStack Spacing="3">
+                <StandardTableSection Title="@($"NGUỒN TIỀN {MonthSelect}/{YearSelect}")"
+                                      ToolbarIcon="@Icons.Material.Filled.AccountBalanceWallet">
+                    <ToolbarTrailing>
+                        <MudText Typo="Typo.caption" Style="opacity:0.85">
+                             Tổng: <strong>@FormatVND(TongNguonTienDaVao)</strong>
+                        </MudText>
+                    </ToolbarTrailing>
+                    <ChildContent>
+                        <MudPaper Class="pa-3 mtl-nguon-tien-bar-card" Elevation="0" Outlined="true">
+                            @if (NguonTienDaVaoChartData.Length > 0 && NguonTienDaVaoChartData.Sum() > 0)
+                            {
+                                var svgData = NguonTienDaVaoChartData.ToList();
+                                var svgLabels = NguonTienDaVaoChartLabels.ToList();
+                                var svgLabelsShort = NguonTienDaVaoChartLabelsShort.ToList();
+                                var svgPaletteLen = NguonTienBarPaletteDistinct.Length;
+                                <div class="mtl-nguon-tien-bar-wrap mtl-nguon-tien-custom">
+                                    @{
+                                        var nNguon = svgData.Count;
+                                        var maxNguon = svgData.Count > 0 ? svgData.Max() : 0;
+                                        const double vbW = 720;
+                                        const double vbH = 300;
+                                        const double plotL = 92;
+                                        const double plotR = 702;
+                                        const double plotT = 28;
+                                        const double plotB = 232;
+                                        var pw = plotR - plotL;
+                                        var ph = plotB - plotT;
+                                        var slotW = pw / Math.Max(1, nNguon);
+                                        var barW = Math.Max(28, slotW * 0.62);
+                                        if (barW > slotW * 0.92) barW = slotW * 0.92;
+                                    }
+                                    <svg class="mtl-nguon-tien-svg" viewBox="0 0 @vbW @vbH" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Biểu đồ nguồn tiền đã vào">
+                                        <g class="mtl-nguon-tien-svg__gridlines">
+                                            @for (var g = 0; g <= 4; g++)
+                                            {
+                                                var gy = plotT + (ph * g / 4);
+                                                <line class="mtl-nguon-tien-svg__grid" x1="@plotL" y1="@gy" x2="@plotR" y2="@gy" />
+                                                var tickVal = maxNguon * (1 - g / 4.0);
+                                                @((MarkupString)$"<text class='mtl-nguon-tien-svg__axis' x='{SvgCoord(plotL - 8)}' y='{SvgCoord(gy + 4)}' text-anchor='end'>{FormatAxisNumber(tickVal)}</text>")
+                                            }
+                                        </g>
+                                        @((MarkupString)$"<text class='mtl-nguon-tien-svg__axis-title' x='{SvgCoord(plotL)}' y='16'>Đã thu (đ)</text>")
+                                        @for (var i = 0; i < nNguon; i++)
+                                        {
+                                            var idxBar = i;
+                                            var bx = plotL + idxBar * slotW + (slotW - barW) / 2;
+                                            var ratio = maxNguon > 0.01 ? svgData[idxBar] / maxNguon : 0;
+                                            var bh = Math.Max(ratio * ph, ratio > 0 ? 3 : 0);
+                                            var by = plotB - bh;
+                                            var fill = svgPaletteLen > 0 ? SafeNguonColor(idxBar) : "#999";
+                                            var dim = _nguonTienBarSelectedIndex >= 0 && _nguonTienBarSelectedIndex != idxBar;
+                                            var sel = _nguonTienBarSelectedIndex == idxBar;
+                                            <rect class="mtl-nguon-tien-svg__bar @(dim ? "mtl-nguon-tien-svg__bar--dim" : "") @(sel ? "mtl-nguon-tien-svg__bar--selected" : "")"
+                                                  x="@SvgCoord(bx)"
+                                                  y="@SvgCoord(by)"
+                                                  width="@SvgCoord(barW)"
+                                                  height="@SvgCoord(bh)"
+                                                  fill="@fill"
+                                                  @onclick="@(() => ToggleNguonTienBarSelect(idxBar))"
+                                                  @onclick:stopPropagation="true">
+                                                <title>@svgLabels[idxBar]: @FormatVND(svgData[idxBar])</title>
+                                            </rect>
+                                            var label = idxBar < svgLabelsShort.Count ? svgLabelsShort[idxBar] : "";
+                                            @((MarkupString)$"<text class='mtl-nguon-tien-svg__axis' x='{SvgCoord(bx + barW / 2)}' y='{SvgCoord(plotB + 18)}' text-anchor='middle'>{SvgTextEscape(label)}</text>")
+                                        }
+                                    </svg>
+                                    @if (_nguonTienBarSelectedIndex >= 0 && _nguonTienBarSelectedIndex < svgData.Count && _nguonTienBarSelectedIndex < svgLabels.Count)
+                                    {
+                                        <MudText Typo="Typo.body2" Class="mt-3 mb-1" Style="text-align:center; font-weight:700">
+                                            @svgLabels[_nguonTienBarSelectedIndex]:
+                                            <span style="color:var(--mud-palette-primary)">@FormatVND(svgData[_nguonTienBarSelectedIndex])</span>
+                                        </MudText>
+                                    }
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary mb-2" Style="text-align:center">
+                                        Nhấn cột hoặc chip để xem chi tiết · mỗi cột một màu.
+                                    </MudText>
+                                    @if (svgLabels.Count > 0 && svgData.Count > 0)
+                                    {
+                                        <MudStack Row="true" Spacing="1" Justify="Justify.Center" Class="flex-wrap px-1" Style="gap:6px;">
+                                            @for (var i = 0; i < svgLabels.Count; i++)
+                                            {
+                                                var idx = i;
+                                                var tip = $"{svgLabels[idx]}: {FormatVND(svgData[idx])}";
+                                                var bg = idx < svgPaletteLen ? SafeNguonColor(idx) : "#999";
+                                                <MudTooltip Text="@tip" Placement="Placement.Top">
+                                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                                             Style="@($"background:{bg};color:#fff;font-weight:700;max-width:12rem;justify-content:center;cursor:help;")"
+                                                             OnClick="@(() => ToggleNguonTienBarSelect(idx))">
+                                                        @svgLabels[idx]
+                                                    </MudChip>
+                                                </MudTooltip>
+                                            }
+                                        </MudStack>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-6">
+                                    <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Style="opacity:0.35" />
+                                    <MudText Typo="Typo.body2" Class="mud-text-secondary">Chưa có dữ liệu tiền đã vào cho tháng này.</MudText>
+                                </MudStack>
+                            }
+                        </MudPaper>
+                    </ChildContent>
+                </StandardTableSection>
+            </MudStack>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <StandardTableSection Title="@($"DOANH THU QUÝ {YearSelect}")"
+                                  ToolbarIcon="@Icons.Material.Filled.StackedBarChart">
+                <ToolbarTrailing>
+                    <MudText Typo="Typo.caption" Style="opacity:0.85">
+                        Tổng năm: <strong>@FormatVND(NguonTienTheoQuyNamTong)</strong>
+                    </MudText>
+                </ToolbarTrailing>
+                <ChildContent>
+                    <MudPaper Class="pa-3 mtl-nguon-theo-quy-card" Elevation="0" Outlined="true">
+                        @if (NguonTienTheoQuyTotals.Sum() > 0.01)
+                        {
+                            <div class="mtl-nguon-tien-bar-wrap">
+                                @{
+                                    var nQuy = 4;
+                                    var maxQuy = NguonTienTheoQuyTotals.Max();
+                                    const double vbWQ = 640;
+                                    const double vbHQ = 320;
+                                    const double plotLQ = 72;
+                                    const double plotRQ = 608;
+                                    const double plotTQ = 32;
+                                    const double plotBQ = 240;
+                                    var pwQ = plotRQ - plotLQ;
+                                    var phQ = plotBQ - plotTQ;
+                                    var slotWQ = pwQ / nQuy;
+                                    var barWQ = Math.Max(40, slotWQ * 0.58);
+                                    if (barWQ > slotWQ * 0.9) barWQ = slotWQ * 0.9;
+                                }
+                                <svg @key="_nguonQuyChartVersion" class="mtl-nguon-quy-svg" viewBox="0 0 @vbWQ @vbHQ" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Biểu đồ nguồn tiền theo quý (chồng lớp theo nguồn)">
+                                    <g>
+                                        @for (var g = 0; g <= 4; g++)
+                                        {
+                                            var gy = plotTQ + (phQ * g / 4);
+                                            <line class="mtl-nguon-quy-svg__grid" x1="@plotLQ" y1="@gy" x2="@plotRQ" y2="@gy" />
+                                            var tickVal = maxQuy * (1 - g / 4.0);
+                                            @((MarkupString)$"<text class='mtl-nguon-quy-svg__axis' x='{SvgCoord(plotLQ - 8)}' y='{SvgCoord(gy + 4)}' text-anchor='end'>{FormatAxisNumber(tickVal)}</text>")
+                                        }
+                                    </g>
+                                    @((MarkupString)$"<text class='mtl-nguon-quy-svg__axis-title' x='{SvgCoord(plotLQ)}' y='18'>Đã thu trong quý (đ) — chồng theo nguồn</text>")
+                                    @for (var iq = 0; iq < nQuy; iq++)
+                                    {
+                                        var qIdx = iq;
+                                        var bx = plotLQ + iq * slotWQ + (slotWQ - barWQ) / 2;
+                                        foreach (var seg in BuildQuyStackRects(qIdx, bx, barWQ, plotBQ, phQ, maxQuy))
+                                        {
+                                            <rect class="mtl-nguon-quy-svg__seg"
+                                                  x="@SvgCoord(seg.X)"
+                                                  y="@SvgCoord(seg.Y)"
+                                                  width="@SvgCoord(seg.W)"
+                                                  height="@SvgCoord(seg.H)"
+                                                  fill="@seg.Fill">
+                                                <title>@seg.Tooltip</title>
+                                            </rect>
+                                        }
+                                        @((MarkupString)$"<text class='mtl-nguon-quy-svg__axis' x='{SvgCoord(bx + barWQ / 2)}' y='{SvgCoord(plotBQ + 22)}' text-anchor='middle'>{SvgTextEscape(SafeAt(NguonTienTheoQuyLabels, qIdx))}</text>")
+                                        @((MarkupString)$"<text class='mtl-nguon-quy-svg__axis' x='{SvgCoord(bx + barWQ / 2)}' y='{SvgCoord(plotBQ + 38)}' text-anchor='middle' opacity='0.85'>{SvgTextEscape(SafeAt(NguonTienTheoQuySubLabels, qIdx))}</text>")
+                                    }
+                                </svg>
+                            </div>
+                            <MudStack Row="true" Class="mt-3 mtl-nguon-quy-legend px-1" AlignItems="AlignItems.Center">
+                                @foreach (var sliceKey in NguonTienQuyOrderedKeys)
+                                {
+                                    var fillL = ColorForQuySliceKey(sliceKey);
+                                    var lblL = NguonTienQuyKeyLabels.GetValueOrDefault(sliceKey, sliceKey);
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                        <div style="width:12px;height:12px;border-radius:3px;background:@fillL;flex-shrink:0"></div>
+                                        <MudText Typo="Typo.caption">@lblL</MudText>
+                                    </MudStack>
+                                }
+                            </MudStack>
+                            <MudGrid Spacing="2" Class="mt-3">
+                                @for (var iq = 0; iq < 4; iq++)
+                                {
+                                    var idx = iq;
+                                    var bg = SafeQuyColor(idx);
+                                    <MudItem xs="12" sm="6">
+                                        <MudPaper Elevation="0" Outlined="true" Class="pa-2" Style="@($"border-left:4px solid {bg}")">
+                                            <MudStack Spacing="1">
+                                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@SafeAt(NguonTienTheoQuyLabels, idx) · @SafeAt(NguonTienTheoQuySubLabels, idx)</MudText>
+                                                    <MudText Typo="Typo.subtitle2" Style="font-weight:800">@FormatVND(SafeAt(NguonTienTheoQuyTotals, idx))</MudText>
+                                                </MudStack>
+                                                <MudStack Row="true" Spacing="1" Class="flex-wrap mtl-nguon-quy-quarter-chips" Style="gap:6px">
+                                                    @foreach (var sliceKey in NguonTienQuyOrderedKeys)
+                                                    {
+                                                        var amtChip = idx >= 0 && idx < NguonTienTheoQuySlicesByQuarter.Length ? NguonTienTheoQuySlicesByQuarter[idx].GetValueOrDefault(sliceKey) : 0;
+                                                        if (amtChip < 0.01)
+                                                            continue;
+                                                        var lblChip = NguonTienQuyKeyLabels.GetValueOrDefault(sliceKey, sliceKey);
+                                                        var bgChip = ColorForQuySliceKey(sliceKey);
+                                                        var tipChip = $"{lblChip}: {FormatVND(amtChip)}";
+                                                        <MudTooltip Text="@tipChip">
+                                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                                                     Class="mtl-nguon-tm-nh-chip"
+                                                                     Style="@($"background:{bgChip};color:#fff;font-size:0.68rem;font-weight:600")">
+                                                                <span style="white-space:normal;word-break:break-word;line-height:1.3">@lblChip</span>
+                                                                <span style="white-space:nowrap;opacity:0.95">@FormatShortVND(amtChip)</span>
+                                                            </MudChip>
+                                                        </MudTooltip>
+                                                    }
+                                                </MudStack>
+                                            </MudStack>
+                                        </MudPaper>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                            
+                        }
+                        else
+                        {
+                            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
+                                <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Style="opacity:0.35" />
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">Chưa có dữ liệu nguồn tiền theo quý cho năm @YearSelect.</MudText>
+                            </MudStack>
+                        }
+                    </MudPaper>
+                </ChildContent>
+            </StandardTableSection>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Spacing="3" Class="mt-2 mtl-nguon-bottom-split">
+        @* ── Trái 6/12: Doanh thu theo ngày (bảng đầy đủ, có chart) ── *@
+        <MudItem xs="12" md="6">
+            @if (NguonTienTheoNgayRows.Count > 0)
+            {
+                <StandardTableSection Title="@($"DOANH THU NGÀY - {MonthSelect:D2}/{YearSelect}")"
+                                      CssClass="mtl-daily-fill"
+                                      ToolbarIcon="@Icons.Material.Filled.CalendarViewDay">
+                    <ToolbarTrailing>
+                        <MudText Typo="Typo.caption" Style="opacity:0.85">
+                            Tổng: <strong>@FormatVND(NguonTienTheoNgayTong)</strong>
+                        </MudText>
+                    </ToolbarTrailing>
+                    <ChildContent>
+                        <MudSimpleTable Dense="true" Striped="true" Bordered="true" Hover="true"
+                                        Class="mtl-simple-table-standard mtl-daily-table-scroll mtl-nguon-theo-ngay-table"
+                                        Style="overflow:auto; max-height:min(72vh, 920px); font-size:0.82rem">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:center; font-weight:700; width:118px">NGÀY</th>
+                                    <th style="text-align:right; font-weight:700; width:140px" class="mtl-cell-total">TỔNG (đ)</th>
+                                    <th style="text-align:center; font-weight:700; width:80px">% MAX</th>
+                                    <th style="min-width:200px">BIỂU ĐỒ</th>
+                                    <th style="min-width:min(420px, 40vw)">TM / NGÂN HÀNG</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var dayRow in NguonTienTheoNgayRows)
+                                {
+                                    var totalNgay = dayRow.TongNgay;
+                                    var pctMaxNgay = MaxNguonTienTheoNgay > 0 ? (int)(100.0 * totalNgay / MaxNguonTienTheoNgay) : 0;
+                                    <tr class="table-row-clickable">
+                                        <td style="text-align:center">
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
+                                                @dayRow.Ngay.ToString("dd/MM/yyyy")
+                                            </MudChip>
+                                        </td>
+                                        <td class="mtl-cell-total" style="text-align:right">@FormatVND(totalNgay)</td>
+                                        <td style="text-align:center">
+                                            <MudChip T="string" Size="Size.Small"
+                                                     Color="@(pctMaxNgay >= 80 ? Color.Success : pctMaxNgay >= 40 ? Color.Warning : Color.Default)">
+                                                @pctMaxNgay%
+                                            </MudChip>
+                                        </td>
+                                        <td style="padding: 4px 8px; min-width: 200px; width: 200px;">
+                                            <div class="mtl-nguon-stack-bar" title="@($"{dayRow.Ngay:dd/MM/yyyy}: {FormatVND(totalNgay)}")">
+                                                @foreach (var seg in BuildNguonTienNgaySegments(dayRow))
+                                                {
+                                                    <div class="mtl-nguon-stack-bar__seg" style="width:@(seg.WidthPct)%; background:@(seg.Color);"></div>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td style="vertical-align:top; min-width:min(420px, 40vw)">
+                                            <MudStack Row="true" Spacing="1" Class="flex-wrap" Style="gap:6px">
+                                                @for (var si = 0; si < dayRow.AmountsBySlice.Count; si++)
+                                                {
+                                                    var amtNguon = dayRow.AmountsBySlice[si];
+                                                    if (amtNguon < 0.01) continue;
+                                                    var lblNguon = si >= 0 && si < NguonTienTheoNgayLabels.Count ? NguonTienTheoNgayLabels[si] : $"Nguồn {si + 1}";
+                                                    var bgNguon = SafeNguonColor(si);
+                                                    var tipNguon = $"{lblNguon}: {FormatVND(amtNguon)}";
+                                                    <MudTooltip Text="@tipNguon">
+                                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                                                 Class="mtl-nguon-tm-nh-chip"
+                                                                 Style="@($"background:{bgNguon};color:#fff;font-size:0.68rem;font-weight:600")">
+                                                            <span style="white-space:normal;word-break:break-word;line-height:1.35">@lblNguon</span>
+                                                            <span style="white-space:nowrap;opacity:0.95;flex-shrink:0">@FormatShortVND(amtNguon)</span>
+                                                        </MudChip>
+                                                    </MudTooltip>
+                                                }
+                                            </MudStack>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="mtl-total-row">
+                                    <td style="text-align:center; font-weight:800">TỔNG CỘNG</td>
+                                    <td class="mtl-cell-total-strong" style="text-align:right">@FormatVND(NguonTienTheoNgayTong)</td>
+                                    <td colspan="3"></td>
+                                </tr>
+                            </tfoot>
+                        </MudSimpleTable>
+                    </ChildContent>
+                    <Footer>
+                        @if (NguonTienTheoNgayLabels.Count > 0)
+                        {
+                            <MudStack Row="true" Spacing="4" Class="pa-3 mtl-legend-strip flex-wrap">
+                                @for (var li = 0; li < NguonTienTheoNgayLabels.Count; li++)
+                                {
+                                    var idxL = li;
+                                    var bgL = SafeNguonColor(idxL);
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                        <div style="width:12px;height:12px;border-radius:2px;background:@bgL"></div>
+                                        <MudText Typo="Typo.caption">@(idxL >= 0 && idxL < NguonTienTheoNgayLabels.Count ? NguonTienTheoNgayLabels[idxL] : "")</MudText>
+                                    </MudStack>
+                                }
+                                <MudSpacer />
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    Cột biểu đồ: tỷ lệ TM / từng TK trong ngày (CK đã thu + phần trả góp gắn TK); % max so với ngày cao nhất tháng.
+                                </MudText>
+                            </MudStack>
+                        }
+                    </Footer>
+                </StandardTableSection>
+            }
+            else if (!IsLoading)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Class="mt-2">
+                    Chưa có dữ liệu nguồn tiền theo ngày cho tháng @MonthSelect.ToString("D2")/@YearSelect
+                </MudAlert>
+            }
+        </MudItem>
+      
+
+        @* ── Phải 6/12: Nhập hàng theo ngày (cùng giao diện DOANH THU NGÀY) ── *@
+        <MudItem xs="12" md="6">
+            @if (NhapHangTheoNgayRows.Count > 0)
+            {
+                <StandardTableSection Title="@($"NHẬP HÀNG THEO NGÀY - {MonthSelect:D2}/{YearSelect}")"
+                                      CssClass="mtl-daily-fill"
+                                      ToolbarIcon="@Icons.Material.Filled.Inventory">
+                    <ToolbarTrailing>
+                        <MudText Typo="Typo.caption" Style="opacity:0.85">
+                            Tổng nhập: <strong>@FormatVND(NhapHangTheoNgayTong)</strong>
+                        </MudText>
+                    </ToolbarTrailing>
+                    <ChildContent>
+                        <MudSimpleTable Dense="true" Striped="true" Bordered="true" Hover="true"
+                                        Class="mtl-simple-table-standard mtl-daily-table-scroll mtl-nguon-theo-ngay-table"
+                                        Style="overflow:auto; max-height:min(72vh, 920px); font-size:0.82rem">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:center; font-weight:700; width:118px">NGÀY</th>
+                                    <th style="text-align:right; font-weight:700" class="mtl-cell-total">TỔNG NHẬP (đ)</th>
+                                    <th style="text-align:center; font-weight:700; width:80px">% MAX</th>
+                                    <th style="min-width:200px">BIỂU ĐỒ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var dayRow in NhapHangTheoNgayRows)
+                                {
+                                    var pct = MaxNhapHangNgay > 0 ? (int)(100.0 * dayRow.TongNgay / MaxNhapHangNgay) : 0;
+                                    <tr>
+                                        <td style="text-align:center">
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary">
+                                                @dayRow.Ngay.ToString("dd/MM/yyyy")
+                                            </MudChip>
+                                        </td>
+                                        <td class="mtl-cell-total" style="text-align:right; color:#e65100">
+                                            @FormatVND(dayRow.TongNgay)
+                                        </td>
+                                        <td style="text-align:center">
+                                            <MudChip T="string" Size="Size.Small"
+                                                     Color="@(pct >= 80 ? Color.Success : pct >= 40 ? Color.Warning : Color.Default)">
+                                                @pct%
+                                            </MudChip>
+                                        </td>
+                                        <td style="padding: 4px 8px;">
+                                            <div style="display:flex; align-items:center; gap:6px;">
+                                                <div class="mtl-nguon-stack-bar" style="flex:1;">
+                                                    <div class="mtl-nguon-stack-bar__seg" style="width:@pct%; background:#e65100; min-width:@(pct > 0 ? 2 : 0)px; height:16px;"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="mtl-total-row">
+                                    <td style="text-align:center; font-weight:800">TỔNG CỘNG</td>
+                                    <td class="mtl-cell-total-strong" style="text-align:right; color:#b71c1c">@FormatVND(NhapHangTheoNgayTong)</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </MudSimpleTable>
+                    </ChildContent>
+                </StandardTableSection>
+            }
+            else if (!IsLoading)
+            {
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-12">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Style="opacity:0.3" />
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">
+                        Chưa có dữ liệu nhập hàng tháng @MonthSelect.ToString("D2")/@YearSelect.
+                    </MudText>
+                </MudStack>
+            }
+        </MudItem>
+    </MudGrid>
+
+</MudContainer>
+
+@code {
+
+    [Parameter]
+    public string? Thang { get; set; }
+
+    bool IsLoading = true;
+    int YearSelect = DateTime.Now.Year;
+    int MonthSelect = DateTime.Now.Month;
+    double? DoanhThuThang = 0;
+
+    /// <summary>Doanh thu từng tháng trong năm YearSelect (dùng cho lưới chọn tháng).</summary>
+    public Dictionary<int, double?> MonthRevenues { get; set; } = new();
+
+    /// <summary>Tổng tiền thu hàng (phiếu) theo tháng trong năm YearSelect — nguồn uf_ThongKeThuHangHoa_Nam.</summary>
+    public Dictionary<int, double?> MonthThuHangRevenues { get; set; } = new();
+
+    public List<MTL_ThongKeDoanhThuResult> data { get; set; } = new();
+    public List<MTL_ThongKeDoanhThuCoBanResult> data_doanhthucoban { get; set; } = new();
+
+    bool isTienThucCo = true;
+    string NgayHienTai = DateTime.Now.ToString("MM/dd/yyyy");
+
+    double? HomNay = 0;
+    double? TuanNay = 0;
+    double? ThangNay = 0;
+    double? HomQua = 0;
+    double? TuanTruoc = 0;
+    double? ThangTruoc = 0;
+    double MaxDayRevenue = 0;
+    ThuTheoNguonThoiGianSummary thuTheoNguonThang = new();
+    ThuDaVaoTheoNguonResult thuDaVaoTheoNguon = new();
+    ThuDaVaoTheoNguonTheoNgayResult thuDaVaoTheoNguonTheoNgay = new();
+
+    IReadOnlyList<ThuDaVaoTheoNguonNgayRow> NguonTienTheoNgayRows => thuDaVaoTheoNguonTheoNgay.Rows;
+
+    IReadOnlyList<string> NguonTienTheoNgayLabels => thuDaVaoTheoNguonTheoNgay.SourceLabels;
+
+    double MaxNguonTienTheoNgay =>
+        NguonTienTheoNgayRows.Count == 0 ? 0 : NguonTienTheoNgayRows.Max(r => r.TongNgay);
+
+    double NguonTienTheoNgayTong => NguonTienTheoNgayRows.Sum(r => r.TongNgay);
+
+    /// <summary>Tổng nguồn tiền đã vào theo quý (Q1–Q4) trong năm <see cref="YearSelect"/> — cộng từ từng tháng.</summary>
+    readonly double[] NguonTienTheoQuyTotals = new double[4];
+
+    /// <summary>Gộp theo <see cref="ThuDaVaoNguonSlice.Key"/> trong từng quý (TM / bank / ck_unassigned).</summary>
+    readonly Dictionary<string, double>[] NguonTienTheoQuySlicesByQuarter =
+    {
+        new Dictionary<string, double>(),
+        new Dictionary<string, double>(),
+        new Dictionary<string, double>(),
+        new Dictionary<string, double>()
+    };
+
+    /// <summary>Nhãn hiển thị theo Key — lấy từ kết quả tháng gần nhất có slice.</summary>
+    Dictionary<string, string> NguonTienQuyKeyLabels { get; set; } = new();
+
+    /// <summary>Thứ tự xếp chồng &amp; legend: cash → bank:* → khác → ck_unassigned.</summary>
+    List<string> NguonTienQuyOrderedKeys { get; set; } = new();
+
+    static readonly string[] NguonTienTheoQuyLabels = { "Quý 1", "Quý 2", "Quý 3", "Quý 4" };
+
+    static readonly string[] NguonTienTheoQuySubLabels = { "T1–T3", "T4–T6", "T7–T9", "T10–T12" };
+
+    /// <summary>Viền trái 4 ô tóm tắt quý.</summary>
+    static readonly string[] NguonTienQuyBarPalette =
+    {
+        "#1565C0", "#C62828", "#2E7D32", "#F9A825"
+    };
+
+    double NguonTienTheoQuyNamTong => NguonTienTheoQuyTotals.Sum();
+
+    int _nguonQuyChartVersion;
+
+    // ── Nhập hàng theo ngày ──
+    NhapHangTheoNgayResult? NhapHangTheoNgay { get; set; }
+    IReadOnlyList<NhapHangTheoNgayRow> NhapHangTheoNgayRows => NhapHangTheoNgay?.Rows ?? Array.Empty<NhapHangTheoNgayRow>();
+    double MaxNhapHangNgay => NhapHangTheoNgayRows.Count > 0 ? NhapHangTheoNgayRows.Max(r => r.TongNgay) : 0;
+    double NhapHangTheoNgayTong => NhapHangTheoNgayRows.Sum(r => r.TongNgay);
+
+    static string TruncateProdName(string? s, int max)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        return s.Length <= max ? s : s[..(max - 1)] + "…";
+    }
+
+    static int RankQuySliceKey(string k)
+    {
+        if (k == "cash") return 0;
+        if (k.StartsWith("bank:", StringComparison.Ordinal)) return 1;
+        if (k == "ck_unassigned") return 3;
+        return 2;
+    }
+
+    static int CompareQuySliceKeyOrder(string a, string b)
+    {
+        var ra = RankQuySliceKey(a);
+        var rb = RankQuySliceKey(b);
+        if (ra != rb) return ra.CompareTo(rb);
+        return string.Compare(a, b, StringComparison.Ordinal);
+    }
+
+    void RebuildNguonTienQuyOrderedKeys()
+    {
+        var keys = new HashSet<string>();
+        foreach (var d in NguonTienTheoQuySlicesByQuarter)
+        {
+            foreach (var kv in d)
+            {
+                if (kv.Value >= 0.01)
+                    keys.Add(kv.Key);
+            }
+        }
+        var list = keys.ToList();
+        list.Sort(CompareQuySliceKeyOrder);
+        NguonTienQuyOrderedKeys = list;
+    }
+
+    string ColorForQuySliceKey(string key)
+    {
+        var idx = NguonTienQuyOrderedKeys.IndexOf(key);
+        if (idx < 0) idx = 0;
+        return SafeNguonColor(idx);
+    }
+
+    IReadOnlyList<(double X, double Y, double W, double H, string Fill, string Tooltip)> BuildQuyStackRects(
+        int quarterIndex, double bx, double barW, double plotBQ, double phQ, double maxQuy)
+    {
+        var result = new List<(double X, double Y, double W, double H, string Fill, string Tooltip)>();
+        var colTotal = quarterIndex >= 0 && quarterIndex < NguonTienTheoQuyTotals.Length ? NguonTienTheoQuyTotals[quarterIndex] : 0;
+        if (maxQuy < 0.01 || colTotal < 0.01)
+            return result;
+
+        var colPixelH = (colTotal / maxQuy) * phQ;
+        var yCursor = plotBQ;
+        foreach (var sliceKey in NguonTienQuyOrderedKeys)
+        {
+            var amt = quarterIndex >= 0 && quarterIndex < NguonTienTheoQuySlicesByQuarter.Length ? NguonTienTheoQuySlicesByQuarter[quarterIndex].GetValueOrDefault(sliceKey) : 0;
+            if (amt < 0.01)
+                continue;
+            var segH = colPixelH * (amt / colTotal);
+            if (segH < 1 && segH > 0)
+                segH = 1;
+            var yTop = yCursor - segH;
+            var fill = ColorForQuySliceKey(sliceKey);
+            var lbl = NguonTienQuyKeyLabels.GetValueOrDefault(sliceKey, sliceKey);
+            var tip = $"{lbl} — {SafeAt(NguonTienTheoQuyLabels, quarterIndex)}: {FormatVND(amt)} (Tổng quý: {FormatVND(colTotal)})";
+            result.Add((bx, yTop, barW, segH, fill, tip));
+            yCursor = yTop;
+        }
+        return result;
+    }
+
+    async Task LoadNguonTienTheoQuyForYearAsync(int year)
+    {
+        for (var i = 0; i < NguonTienTheoQuyTotals.Length; i++)
+        {
+            NguonTienTheoQuyTotals[i] = 0;
+            NguonTienTheoQuySlicesByQuarter[i].Clear();
+        }
+        NguonTienQuyKeyLabels.Clear();
+        NguonTienQuyOrderedKeys.Clear();
+
+        if (idcompany <= 0)
+        {
+            _nguonQuyChartVersion++;
+            return;
+        }
+        for (var m = 1; m <= 12; m++)
+        {
+            try
+            {
+                var res = await reportService.GetThuDaVaoTheoNguonTrongThangAsync(idcompany, year, m);
+                var qi = (m - 1) / 3;
+                if (qi < 0 || qi >= 4)
+                    continue;
+                var dict = NguonTienTheoQuySlicesByQuarter[qi];
+                if (res.Slices == null)
+                    continue;
+                foreach (var s in res.Slices)
+                {
+                    if (s.Amount < 0.01)
+                        continue;
+                    dict[s.Key] = dict.GetValueOrDefault(s.Key) + s.Amount;
+                    if (!string.IsNullOrWhiteSpace(s.Label))
+                        NguonTienQuyKeyLabels[s.Key] = s.Label;
+                }
+            }
+            catch
+            {
+                // bỏ qua tháng lỗi
+            }
+        }
+
+        for (var q = 0; q < 4; q++)
+            NguonTienTheoQuyTotals[q] = NguonTienTheoQuySlicesByQuarter[q].Values.Sum();
+
+        RebuildNguonTienQuyOrderedKeys();
+        _nguonQuyChartVersion++;
+    }
+
+    IReadOnlyList<(int WidthPct, string Color, string Tooltip)> BuildNguonTienNgaySegments(ThuDaVaoTheoNguonNgayRow dayRow)
+    {
+        var result = new List<(int WidthPct, string Color, string Tooltip)>();
+        var total = dayRow.TongNgay;
+        
+        if (total < 0.01)
+        {
+            result.Add((5, "#e0e0e0", "Ngày nghỉ: 0đ"));
+            return result;
+        }
+        
+        var maxDay = MaxNguonTienTheoNgay;
+        int pct;
+        if (maxDay > 0.01)
+        {
+            pct = (int)Math.Round(100.0 * total / maxDay);
+        }
+        else
+        {
+            pct = 100;
+        }
+        pct = Math.Max(pct, 5);
+        
+        var color = pct >= 80 ? "#2E7D32" : pct >= 40 ? "#F9A825" : "#1565C0";
+        result.Add((pct, color, $"{dayRow.Ngay:dd/MM}: {FormatVND(total)} ({pct}% max tháng)"));
+        return result;
+    }
+
+    /// <summary>Màu mỗi cột nguồn tiền — tách biệt pie, độ bão hòa cao để phân biệt.</summary>
+    static readonly string[] NguonTienBarPaletteDistinct =
+    {
+        "#0D47A1", "#C62828", "#2E7D32", "#F9A825", "#6A1B9A", "#00838F",
+        "#E65100", "#AD1457", "#33691E", "#006064", "#5D4037", "#3949AB",
+        "#D84315", "#558B2F", "#4527A0", "#0277BD", "#BF360C"
+    };
+
+    int _nguonTienBarSelectedIndex = -1;
+
+    /// <summary>Trả màu an toàn cho quý, tránh IndexOutOfRange.</summary>
+    string SafeQuyColor(int idx) =>
+        NguonTienQuyBarPalette[Math.Clamp(idx, 0, NguonTienQuyBarPalette.Length - 1)];
+
+    /// <summary>Trả màu an toàn, tránh IndexOutOfRange khi số nguồn > palette length.</summary>
+    string SafeNguonColor(int idx) =>
+        NguonTienBarPaletteDistinct[Math.Abs(idx) % NguonTienBarPaletteDistinct.Length];
+
+    /// <summary>Truy xuất mảng an toàn — trả default nếu ngoài bounds.</summary>
+    static T SafeAt<T>(T[] arr, int idx, T @default = default!) =>
+        idx >= 0 && idx < arr.Length ? arr[idx] : @default;
+
+    double[] NguonTienDaVaoChartData =>
+        thuDaVaoTheoNguon?.Slices?
+            .Where(s => s.Amount >= 0.01)
+            .Select(s => s.Amount)
+            .ToArray() ?? Array.Empty<double>();
+
+    string[] NguonTienDaVaoChartLabels =>
+        thuDaVaoTheoNguon?.Slices?
+            .Where(s => s.Amount >= 0.01)
+            .Select(s => s.Label)
+            .ToArray() ?? Array.Empty<string>();
+
+    /// <summary>Nhãn trục X rút gọn để cột đứng không chồng chữ.</summary>
+    string[] NguonTienDaVaoChartLabelsShort =>
+        NguonTienDaVaoChartLabels.Select(ShortAxisLabel).ToArray();
+
+    static string ShortAxisLabel(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var t = s.Trim();
+        if (t.Length <= 16) return t;
+        return t.Substring(0, 15) + "…";
+    }
+
+    double TongNguonTienDaVao =>
+        thuDaVaoTheoNguon?.Slices?.Sum(s => s.Amount) ?? 0;
+
+    void ToggleNguonTienBarSelect(int index)
+    {
+        _nguonTienBarSelectedIndex = _nguonTienBarSelectedIndex == index ? -1 : index;
+    }
+
+    static string FormatAxisNumber(double v)
+    {
+        if (double.IsNaN(v) || double.IsInfinity(v))
+            return "0";
+        return Math.Round(v).ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    static string SvgCoord(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    static string SvgTextEscape(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
+    }
+
+    string _TenUser = "";
+    string _Hethong = "";
+    string theTime;
+    string _welcome = "";
+    private Timer? aTimer;
+    int idcompany = 0;
+    UserSession? userSession { get; set; }
+    MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+    /// <summary>12 màu pie mặc định (theme Xanh báo cáo và các theme khác dùng tông trung tính).</summary>
+    static readonly string[] MonthlyPiePaletteBlue =
+    {
+        "#1565C0", "#C62828", "#2E7D32", "#F9A825", "#6A1B9A", "#00838F",
+        "#E65100", "#283593", "#AD1457", "#33691E", "#006064", "#5D4037"
+    };
+
+    string[] _activePiePalette = MonthlyPiePaletteBlue;
+
+    ChartOptions _monthlyPieChartOptions = new()
+    {
+        ShowLegend = false,
+        ChartPalette = MonthlyPiePaletteBlue
+    };
+
+    static string[] MonthlyPiePaletteForTheme(string themeId) =>
+        AppThemeCatalog.Normalize(themeId) switch
+        {
+            AppThemeCatalog.CrmRed => new[]
+            {
+                "#B71C1C", "#C62828", "#E53935", "#EF5350", "#FF7043", "#F9A825",
+                "#2E7D32", "#6A1B9A", "#00838F", "#5D4037", "#AD1457", "#E65100"
+            },
+            AppThemeCatalog.Forest => new[]
+            {
+                "#2E7D32", "#43A047", "#558B2F", "#33691E", "#C62828", "#F9A825",
+                "#1565C0", "#6A1B9A", "#00838F", "#E65100", "#AD1457", "#5D4037"
+            },
+            AppThemeCatalog.Midnight => new[]
+            {
+                "#7C4DFF", "#5E35B1", "#9575CD", "#3949AB", "#C62828", "#00838F",
+                "#2E7D32", "#F9A825", "#AD1457", "#006064", "#5D4037", "#E65100"
+            },
+            _ => MonthlyPiePaletteBlue
+        };
+
+    void SyncMonthlyPieUiFromTheme(bool bumpChartKey = false)
+    {
+        _activePiePalette = MonthlyPiePaletteForTheme(AppTheme.ThemeId);
+        _monthlyPieChartOptions.ChartPalette = _activePiePalette;
+        SyncThuHangPieUiFromTheme(bumpChartKey);
+        if (bumpChartKey)
+            _monthlyChartVersion++;
+    }
+
+    /// <summary>Bảng màu pie thu hàng — đảo thứ tự so với doanh thu để phân biệt.</summary>
+    void SyncThuHangPieUiFromTheme(bool bumpChartKey)
+    {
+        _thuHangPiePalette = MonthlyPiePaletteForTheme(AppTheme.ThemeId).Reverse().ToArray();
+        _thuHangPieChartOptions.ChartPalette = _thuHangPiePalette;
+        if (bumpChartKey)
+            _thuHangChartVersion++;
+    }
+
+    protected override void OnInitialized()
+    {
+        AppTheme.ThemeChanged += OnAppThemeChanged;
+        base.OnInitialized();
+    }
+
+    void OnAppThemeChanged()
+    {
+        SyncMonthlyPieUiFromTheme(bumpChartKey: true);
+        _ = InvokeAsync(StateHasChanged);
+    }
+    int _monthlyChartVersion;
+    int _monthlyPieSelectedIndex = -1;
+
+    int _thuHangChartVersion;
+    int _thuHangPieSelectedIndex = -1;
+    string[] _thuHangPiePalette = MonthlyPiePaletteBlue;
+
+    // Hover state for custom pie charts (kept for MudChart integration)
+    int _hoveredPieDt = -1;
+    int _hoveredPieTh = -1;
+
+    // Click event handler for Doanh Thu pie chart
+    void OnPieDtClick()
+    {
+        // Chart click handled via chip buttons
+    }
+
+    // Click event handler for Thu Hang pie chart
+    void OnPieThClick()
+    {
+        // Chart click handled via chip buttons
+    }
+
+    // Chip click for Doanh Thu pie
+    void OnPieDtChipClick(int index)
+    {
+        _hoveredPieDt = index;
+        _monthlyPieSelectedIndex = index;
+    }
+
+    // Chip click for Thu Hang pie
+    void OnPieThChipClick(int index)
+    {
+        _hoveredPieTh = index;
+        _thuHangPieSelectedIndex = index;
+    }
+
+    // RevenuePieChart data
+    List<MTL.APP.Shared.PieSegment> RevenuePieDtSegments { get; set; } = new();
+    List<MTL.APP.Shared.PieSegment> RevenuePieThSegments { get; set; } = new();
+
+    decimal RevenuePieDtTotal => RevenuePieDtSegments.Sum(s => s.Value);
+    decimal RevenuePieThTotal => RevenuePieThSegments.Sum(s => s.Value);
+
+    string RevenuePieDtCenterValue => FormatShortVND((double)RevenuePieDtTotal);
+    string RevenuePieThCenterValue => FormatShortVND((double)RevenuePieThTotal);
+
+    void BuildRevenuePieChartData()
+    {
+        // Build Doanh Thu pie segments
+        RevenuePieDtSegments = new();
+        var lastM = GetLastComparisonMonth(YearSelect);
+        var totalDt = TongDoanhThuKySoSanh;
+
+        for (int i = 0; i < lastM; i++)
+        {
+            var val = (decimal)MonthlyComparisonData[i];
+            var pct = totalDt > 0 ? (double)(val / (decimal)totalDt * 100) : 0;
+            var seg = new MTL.APP.Shared.PieSegment
+            {
+                Name = $"Tháng {i + 1}",
+                Value = val,
+                Percent = pct,
+                Color = _activePiePalette[i % _activePiePalette.Length],
+                Month = i + 1
+            };
+            RevenuePieDtSegments.Add(seg);
+        }
+
+        // Build Thu Hang pie segments
+        RevenuePieThSegments = new();
+        var totalTh = TongThuHangKySoSanh;
+
+        for (int i = 0; i < lastM; i++)
+        {
+            var val = (decimal)MonthlyThuHangComparisonData[i];
+            var pct = totalTh > 0 ? (double)(val / (decimal)totalTh * 100) : 0;
+            var seg = new MTL.APP.Shared.PieSegment
+            {
+                Name = $"Tháng {i + 1}",
+                Value = val,
+                Percent = pct,
+                Color = _thuHangPiePalette[i % _thuHangPiePalette.Length],
+                Month = i + 1
+            };
+            RevenuePieThSegments.Add(seg);
+        }
+    }
+
+    ChartOptions _thuHangPieChartOptions = new()
+    {
+        ShowLegend = false,
+        ChartPalette = MonthlyPiePaletteBlue
+    };
+
+    /// <summary>Tháng cuối cùng đưa vào so sánh: năm hiện tại → đến tháng hôm nay; năm trước → 12; năm sau → 0.</summary>
+    int LastComparisonMonth => GetLastComparisonMonth(YearSelect);
+
+    static int GetLastComparisonMonth(int year)
+    {
+        var now = DateTime.Now;
+        if (year > now.Year) return 0;
+        if (year < now.Year) return 12;
+        return now.Month;
+    }
+
+    string MonthlyComparisonRangeText
+    {
+        get
+        {
+            var last = LastComparisonMonth;
+            if (last < 1) return "";
+            if (last == 12 && YearSelect < DateTime.Now.Year) return "Tháng 1–Tháng 12";
+            return last == 1 ? "Tháng 1" : $"Tháng 1–Tháng {last}";
+        }
+    }
+
+    double TongDoanhThuKySoSanh
+    {
+        get
+        {
+            var last = LastComparisonMonth;
+            if (last < 1) return 0;
+            return Enumerable.Range(1, last).Sum(m => MonthRevenues.GetValueOrDefault(m) ?? 0);
+        }
+    }
+
+    double TongThuHangKySoSanh
+    {
+        get
+        {
+            var last = LastComparisonMonth;
+            if (last < 1) return 0;
+            return Enumerable.Range(1, last).Sum(m => MonthThuHangRevenues.GetValueOrDefault(m) ?? 0);
+        }
+    }
+
+    double[] MonthlyComparisonData
+    {
+        get
+        {
+            var last = LastComparisonMonth;
+            if (last < 1) return Array.Empty<double>();
+            return Enumerable.Range(1, last)
+                .Select(m => (double)(MonthRevenues.GetValueOrDefault(m) ?? 0))
+                .ToArray();
+        }
+    }
+
+    double[] MonthlyThuHangComparisonData
+    {
+        get
+        {
+            var last = LastComparisonMonth;
+            if (last < 1) return Array.Empty<double>();
+            return Enumerable.Range(1, last)
+                .Select(m => (double)(MonthThuHangRevenues.GetValueOrDefault(m) ?? 0))
+                .ToArray();
+        }
+    }
+
+    string[] MonthlyComparisonLabels
+    {
+        get
+        {
+            var last = LastComparisonMonth;
+            if (last < 1) return Array.Empty<string>();
+            return Enumerable.Range(1, last).Select(m => MonthLabels[m - 1]).ToArray();
+        }
+    }
+
+    /// <summary>Nhãn thu hàng theo tháng — dùng cùng MonthLabels nhưng chỉ đến LastComparisonMonth.</summary>
+    string[] MonthlyThuHangLabels
+    {
+        get
+        {
+            var last = LastComparisonMonth;
+            if (last < 1) return Array.Empty<string>();
+            return Enumerable.Range(1, last).Select(m => MonthLabels[m - 1]).ToArray();
+        }
+    }
+
+    double MaxDayTotalForSelectedMonth =>
+        data == null || !data.Any() ? 0 : data.Max(DayTotal);
+
+    static double DayTotal(MTL_ThongKeDoanhThuResult x)
+        => (x.doanhthudichvu ?? 0) + (x.doanhthu ?? 0);
+
+    private void Tick(object? _)
+    {
+        theTime = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
+        _welcome = $"HÔM NAY {theTime} — {_TenUser?.ToUpper()} — {_Hethong?.ToUpper()}";
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AppTheme.ThemeChanged -= OnAppThemeChanged;
+        aTimer?.Dispose();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AppTheme.InitializeAsync();
+        SyncMonthlyPieUiFromTheme(bumpChartKey: false);
+        try
+        {
+            IsLoading = true;
+            userSession = await configs.LoadAllConfig();
+            _TenUser = userSession?.user?.Fullname ?? "";
+            _Hethong = userSession?.company?.Name ?? "";
+            idcompany = userSession?.company?.Id ?? 0;
+            YearSelect = DateTime.Now.Year;
+            MonthSelect = DateTime.Now.Month;
+            NgayHienTai = DateTime.Now.ToString("MM/dd/yyyy");
+
+            aTimer = new Timer(Tick, null, 0, 1000);
+
+            await LoadReportDoanhThuCoBan(NgayHienTai, isTienThucCo);
+            await LoadMonthlyTotalsForYearAsync(YearSelect);
+            await LoadMonthlyThuHangForYearAsync(YearSelect);
+            await LoadNguonTienTheoQuyForYearAsync(YearSelect);
+            await LoadChartDoanhThu(YearSelect, MonthSelect, isTienThucCo);
+            BuildRevenuePieChartData();
+
+            MaxDayRevenue = data == null || !data.Any() ? 0 : data.Max(DayTotal);
+        }
+        catch { }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    async Task SelectMonth(int month)
+    {
+        MonthSelect = month;
+        IsLoading = true;
+        await LoadChartDoanhThu(YearSelect, MonthSelect, isTienThucCo);
+        BuildRevenuePieChartData();
+        MaxDayRevenue = data == null || !data.Any() ? 0 : data.Max(DayTotal);
+        IsLoading = false;
+    }
+
+    async Task OnYearChanged(int year)
+    {
+        YearSelect = year;
+        IsLoading = true;
+        await LoadReportDoanhThuCoBan(NgayHienTai, isTienThucCo);
+        await LoadMonthlyTotalsForYearAsync(YearSelect);
+        await LoadMonthlyThuHangForYearAsync(YearSelect);
+        await LoadNguonTienTheoQuyForYearAsync(YearSelect);
+        await LoadChartDoanhThu(YearSelect, MonthSelect, isTienThucCo);
+        BuildRevenuePieChartData();
+        MaxDayRevenue = data == null || !data.Any() ? 0 : data.Max(DayTotal);
+        IsLoading = false;
+    }
+
+    private async Task LoadChartDoanhThu(int Nam, int Thang, bool isTienThucCo)
+    {
+        try
+        {
+            DoanhThuThang = 0;
+            data = await reportService.GetDoanhThuAsync(idcompany, Nam, Thang, isTienThucCo) ?? new();
+            if (data.Any())
+            {
+                DoanhThuThang = data.Sum(DayTotal);
+                if (Thang >= 1 && Thang <= 12)
+                    MonthRevenues[Thang] = DoanhThuThang;
+            }
+            else if (Thang >= 1 && Thang <= 12)
+                MonthRevenues[Thang] = 0;
+            try
+            {
+                thuTheoNguonThang = await reportService.GetThuTheoNguonTrongThangAsync(idcompany, Nam, Thang);
+            }
+            catch
+            {
+                thuTheoNguonThang = new ThuTheoNguonThoiGianSummary();
+            }
+            try
+            {
+                thuDaVaoTheoNguon = await reportService.GetThuDaVaoTheoNguonTrongThangAsync(idcompany, Nam, Thang);
+            }
+            catch
+            {
+                thuDaVaoTheoNguon = new ThuDaVaoTheoNguonResult();
+            }
+            try
+            {
+                thuDaVaoTheoNguonTheoNgay = await reportService.GetThuDaVaoTheoNguonTheoNgayTrongThangAsync(idcompany, Nam, Thang, thuDaVaoTheoNguon);
+            }
+            catch
+            {
+                thuDaVaoTheoNguonTheoNgay = new ThuDaVaoTheoNguonTheoNgayResult();
+            }
+            _nguonTienBarSelectedIndex = -1;
+            // Nhập hàng theo ngày
+            try
+            {
+                NhapHangTheoNgay = await reportService.GetNhapHangTheoNgayTrongThangAsync(idcompany, Nam, Thang);
+            }
+            catch
+            {
+                NhapHangTheoNgay = new NhapHangTheoNgayResult();
+            }
+        }
+        catch
+        {
+            data = new();
+            thuTheoNguonThang = new ThuTheoNguonThoiGianSummary();
+            thuDaVaoTheoNguon = new ThuDaVaoTheoNguonResult();
+            thuDaVaoTheoNguonTheoNgay = new ThuDaVaoTheoNguonTheoNgayResult();
+            NhapHangTheoNgay = new NhapHangTheoNgayResult();
+        }
+    }
+
+    /// <summary>
+    /// Gọi tuần tự từ T1 đến tháng cuối kỳ so sánh (năm nay: đến tháng hiện tại; năm cũ: đủ 12).
+    /// Các tháng sau (cùng năm tương lai trong lịch) giữ 0 — vẫn load khi user bấm tháng đó.
+    /// </summary>
+    private async Task LoadMonthlyTotalsForYearAsync(int year)
+    {
+        MonthRevenues = Enumerable.Range(1, 12).ToDictionary(m => m, _ => (double?)0);
+        if (idcompany <= 0)
+        {
+            _monthlyPieSelectedIndex = -1;
+            _monthlyChartVersion++;
+            return;
+        }
+        var lastM = GetLastComparisonMonth(year);
+        if (lastM < 1)
+        {
+            _monthlyPieSelectedIndex = -1;
+            _monthlyChartVersion++;
+            return;
+        }
+        for (var m = 1; m <= lastM; m++)
+        {
+            try
+            {
+                var rows = await reportService.GetDoanhThuAsync(idcompany, year, m, isTienThucCo) ?? new();
+                MonthRevenues[m] = rows.Sum(DayTotal);
+            }
+            catch
+            {
+                MonthRevenues[m] = 0;
+            }
+        }
+        _monthlyPieSelectedIndex = -1;
+        _monthlyChartVersion++;
+    }
+
+    /// <summary>Nạp tổng thu hàng theo tháng (năm) từ SP uf_ThongKeThuHangHoa_Nam.</summary>
+    private async Task LoadMonthlyThuHangForYearAsync(int year)
+    {
+        MonthThuHangRevenues = Enumerable.Range(1, 12).ToDictionary(m => m, _ => (double?)0);
+        if (idcompany <= 0)
+        {
+            _thuHangPieSelectedIndex = -1;
+            _thuHangChartVersion++;
+            return;
+        }
+        var lastM = GetLastComparisonMonth(year);
+        if (lastM < 1)
+        {
+            _thuHangPieSelectedIndex = -1;
+            _thuHangChartVersion++;
+            return;
+        }
+        try
+        {
+            var rows = await thuHangHoaService.ThongKeNamAsync(idcompany, year) ?? new();
+            foreach (var g in rows.GroupBy(r => r.thang))
+            {
+                var month = g.Key;
+                if (month >= 1 && month <= 12)
+                    MonthThuHangRevenues[month] = g.Sum(x => x.tongsotien ?? 0);
+            }
+        }
+        catch
+        {
+            for (var m = 1; m <= 12; m++)
+                MonthThuHangRevenues[m] = 0;
+        }
+        _thuHangPieSelectedIndex = -1;
+        _thuHangChartVersion++;
+    }
+
+    private async Task LoadReportDoanhThuCoBan(string NgayHienTai, bool isTienThucCo)
+    {
+        try
+        {
+            data_doanhthucoban = await reportService.GetDoanhThuCoBanAsync(idcompany, NgayHienTai, isTienThucCo) ?? new();
+        }
+        catch { data_doanhthucoban = new(); }
+    }
+
+    string FormatVND(double? amount)
+    {
+        return string.Format("{0:n0}đ", amount ?? 0);
+    }
+
+    /// <summary>Rút gọn: 1.5M, 250K…</summary>
+    string FormatShortVND(double? amount)
+    {
+        if (!amount.HasValue || amount == 0) return "0đ";
+        var v = amount.Value;
+        if (v >= 1_000_000_000) return $"{v / 1_000_000_000:0.0}T";
+        if (v >= 1_000_000) return $"{v / 1_000_000:0.0}M";
+        if (v >= 1_000) return $"{v / 1_000:0.#}K";
+        return $"{v:0}đ";
+    }
+
+    int SparkPct(double? value, double max)
+    {
+        if (max <= 0 || !value.HasValue) return 0;
+        return Math.Min(100, (int)(100.0 * value.Value / max));
+    }
+
+    static readonly string[] MonthLabels =
+    {
+        "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+        "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"
+    };
+
+}

@@ -1,0 +1,85 @@
+@using MTL.APP.Models
+@inject ISnackbar SnackbarService
+@inject IJSRuntime JSRuntime
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="false" HideText="true" />
+		}
+		else
+		{
+			<MudGrid Spacing=1>
+				<MudItem xs="12" sm="12" md="12">
+					<img class="mx-auto d-block" src="/images/icons/printer-icon.jpg" width="50" />
+				</MudItem>
+				<MudItem xs="12" sm="12" md="12">
+					<MudText Typo="Typo.h5" Class="mtl-dialog-confirm-title">CHỌN KIỂU IN ?</MudText>
+				</MudItem>
+				<MudItem xs="12" sm="12" md="12">
+					<MudText Typo="Typo.h6" Class="mtl-dialog-confirm-subtitle">@NoiDung</MudText>
+				</MudItem>
+			</MudGrid>
+		}
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Print"
+					   OnClick="InTem" Color="Color.Primary">IN GỬI HÀNG</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="OnCancelDeleteClick" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public string NoiDung { get; set; }
+	
+	[Parameter]
+	public bool Visible { get; set; }
+	bool IsLoading = false;
+
+	[Parameter]
+	public TblUser KhachHang { get; set; }
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			IsLoading = true;
+
+			IsLoading = false;
+		}
+		catch (Exception)
+		{
+			IsLoading = false;
+		}
+	}
+
+	void OnCancelDeleteClick()
+	{
+		MudDialog.Cancel();
+	}
+
+	async Task InTem()
+	{
+		string url = string.Format("/KhachHang/InGuiHang/{0}", KhachHang.Id);
+		await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+	}
+
+	async Task InNameCard()
+	{
+		string url = string.Format("/KhachHang/InNameCard/{0}", KhachHang.Id);
+		await JSRuntime.InvokeVoidAsync("open", url, "_blank");
+	}
+
+	
+}

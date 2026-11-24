@@ -1,0 +1,182 @@
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using System.ComponentModel.DataAnnotations
+@inject KhachHangService khachHangService
+@inject ISnackbar SnackbarService
+@attribute [Authorize]
+<MudDialog Class="blur dialog-background"
+		   TitleClass="blur dialog-background-title"
+		   ContentClass="dialog-background-surface pa-4"
+		   ActionsClass="dialog-background-surface">
+	<DialogContent>
+		<MudGrid Spacing=1>
+			<MudItem xs="12" sm="12" md="12">
+				<MudSelect Label="Nhóm khách hàng" T="int?"
+						   @bind-Value=KhachHang.Idnhomkhachhang Disabled=true
+						   AnchorOrigin="Origin.BottomCenter">
+					@if (ListNhomKhachHang != null)
+					{
+						foreach (var item in ListNhomKhachHang)
+						{
+							<MudSelectItem T="int?" Value="@item.Id">@item.Nhomkhachhang</MudSelectItem>
+						}
+					}
+				</MudSelect>
+			</MudItem>
+			<MudItem xs="9" sm="9" md="9">
+				<MudTextField T="string" Label="Điện thoại" Margin="Margin.Dense" Variant="Variant.Outlined"
+							  HelperTextOnFocus="true" Disabled=SDT_Enable
+							  Class="mud-input-emphasis"
+							  Text=@KhachHang.Dienthoai TextChanged=SDT_TextChanged />
+			</MudItem>
+			<MudItem xs="3" sm="3" md="3">
+				<MudButton FullWidth=true Variant="Variant.Filled"
+						   Target="_blank" Href="@string.Format("https://zalo.me/{0}", KhachHang.Dienthoai)" Color="Color.Primary">ZALO</MudButton>
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudTextField T="string" Label="Họ tên"
+							  style="color:var(--mud-palette-primary) ;font-weight: bold; !important;"
+							  HelperTextOnFocus="true"
+							  @bind-Text=KhachHang.Fullname />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudTextField T="string" Label="Địa chỉ"
+							  HelperTextOnFocus="true"
+							  @bind-Text=KhachHang.Diachi />
+			</MudItem>
+			<MudItem xs="6" sm="6" md="6">
+				<MudTextField T="string" Label="Mã bưu điện"
+							  HelperTextOnFocus="true"
+							  @bind-Text=KhachHang.Mabuudien />
+			</MudItem>
+			<MudItem xs="6" sm="6" md="6">
+				<MudTextField T="string" Label="Email"
+							  Validation="@(new EmailAddressAttribute() {ErrorMessage = "Email không hợp lệ !"})" />
+			</MudItem>
+			<MudItem xs="6" sm="6" md="6">
+				<MudTextField T="string" Label="Tên Facebook"
+							  HelperTextOnFocus="true" style="color:var(--mud-palette-primary) !important;"
+							  @bind-Text=KhachHang.Tenfacebook />
+			</MudItem>
+			<MudItem xs="6" sm="6" md="6">
+				<MudTextField T="string" Label="Link Facebook"
+							  HelperTextOnFocus="true" style="color:var(--mud-palette-primary) !important;"
+							  @bind-Text=KhachHang.Facebook />
+			</MudItem>
+			<MudItem xs="6" sm="6" md="6">
+				<MudTextField T="string" Label="Mã số thuế"
+							  HelperTextOnFocus="true"
+							  @bind-Text=KhachHang.Masothue />
+			</MudItem>
+			<MudItem xs="6" sm="6" md="6">
+				<MudTextField T="string" Label="Website"
+							  HelperTextOnFocus="true"
+							  @bind-Text=KhachHang.Website />
+			</MudItem>
+			<MudItem xs="12" sm="12" md="12">
+				<MudTextField T="string" Label="Ghi chú"
+							  HelperTextOnFocus="true" Lines="2"
+							  @bind-Text=KhachHang.Ghichu />
+			</MudItem>
+		</MudGrid>
+	</DialogContent>
+	<DialogActions>
+		<div class="dlg-footer">
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+					   OnClick="OnConfirm_ThemKH" Color="Color.Success">LƯU THÔNG TIN</MudButton>
+			<div class="dlg-footer__spacer"></div>
+			<MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Close"
+					   OnClick="ClosePopup" Color="Color.Error">HỦY BỎ</MudButton>
+		</div>
+	</DialogActions>
+</MudDialog>
+
+@code {
+
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter]
+	public int Id { get; set; }
+	[Parameter]
+	public UserSession userSession { get; set; }
+	[Parameter]
+	public bool Visible { get; set; }
+	[Parameter]
+	public bool isNew { get; set; }
+	[Parameter]
+	public TblUser KhachHang { get; set; } = new TblUser();
+	[Parameter]
+	public int Idnhomkhachhang { get; set; }
+
+	[Parameter]
+	public EventCallback<TblUser> OnCustomerCallback { get; set; }
+
+	public IEnumerable<TblNhomkhachhang>? ListNhomKhachHang { get; set; }
+
+	private ToastParameters _toastParameters;
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	string _tmpDienThoai = "";
+	TblUser khach = new TblUser();
+
+	public bool SDT_Enable { get; set; } = false;
+	string EmailMask { get; set; } = @"(\w|[.-])+@(\w|-)+\.(\w|-){2,4}";
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			ListNhomKhachHang = await khachHangService.GetAllNhomKhachHang();
+			if (isNew)
+			{
+				KhachHang.Id = 0;
+				KhachHang.Active = true;
+				KhachHang.Fullname = "";
+				KhachHang.Idnhomkhachhang = Idnhomkhachhang;
+				KhachHang.Idcompany = userSession.company.Id;
+			}
+			else
+			{
+				SDT_Enable = true;
+			}
+		}
+		catch (Exception)
+		{
+
+		}
+	}
+
+	async Task OnConfirm_ThemKH()
+	{
+		khach = await khachHangService.SaveKhachHangAsync(KhachHang, userSession);
+		KhachHang.Id = khach.Id;
+
+		Visible = false;
+		string mess = $"Cập nhật thông tin [{KhachHang.Fullname}] thành công";
+		_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+
+		await OnCustomerCallback.InvokeAsync(KhachHang);
+		MudDialog.Close(DialogResult.Ok(true));
+	}
+
+	async Task SDT_TextChanged(string Dienthoai)
+	{
+		KhachHang.Dienthoai = Dienthoai.Replace("_", "");
+		_tmpDienThoai = Dienthoai.Replace("_", "");
+		KhachHang = await khachHangService.CheckSDTKhachHangExitsAsync(userSession.company.Id, KhachHang);
+
+		if (KhachHang.Dienthoai == null)
+		{
+			KhachHang.Idnhomkhachhang = Idnhomkhachhang;
+			KhachHang.Fullname = "Khách VIP";
+			KhachHang.Dienthoai = _tmpDienThoai;
+		}
+	}
+
+	async Task ClosePopup()
+	{
+		Visible = false;
+		MudDialog.Cancel();
+	}
+
+}

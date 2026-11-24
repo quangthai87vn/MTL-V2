@@ -1,0 +1,354 @@
+@page "/HangHoa/TemDanHangHoa/{Id:int}"
+@page "/HangHoa/TemDanHangHoa35X22/{Id:int}"
+@page "/HangHoa/ThanhPhan/{Id:int}"
+@page "/HangHoa/InTem/{Id:int}"
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@inject HangHoaService hangHoaService
+@inject Configs configs
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@layout NoMenuLayout
+@attribute [Authorize]
+
+<link href="/css/product-print.css" rel="stylesheet" />
+
+@if (Mode == PrintMode.Tem5030)
+{
+	<style>
+		@@media print {
+			@@page { size: 50mm auto; margin: 0.5mm; }
+		}
+	</style>
+}
+else if (Mode == PrintMode.Tem3522x2)
+{
+	<style>
+		@@media print {
+			@@page { size: 72mm auto; margin: 0; }
+		}
+	</style>
+}
+else if (Mode == PrintMode.ThanhPhan || Mode == PrintMode.InTemLaptop)
+{
+	<style>
+		@@media print {
+			@@page { size: A4; margin: 8mm; }
+		}
+	</style>
+}
+
+<div class="no-print product-print-toolbar">
+	<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Justify="Justify.SpaceBetween">
+		<MudText Typo="Typo.subtitle1" Class="fw-bold">@ToolbarTitle — #@Id</MudText>
+		<MudStack Row="true" Spacing="1">
+			<MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="DoPrint">In</MudButton>
+			<MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="DoPdf">PDF</MudButton>
+			<MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Image" OnClick="DoPng">Ảnh PNG</MudButton>
+			<MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/Product">Đóng</MudButton>
+		</MudStack>
+	</MudStack>
+</div>
+
+@if (_error != null)
+{
+	<MudAlert Severity="Severity.Error" Class="ma-4">@_error</MudAlert>
+}
+else if (_product == null)
+{
+	<MudProgressLinear Indeterminate="true" />
+}
+else
+{
+	var p = _product!;
+	<div id="hanghoa-print-root">
+		@if (Mode == PrintMode.Tem5030)
+		{
+			@TemBlock(p, _qrDataUrl, _company)
+		}
+		else if (Mode == PrintMode.Tem3522x2)
+		{
+			<div class="tem-3522-sheet">
+				<div class="tem-3522-cell">
+					<div class="tem-3522-info">
+						<div class="tem-3522-name">@(p.Tensp ?? "")</div>
+						<div class="tem-3522-price">@Money(p.Giaban) đ</div>
+					</div>
+				</div>
+				<div class="tem-3522-cell">
+					<div class="tem-3522-info">
+						<div class="tem-3522-name">@(p.Tensp ?? "")</div>
+						<div class="tem-3522-price">@Money(p.Giaban) đ</div>
+					</div>
+				</div>
+			</div>
+		}
+		else if (Mode == PrintMode.InTemLaptop)
+		{
+			<div class="intem-root">
+				<div style="font-weight:bold;font-size:15px;text-align:center;">@p.Tensp</div>
+				@if (!string.IsNullOrWhiteSpace(p.Model))
+				{
+					<div><strong>Model:</strong> @p.Model</div>
+				}
+				@if (!string.IsNullOrWhiteSpace(p.Cpu))
+				{
+					<div>CPU: @p.Cpu</div>
+				}
+				@if (!string.IsNullOrWhiteSpace(p.Ram))
+				{
+					<div>RAM: @p.Ram</div>
+				}
+				@if (!string.IsNullOrWhiteSpace(p.Ssd))
+				{
+					<div>SSD: @p.Ssd</div>
+				}
+				@if (!string.IsNullOrWhiteSpace(p.Vga))
+				{
+					<div>VGA: @p.Vga</div>
+				}
+				<div class="intem-gia">@Money(p.Giaban) VNĐ</div>
+			</div>
+		}
+		else if (Mode == PrintMode.ThanhPhan)
+		{
+			var rows = _thanhPhan ?? new List<MTL_GetSanPhamThanhPhanResult>();
+			<div class="thanhphan-root">
+				<div class="thanhphan-title">THÀNH PHẦN / CẤU HÌNH — @(_company?.Name ?? "")</div>
+				<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+					<tr>
+						<td style="width:22%;vertical-align:top;">
+							@if (!string.IsNullOrWhiteSpace(_company?.Logourl))
+							{
+								<img src="@_company.Logourl" alt="logo" style="max-width:100px;max-height:60px;object-fit:contain;" />
+							}
+						</td>
+						<td style="vertical-align:top;padding-left:8px;">
+							<div><strong>Sản phẩm:</strong> @p.Tensp</div>
+							<div><strong>Giá bán:</strong> @Money(p.Giaban) VNĐ</div>
+							<div><strong>Bằng chữ:</strong> @_tienBangChu</div>
+						</td>
+						<td style="width:28%;vertical-align:top;text-align:center;">
+							@{
+								var imgTp = ProductImageUrl(_company, p);
+							}
+							@if (!string.IsNullOrEmpty(imgTp))
+							{
+								<img src="@imgTp" alt="" style="max-width:120px;max-height:90px;object-fit:contain;" />
+							}
+						</td>
+					</tr>
+				</table>
+				<table class="thanhphan-table">
+					<thead>
+						<tr>
+							<th class="text-center" style="width:36px;">STT</th>
+							<th>Hàng thành phần</th>
+							<th class="text-center" style="width:44px;">SL</th>
+							<th class="text-right" style="width:72px;">Đơn giá</th>
+							<th class="text-right" style="width:80px;">Thành tiền</th>
+							<th style="width:64px;">Bảo hành</th>
+						</tr>
+					</thead>
+					<tbody>
+						@{ var i = 0; }
+						@foreach (var line in rows)
+						{
+							i++;
+							<tr>
+								<td class="text-center">@i</td>
+								<td>@line.tensp</td>
+								<td class="text-center">@(line.sl ?? 0)</td>
+								<td class="text-right">@Money(line.giaban)</td>
+								<td class="text-right">@Money(line.thanhtien)</td>
+								<td>@(line.baohanh ?? "")</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+				@if (rows.Count == 0)
+				{
+					<MudText Class="mt-2" Typo="Typo.body2">Chưa có dòng thành phần nào cho sản phẩm này.</MudText>
+				}
+			</div>
+		}
+	</div>
+}
+
+@code {
+	[Parameter] public int Id { get; set; }
+
+	enum PrintMode { Tem5030, Tem3522x2, ThanhPhan, InTemLaptop }
+
+	TblSanpham? _product;
+	Company? _company;
+	List<MTL_GetSanPhamThanhPhanResult>? _thanhPhan;
+	string? _error;
+	string _qrDataUrl = "";
+	string _tienBangChu = "";
+	readonly HandleCommon _handle = new();
+
+	PrintMode Mode { get; set; } = PrintMode.Tem5030;
+
+	string ToolbarTitle => Mode switch
+	{
+		PrintMode.Tem5030 => "Tem dán 50×30",
+		PrintMode.Tem3522x2 => "Tem dán 35×22 (×2)",
+		PrintMode.ThanhPhan => "In thành phần",
+		PrintMode.InTemLaptop => "In tem cấu hình",
+		_ => "In hàng hóa"
+	};
+
+	protected override async Task OnParametersSetAsync()
+	{
+		Mode = ResolveMode(Navigation.Uri);
+		await LoadAsync();
+	}
+
+	static PrintMode ResolveMode(string uri)
+	{
+		if (uri.Contains("/TemDanHangHoa35X22/", StringComparison.OrdinalIgnoreCase))
+			return PrintMode.Tem3522x2;
+		if (uri.Contains("/ThanhPhan/", StringComparison.OrdinalIgnoreCase))
+			return PrintMode.ThanhPhan;
+		if (uri.Contains("/InTem/", StringComparison.OrdinalIgnoreCase))
+			return PrintMode.InTemLaptop;
+		return PrintMode.Tem5030;
+	}
+
+	async Task LoadAsync()
+	{
+		_error = null;
+		_product = null;
+		_thanhPhan = null;
+		try
+		{
+			var session = await configs.LoadAllConfig();
+			_company = session.company;
+			if (_company == null)
+			{
+				_error = "Chưa có thông tin công ty (đăng nhập / cấu hình).";
+				return;
+			}
+
+			var pd = await hangHoaService.GetProductAsync(Id);
+			if (pd == null)
+			{
+				_error = $"Không tìm thấy hàng hóa #{Id}.";
+				return;
+			}
+			_product = pd;
+
+			var qrText = !string.IsNullOrWhiteSpace(pd.Mavach) ? pd.Mavach! : pd.Id.ToString();
+			var ppm = Mode == PrintMode.Tem3522x2 ? 3 : 4;
+			_qrDataUrl = QrCodeHelper.ToDataUrlPng(qrText, ppm);
+			_tienBangChu = _handle.NumberToText(Convert.ToDouble(pd.Giaban ?? 0));
+
+			if (Mode == PrintMode.ThanhPhan)
+				_thanhPhan = await hangHoaService.GetHangHoaThanhPhanAsync(Id, _company.Id);
+		}
+		catch (Exception ex)
+		{
+			_error = ex.Message;
+		}
+	}
+
+	static string Money(double? v) => string.Format("{0:n0}", v ?? 0);
+
+	static string? ProductImageUrl(Company? c, TblSanpham p)
+	{
+		var raw = p.Pic00 ?? p.Hinhanh1;
+		if (string.IsNullOrWhiteSpace(raw)) return null;
+		if (raw.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return raw;
+		var baseUrl = (c?.UploadProductUrl ?? "").TrimEnd('/');
+		if (string.IsNullOrEmpty(baseUrl)) return raw;
+		return $"{baseUrl}/{raw.TrimStart('/')}";
+	}
+
+	RenderFragment TemBlock(TblSanpham p, string qr, Company? c) => __builder =>
+	{
+		<div class="tem-5030">
+			<div class="tem-5030-inner">
+				<div class="tem-5030-name">@(p.Tensp ?? "")</div>
+				<div class="tem-5030-price">@Money(p.Giaban) đ</div>
+				@if (!string.IsNullOrWhiteSpace(c?.Website))
+				{
+					<div class="tem-5030-website">@(c.Website)</div>
+				}
+			</div>
+		</div>
+	};
+
+	RenderFragment TemBlockSmall(TblSanpham p, string qr, Company? c) => __builder =>
+	{
+		<div class="tem-3522">
+			<div class="tem-5030-row">
+				<div class="tem-5030-qr">
+					@if (!string.IsNullOrEmpty(qr))
+					{
+						<img src="@qr" alt="" />
+					}
+				</div>
+				<div class="tem-5030-text">
+					<div class="tem-5030-name">@(p.Tensp ?? "")</div>
+					<div class="tem-5030-price">@Money(p.Giaban)</div>
+				</div>
+			</div>
+			<div class="tem-5030-website">@(c?.Website ?? "")</div>
+		</div>
+	};
+
+	async Task DoPrint()
+	{
+		var (pageSize, margin) = Mode switch
+		{
+			PrintMode.Tem5030  => ("50mm", "0.5mm"),
+			PrintMode.Tem3522x2 => ("72mm", "0"),
+			_                   => ("A4",   "8mm")
+		};
+		await JS.InvokeVoidAsync("mtlInvoiceExport.printLabel", "hanghoa-print-root", pageSize, margin);
+	}
+
+	async Task DoPdf()
+	{
+		var (pageSize, _) = Mode switch
+		{
+			PrintMode.Tem5030  => ("50mm", "0.5mm"),
+			PrintMode.Tem3522x2 => ("72mm", "0"),
+			_                   => ("A4",   "8mm")
+		};
+		var name = Mode switch
+		{
+			PrintMode.Tem5030 => $"Tem50x30_{Id}",
+			PrintMode.Tem3522x2 => $"Tem35x22_{Id}",
+			PrintMode.ThanhPhan => $"ThanhPhan_{Id}",
+			PrintMode.InTemLaptop => $"InTem_{Id}",
+			_ => $"HangHoa_{Id}"
+		};
+		var ok = await JS.InvokeAsync<bool>("mtlInvoiceExport.downloadPdf", "hanghoa-print-root", name, pageSize);
+		if (!ok)
+			await JS.InvokeVoidAsync("alert", "Không tạo được PDF (thiếu thư viện trên trang).");
+	}
+
+	async Task DoPng()
+	{
+		var (pageSize, _) = Mode switch
+		{
+			PrintMode.Tem5030  => ("50mm", "0.5mm"),
+			PrintMode.Tem3522x2 => ("72mm", "0"),
+			_                   => ("A4",   "8mm")
+		};
+		var name = Mode switch
+		{
+			PrintMode.Tem5030 => $"Tem50x30_{Id}.png",
+			PrintMode.Tem3522x2 => $"Tem35x22_{Id}.png",
+			PrintMode.ThanhPhan => $"ThanhPhan_{Id}.png",
+			PrintMode.InTemLaptop => $"InTem_{Id}.png",
+			_ => $"HangHoa_{Id}.png"
+		};
+		var ok = await JS.InvokeAsync<bool>("mtlInvoiceExport.downloadPng", "hanghoa-print-root", name, pageSize);
+		if (!ok)
+			await JS.InvokeVoidAsync("alert", "Không tạo được ảnh (cần html2canvas).");
+	}
+}

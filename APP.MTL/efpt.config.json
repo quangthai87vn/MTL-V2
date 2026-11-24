@@ -1,0 +1,630 @@
+﻿{
+   "CodeGenerationMode": 4,
+   "ContextClassName": "MTLContext",
+   "ContextNamespace": null,
+   "FilterSchemas": false,
+   "IncludeConnectionString": false,
+   "IrregularWords": null,
+   "MinimumProductVersion": "2.6.1382",
+   "ModelNamespace": null,
+   "OutputContextPath": null,
+   "OutputPath": "Models",
+   "PluralRules": null,
+   "PreserveCasingWithRegex": true,
+   "ProjectRootNamespace": "MTL.APP",
+   "Schemas": null,
+   "SelectedHandlebarsLanguage": 2,
+   "SelectedToBeGenerated": 0,
+   "SingularRules": null,
+   "T4TemplatePath": null,
+   "Tables": [
+      {
+         "Name": "[dbo].[Author]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Book]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[BookAuthor]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ChatGPTHistory]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Company]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Customers]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CVJP_DonHang]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CVJP_DonHangChiTiet]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CVJP_GioNhanGiao]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CVJP_PhuPhi]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CVJP_sanpham]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[GymSessions]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[HinhThucThanhToan]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[HopDong]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Job]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[LoaiPhieu]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Menu]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[MenuOfCompany]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[PhuongThucDongGoi]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Products]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Publisher]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[RefreshToken]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Register]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Role]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[RoleOfMenu]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Sale]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Store]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Tag]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_anhnen]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_ban]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_BaoHanh]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_baohanhsanpham]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_baotrisanpham]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_bienthe]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_config]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_content]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_dichvu]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_donvitinh]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_hanghoathanhphan]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_HoaDonBanHang]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_HoaDonBanHangChiTiet]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_HoaDonBanHangTagMap]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_HoaDonNhapHang]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_HoaDonNhapHangChiTiet]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_KhachHangGhiChu]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_LoaiChamSocKH]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_loaihanghoadichvu]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_nhomhang]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_nhomkhachhang]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_phieudichvu]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_phieudichvuchitiet]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_phieuthuchi]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_sanpham]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_thoigian]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_thuoctinh]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_thuoctinhbienthe]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_thuonghieu]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_UserHistory]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_users]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_videosanpham]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_vitri]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tbl_znztemplate]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tblBank]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tblHoaDon]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[tblHoaDonChiTiet]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[TimeSheet_BaiViet]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[TimeSheet_DuAn]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[TonKho]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[TrangThaiDonHang]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[User]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[User_Company]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[GymCheckInCustomer]",
+         "ObjectType": 1
+      },
+      {
+         "Name": "[dbo].[GymCheckOutCustomer]",
+         "ObjectType": 1
+      },
+      {
+         "Name": "[dbo].[sp_CopyHoaDon]",
+         "ObjectType": 1
+      },
+      {
+         "Name": "[dbo].[sp_CopySanPham]",
+         "ObjectType": 1
+      },
+      {
+         "Name": "[dbo].[sp_ImportThuocTinhSP]",
+         "ObjectType": 1
+      },
+      {
+         "Name": "[dbo].[sp_SaveHangHoaThanhPhanToHoaDon]",
+         "ObjectType": 1
+      },
+      {
+         "Name": "[dbo].[sp_UpdateAutoMaHang]",
+         "ObjectType": 1
+      },
+      {
+         "Name": "[dbo].[UpdateGymSession]",
+         "ObjectType": 1
+      },
+      {
+         "Name": "[dbo].[CreateMaDV]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[CreateMaHD_NhapHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[CreateMaHD]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[CreateMaPhieuThuChi]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[CVJP_CreateMaPhieuDatHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[CVJP_GetAllDonHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[CVJP_GetAllProducts]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[CVJP_GetDonHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[CVJP_GetDonHangChiTiet]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[GetRoleID]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[GymGetAllUsersWorkoutTimes]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_CreateMaPhieuNhapHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllCongNo]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllHoaDonCu]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllInvoice_byKhachHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllInvoice]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllKhachHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllNhomHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllPhieuDV]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllPhieuNhap]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllPhieuThuChi]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllProducts]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllProductsInCompany]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllThuongHieu]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetAllUserCompany]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetHoaDon]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetHoaDonBySDT_Serial]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetHoaDonChiTiet]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetHoaDonNhapHangChiTiet]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetMenuAll]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetMenuByCompany]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetMenuByRoles]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_GetSanPhamThanhPhan]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_ThongKeDoanhThu]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[MTL_ThongKeDoanhThuCoBan]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllCongNo_KH]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllCongNo]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllContent]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllDichVu]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllHoaDon]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllHoaDonDichVu]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllInvoice]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllNhomHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllPhieuDV]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllPhieuNhap]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllPhieuThuChi]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllProducts]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllSanPham_HangHoaThanhPhan]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllSanPham]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetAllThuongHieu]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetCongNo]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetCongNoChiTietTheoKhachHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetCongNoChiTietTheoKhachMuaHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetCongNoKhachMuaHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetCongNoTheoKhachHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetDichVu]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetDichVuChiTiet]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetHangHoaThanhPhan_UpdateGia]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetHoaDon]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetHoaDonChiTiet]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetHoaDonNhapHang]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetHoaDonNhapHangChiTiet]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_GetSanPhamThanhPhan]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_SoNhatKyChung]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_ThongKeDoanhThu]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[uf_ThongKeDoanhThuCoBan]",
+         "ObjectType": 2
+      }
+   ],
+   "UiHint": null,
+   "UncountableWords": null,
+   "UseAsyncStoredProcedureCalls": true,
+   "UseBoolPropertiesWithoutDefaultSql": false,
+   "UseDatabaseNames": false,
+   "UseDatabaseNamesForRoutines": true,
+   "UseDateOnlyTimeOnly": false,
+   "UseDbContextSplitting": false,
+   "UseDecimalDataAnnotationForSprocResult": true,
+   "UseFluentApiOnly": true,
+   "UseHandleBars": false,
+   "UseHierarchyId": false,
+   "UseInflector": true,
+   "UseInternalAccessModifiersForSprocsAndFunctions": false,
+   "UseLegacyPluralizer": false,
+   "UseManyToManyEntity": false,
+   "UseNoDefaultConstructor": false,
+   "UseNoNavigations": false,
+   "UseNoObjectFilter": false,
+   "UseNodaTime": false,
+   "UseNullableReferences": false,
+   "UsePrefixNavigationNaming": false,
+   "UseSchemaFolders": false,
+   "UseSchemaNamespaces": false,
+   "UseSpatial": false,
+   "UseT4": false,
+   "UseT4Split": false,
+   "UseTypedTvpParameters": true
+}

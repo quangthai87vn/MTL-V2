@@ -1,0 +1,496 @@
+@page "/DSThuHangHoa"
+@using MTL.APP.Models
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MTL.APP.Pages.ThuHangHoa
+@using MudBlazor.Extensions.Options
+
+@inject IJSRuntime JSRuntime
+@inject ThuHangHoaService thuHangHoaService
+@inject UserService userService
+@inject Configs configs
+@inject ISnackbar SnackbarService
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<AuthorizeView Context="auth">
+	<Authorized>
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="true" PageName="NHẬP HÀNG HOÁ" />
+		}
+		else
+		{
+			<PageStandardHeader Icon="@Icons.Material.Filled.ShoppingBag" Title="NHẬP HÀNG HOÁ">
+				<Actions>
+					<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+						<MudButton Variant="Variant.Filled" Size="Size.Small" Class="mtl-header-action-btn"
+								   StartIcon="@Icons.Material.Filled.Add"
+								   OnClick="OpenAddDialog"
+								   Color="Color.Primary">THÊM PHIẾU NHẬP HÀNG</MudButton>
+					</MudStack>
+				</Actions>
+				<ChildContent>
+					<MudStack Spacing="2" Class="pb-2">
+						<MudGrid Spacing="2" AlignItems="AlignItems.Center">
+							<MudItem xs="12" sm="12" md="8">
+								<MudGrid Spacing="2">
+									<MudItem xs="4">
+										<MudPaper Elevation="3" Class="pa-3 rounded-lg" Style="background:#fff; border:1px solid #ddd; border-top:4px solid #4A90D9;">
+											<MudIcon Icon="@Icons.Material.Filled.DateRange" Size="Size.Small" Style="color:#4A90D9; opacity:0.7" />
+											<MudText Typo="Typo.caption" Class="fw-bold" Style="color:#4A90D9;">TUẦN NÀY</MudText>
+											<MudText Typo="Typo.h5" Class="fw-bolder" Style="color:#222;">@TongTienTuan.ToString("N0") đ</MudText>
+											<MudText Typo="Typo.caption" Class="mud-text-secondary">@SoLuotTuan lượt nhập</MudText>
+										</MudPaper>
+									</MudItem>
+									<MudItem xs="4">
+										<MudPaper Elevation="3" Class="pa-3 rounded-lg" Style="background:#fff; border:1px solid #ddd; border-top:4px solid #E74C3C;">
+											<MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" Style="color:#E74C3C; opacity:0.7" />
+											<MudText Typo="Typo.caption" Class="fw-bold" Style="color:#E74C3C;">THÁNG @DateTime.Now.Month</MudText>
+											<MudText Typo="Typo.h5" Class="fw-bolder" Style="color:#222;">@TongTienThang.ToString("N0") đ</MudText>
+											<MudText Typo="Typo.caption" Class="mud-text-secondary">@SoLuotThang lượt nhập</MudText>
+										</MudPaper>
+									</MudItem>
+									<MudItem xs="4">
+										<MudPaper Elevation="3" Class="pa-3 rounded-lg" Style="background:#fff; border:1px solid #ddd; border-top:4px solid #27AE60;">
+											<MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" Style="color:#27AE60; opacity:0.7" />
+											<MudText Typo="Typo.caption" Class="fw-bold" Style="color:#27AE60;">NĂM @DateTime.Now.Year</MudText>
+											<MudText Typo="Typo.h5" Class="fw-bolder" Style="color:#222;">@TongTienNam.ToString("N0") đ</MudText>
+											<MudText Typo="Typo.caption" Class="mud-text-secondary">@SoLuotNam lượt nhập</MudText>
+										</MudPaper>
+									</MudItem>
+								</MudGrid>
+							</MudItem>
+							<MudItem xs="12" sm="12" md="4">
+								<MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+									<MudSelect T="string" Label="Lọc theo" Value="filterType" ValueChanged="OnFilterTypeChanged"
+											   Margin="Margin.Dense" Variant="Variant.Outlined" Dense="true" FullWidth="true">
+										<MudSelectItem T="string" Value="@("Tuan")">Tuần này</MudSelectItem>
+										<MudSelectItem T="string" Value="@("Thang")">Tháng này</MudSelectItem>
+										<MudSelectItem T="string" Value="@("Nam")">Năm nay</MudSelectItem>
+										<MudSelectItem T="string" Value="@("TatCa")">Tất cả</MudSelectItem>
+									</MudSelect>
+									<MudSelect T="int" Label="Năm" Value="SelectedYear" ValueChanged="OnSelectedYearChanged"
+											   Margin="Margin.Dense" Variant="Variant.Outlined" Dense="true" Style="min-width:90px">
+										@foreach (var year in YearPickerOptions)
+										{
+											<MudSelectItem T="int" Value="@year">@year</MudSelectItem>
+										}
+									</MudSelect>
+								</MudStack>
+							</MudItem>
+						</MudGrid>
+						<MudTextField @bind-Value="_searchString" Placeholder="Tìm theo tên, SĐT, mã phiếu, CMND/CCCD..."
+									  Adornment="Adornment.Start" Immediate="true" Clearable="true" FullWidth="true"
+									  Variant="Variant.Outlined" Margin="Margin.Dense"
+									  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium"
+									  Class="mtl-page-header-search" />
+					</MudStack>
+				</ChildContent>
+			</PageStandardHeader>
+
+			<MudPaper Elevation="3" Class="rounded-lg overflow-hidden mb-3">
+				<MudDivider Class="mx-0" />
+
+					<MudDataGrid T="MTL_GetAllThuHangHoaResult"
+							 Items="@FilteredList"
+							 Filterable="true"
+							 FilterMode="@DataGridFilterMode.Simple"
+							 QuickFilterFilter="@_quickFilter"
+							 Sortable="true"
+							 Hover="true"
+							 Striped="true"
+							 Bordered="true"
+							 Dense="true"
+							 RowsPerPage="50"
+							 ShowMenuIcon="false"
+							 ShowColumnOptions="true"
+							 ColumnResizeMode="ResizeMode.Container"
+							 Loading="IsLoading"
+							 Class="MTLGrid mtl-standard-grid">
+					<NoRecordsContent>
+						<MudText Typo="Typo.body1">Không có dữ liệu phiếu thu hàng hoá.</MudText>
+					</NoRecordsContent>
+					<LoadingContent>
+						<MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText>
+					</LoadingContent>
+					<ToolBarContent>
+						<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+							<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+							<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+							<MudSpacer />
+						</MudStack>
+					</ToolBarContent>
+					<Columns>
+						<HierarchyColumn T="MTL_GetAllThuHangHoaResult"
+										 HeaderStyle="width:52px; min-width:52px; text-align:center;"
+										 Hideable="false" />
+						<TemplateColumn T="MTL_GetAllThuHangHoaResult" Title="THAO TÁC" HeaderStyle="width:120px;" Filterable="false" Sortable="false">
+							<CellTemplate>
+								<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+									<MudIconButton OnClick="@(() => OpenEditDialog(context.Item.id))"
+												   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+												   Color="Color.Primary" Size="Size.Medium" Title="Sửa" />
+									<MudIconButton @onclick="@(() => XoaPhieu(context.Item))"
+												   Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled"
+												   Color="Color.Error" Size="Size.Medium" Title="Xóa" />
+									<MudIconButton OnClick="@(() => InPhieu(context.Item))"
+												   Icon="@Icons.Material.Filled.Print" Variant="Variant.Filled"
+												   Color="Color.Primary" Size="Size.Medium" Title="In phiếu" />
+								</MudButtonGroup>
+							</CellTemplate>
+						</TemplateColumn>
+
+					
+						<TemplateColumn T="MTL_GetAllThuHangHoaResult" Title="NGÀY NHẬP" HeaderStyle="width:120px;" Filterable="false">
+							<CellTemplate>
+								<MudText Typo="Typo.body2">@(context.Item.ngaythu?.ToString("dd/MM/yyyy") ?? "-")</MudText>
+							</CellTemplate>
+						</TemplateColumn>
+
+						<PropertyColumn Property="x => x.idkhachhang" Title="MÃ KH" HeaderStyle="width:80px;" Filterable="true" />
+
+						<PropertyColumn Property="x => x.tenkhachhang" Title="KHÁCH HÀNG" HeaderStyle="width:200px;" Filterable="true" />
+
+						<PropertyColumn Property="x => x.sdtkhachhang" Title="ĐIỆN THOẠI" HeaderStyle="width:130px;" Filterable="true" />
+
+						<PropertyColumn Property="x => x.diachi" Title="ĐỊA CHỈ" HeaderStyle="width:250px;" Filterable="true" />
+
+						<PropertyColumn Property="x => x.cmndcccd" Title="CMND/CCCD" HeaderStyle="width:140px;" Filterable="true" />
+
+						<TemplateColumn T="MTL_GetAllThuHangHoaResult" Title="TỔNG TIỀN" HeaderStyle="width:150px; min-width:130px;"
+										HeaderAlignment="Align.Right" ContentAlignment="Align.Right" Filterable="false">
+							<CellTemplate>
+								<MudText Typo="Typo.body2" Style="font-weight:600; color:var(--mud-palette-error); text-align:right; width:100%;">
+									@(context.Item.tongtienthu?.ToString("N0") ?? "0") đ
+								</MudText>
+							</CellTemplate>
+						</TemplateColumn>
+
+						<TemplateColumn T="MTL_GetAllThuHangHoaResult" Title="THANH TOÁN" HeaderStyle="width:150px; min-width:130px;"
+										HeaderAlignment="Align.Right" ContentAlignment="Align.Right" Filterable="false">
+							<CellTemplate>
+								<MudText Typo="Typo.body2" Style="font-weight:700; color:var(--mud-palette-success); text-align:right; width:100%;">
+									@(context.Item.thanhtoan?.ToString("N0") ?? "0") đ
+								</MudText>
+							</CellTemplate>
+						</TemplateColumn>
+
+						<TemplateColumn T="MTL_GetAllThuHangHoaResult" Title="TÌNH TRẠNG" HeaderStyle="width:130px;" Filterable="false">
+							<CellTemplate>
+								@{
+									var (chipColor, chipText) = context.Item.isThanhToan == true
+										? ("success", "Đã thanh toán")
+										: ("warning", "Chưa thanh toán");
+								}
+								<MudChip T="string" Color="@GetChipColor(chipColor)" Size="Size.Small">@chipText</MudChip>
+							</CellTemplate>
+						</TemplateColumn>
+
+						<PropertyColumn Property="x => x.ghichu" Title="GHI CHÚ" HeaderStyle="width:200px;" Filterable="true" />
+					</Columns>
+					<ChildRowContent Context="detail">
+						<MudPaper Elevation="0" Class="pa-3 ma-2 rounded-lg"
+								  Style="background:var(--mud-palette-background); border-left:4px solid var(--mud-palette-primary);">
+							<MudText Typo="Typo.subtitle2" Class="mb-2" Style="font-weight:600">Chi tiết phiếu @detail.Item.maphieu</MudText>
+							@if (TryGetChiTiet(detail.Item.id, out var lines) && lines!.Count > 0)
+							{
+								<div class="mud-table-container" style="overflow-x:auto;">
+									<table class="mud-table-root mtl-simple-table-standard" style="width:100%;">
+										<thead class="mud-table-head">
+											<tr class="mud-table-row">
+												<th class="mud-table-cell" style="font-weight:700;">TÊN HÀNG</th>
+												<th class="mud-table-cell" style="font-weight:700;">MÔ TẢ</th>
+												<th class="mud-table-cell" style="font-weight:700; text-align:right;">SL</th>
+												<th class="mud-table-cell" style="font-weight:700; text-align:right;">ĐƠN GIÁ</th>
+												<th class="mud-table-cell" style="font-weight:700; text-align:right;">THÀNH TIỀN</th>
+												<th class="mud-table-cell" style="font-weight:700;">GHI CHÚ</th>
+											</tr>
+										</thead>
+										<tbody class="mud-table-body">
+											@foreach (var line in lines)
+											{
+												<tr class="mud-table-row">
+													<td class="mud-table-cell" data-label="TÊN HÀNG">@line.Tensanpham</td>
+													<td class="mud-table-cell" data-label="MÔ TẢ">@(line.Motasanpham ?? "—")</td>
+													<td class="mud-table-cell" data-label="SL" style="text-align:right;">@(line.Soluong?.ToString("N2") ?? "—")</td>
+													<td class="mud-table-cell mtl-cell-total" data-label="ĐƠN GIÁ" style="text-align:right;">@(line.Dongia?.ToString("N0") ?? "0") đ</td>
+													<td class="mud-table-cell mtl-cell-total" data-label="THÀNH TIỀN" style="text-align:right; font-weight:600;">@(line.Thanhtien?.ToString("N0") ?? "0") đ</td>
+													<td class="mud-table-cell" data-label="GHI CHÚ">@(line.Ghichu ?? "—")</td>
+												</tr>
+											}
+										</tbody>
+									</table>
+								</div>
+							}
+							else
+							{
+								<MudText Typo="Typo.body2" Class="mud-text-secondary">Không có dòng chi tiết cho phiếu này.</MudText>
+							}
+						</MudPaper>
+					</ChildRowContent>
+					<PagerContent>
+						<MudText Typo="Typo.body2" Class="pa-2">
+							Tổng số: <strong>@(FilteredList?.Count ?? 0)</strong> phiếu thu
+						</MudText>
+						<MudDataGridPager T="MTL_GetAllThuHangHoaResult" PageSizeOptions="new int[] { 15, 30, 50, 100 }" />
+					</PagerContent>
+				</MudDataGrid>
+			</MudPaper>
+		}
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+	UserSession userSession { get; set; }
+	bool IsLoading = true;
+	List<MTL_GetAllThuHangHoaResult> ListPhieu { get; set; }
+	List<MTL_GetAllThuHangHoaResult> FilteredList => ListPhieu ?? new();
+
+	Dictionary<int, List<TblThuHangHoaChiTiet>> _chiTietByPhieuId = new();
+
+	bool TryGetChiTiet(int phieuId, out List<TblThuHangHoaChiTiet>? lines)
+	{
+		return _chiTietByPhieuId.TryGetValue(phieuId, out lines);
+	}
+
+	string _searchString = "";
+	string filterType = "TatCa";
+	/// <summary>Năm nhỏ nhất có dữ liệu thu hàng — dropdown chỉ từ đây đến năm hiện tại.</summary>
+	const int ThuHangHoaYearFrom = 2026;
+	int SelectedYear = Math.Max(ThuHangHoaYearFrom, DateTime.Now.Year);
+
+	IEnumerable<int> YearPickerOptions =>
+		Enumerable.Range(ThuHangHoaYearFrom, Math.Max(1, DateTime.Now.Year - ThuHangHoaYearFrom + 1))
+			.OrderByDescending(y => y);
+
+	double TongTienTuan = 0, TongTienThang = 0, TongTienNam = 0;
+	int SoLuotTuan = 0, SoLuotThang = 0, SoLuotNam = 0;
+
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+
+	private Func<MTL_GetAllThuHangHoaResult, bool> _quickFilter => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchString))
+			return true;
+		if (x.tenkhachhang?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (x.sdtkhachhang?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (x.maphieu?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (x.cmndcccd?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true) return true;
+		if (x.diachi?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true) return true;
+		return false;
+	};
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			IsLoading = true;
+			userSession = await configs.LoadAllConfig();
+			await LoadData();
+			IsLoading = false;
+			StateHasChanged();
+		}
+	}
+
+	async Task OnFilterTypeChanged(string v)
+	{
+		filterType = v;
+		await LoadData();
+		StateHasChanged();
+	}
+
+	async Task OnSelectedYearChanged(int y)
+	{
+		SelectedYear = y;
+		await LoadData();
+		StateHasChanged();
+	}
+
+	async Task LoadData()
+	{
+		try
+		{
+			if (userSession?.company?.Id == null)
+			{
+				_chiTietByPhieuId = new Dictionary<int, List<TblThuHangHoaChiTiet>>();
+				return;
+			}
+			var all = await thuHangHoaService.GetAllAsync(userSession.company.Id);
+
+			var now = DateTime.Now;
+			var startOfWeek = now.AddDays(-(int)now.DayOfWeek);
+			var startOfMonth = new DateTime(now.Year, now.Month, 1);
+
+			TongTienTuan = all.Where(x => x.ngaythu >= startOfWeek && x.ngaythu <= now)
+							  .Sum(x => x.thanhtoan ?? 0);
+			SoLuotTuan = all.Count(x => x.ngaythu >= startOfWeek && x.ngaythu <= now);
+
+			TongTienThang = all.Where(x => x.ngaythu >= startOfMonth && x.ngaythu <= now)
+							   .Sum(x => x.thanhtoan ?? 0);
+			SoLuotThang = all.Count(x => x.ngaythu >= startOfMonth && x.ngaythu <= now);
+
+			TongTienNam = all.Where(x => x.ngaythu?.Year == now.Year)
+							 .Sum(x => x.thanhtoan ?? 0);
+			SoLuotNam = all.Count(x => x.ngaythu?.Year == now.Year);
+
+			ListPhieu = all.Where(x =>
+			{
+				if (filterType == "Tuan") return x.ngaythu >= startOfWeek && x.ngaythu <= now;
+				if (filterType == "Thang") return x.ngaythu >= startOfMonth && x.ngaythu <= now;
+				if (filterType == "Nam") return x.ngaythu?.Year == SelectedYear;
+				return true;
+			}).ToList();
+
+			try
+			{
+				_chiTietByPhieuId = await thuHangHoaService.GetChiTietByPhieuIdsAsync(ListPhieu.Select(p => p.id));
+			}
+			catch (Exception ctex)
+			{
+				_chiTietByPhieuId = new Dictionary<int, List<TblThuHangHoaChiTiet>>();
+				_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Đã tải danh sách phiếu nhưng không tải được chi tiết: " + ctex.Message);
+			}
+		}
+		catch (Exception ex)
+		{
+			// Lỗi "Invalid object name dbo.TblUser" → gợi ý tự sửa SP bằng 1 nút
+			_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Lỗi tải dữ liệu: " + ex.Message);
+			ListPhieu = new List<MTL_GetAllThuHangHoaResult>();
+			_chiTietByPhieuId = new Dictionary<int, List<TblThuHangHoaChiTiet>>();
+		}
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		await LoadData();
+	}
+
+	async Task OpenAddDialog()
+	{
+		var parameters = new DialogParameters<DialogAddThuHangHoa>();
+		parameters.Add(x => x.IdPhieuThu, 0);
+
+		DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.ExtraExtraLarge,
+			FullWidth = true,
+			FullHeight = true,
+			MaxHeight = MaxHeight.False,
+			MaximizeButton = true,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+		};
+
+		var dialog = await DialogService.ShowEx<DialogAddThuHangHoa>("THÊM PHIẾU NHẬP HÀNG HOÁ", parameters, options);
+		var result = await dialog.Result;
+
+		if (!result.Canceled)
+		{
+			await LoadData();
+			StateHasChanged();
+		}
+	}
+
+	async Task OpenEditDialog(int idPhieuThu)
+	{
+		var parameters = new DialogParameters<DialogAddThuHangHoa>();
+		parameters.Add(x => x.IdPhieuThu, idPhieuThu);
+
+		DialogOptionsEx options = new DialogOptionsEx
+		{
+			MaxWidth = MaxWidth.ExtraExtraLarge,
+			FullWidth = true,
+			FullHeight = true,
+			MaxHeight = MaxHeight.False,
+			MaximizeButton = true,
+			CloseButton = true,
+			Position = DialogPosition.Center,
+			DragMode = MudDialogDragMode.Simple,
+			CloseOnEscapeKey = true,
+		};
+
+		var dialog = await DialogService.ShowEx<DialogAddThuHangHoa>("SỬA PHIẾU NHẬP HÀNG HOÁ", parameters, options);
+		var result = await dialog.Result;
+
+		if (!result.Canceled)
+		{
+			await LoadData();
+			StateHasChanged();
+		}
+	}
+
+	MudBlazor.Color GetChipColor(string color)
+	{
+		return color switch
+		{
+			"success" => MudBlazor.Color.Success,
+			"warning" => MudBlazor.Color.Warning,
+			"error" => MudBlazor.Color.Error,
+			_ => MudBlazor.Color.Default
+		};
+	}
+
+	async Task XoaPhieu(MTL_GetAllThuHangHoaResult item)
+	{
+		bool? confirmed = await DialogService.ShowMessageBox(
+			"Xác nhận xóa",
+			$"Bạn có chắc muốn xóa phiếu [{item.maphieu}] không?",
+			yesText: "XÓA", cancelText: "HỦY");
+
+		if (confirmed == true)
+		{
+			try
+			{
+				await thuHangHoaService.DeleteAsync(item.id);
+				_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, "Đã xóa phiếu thu!");
+				await LoadData();
+			}
+			catch (Exception ex)
+			{
+				_HandleCommon.OpenErrorSnackbarDialog(SnackbarService, "Lỗi xóa: " + ex.Message);
+			}
+		}
+	}
+
+	async Task InPhieu(MTL_GetAllThuHangHoaResult item)
+	{
+		await JSRuntime.InvokeVoidAsync("window.open", $"/AddThuHangHoa/{item.id}?print=1", "_blank");
+	}
+
+	async Task ExportXlsx()
+	{
+		try
+		{
+			var data = ListPhieu.Select(x => new
+			{
+				x.maphieu,
+				NgayThu = x.ngaythu?.ToString("dd/MM/yyyy"),
+				x.tenkhachhang,
+				x.sdtkhachhang,
+				x.diachi,
+				x.cmndcccd,
+				x.tongtienthu,
+				x.giamgia,
+				x.thanhtoan,
+				TrangThai = x.isThanhToan == true ? "Đã thanh toán" : "Chưa thanh toán",
+				x.tennhanvien,
+				x.ghichu
+			}).ToList();
+
+			await JSRuntime.InvokeVoidAsync("exportToExcel",
+				"ThuHangHoa_" + DateTime.Now.ToString("yyyyMMdd_HHmmss"),
+				new[] {
+					"Mã phiếu", "Ngày thu", "Tên khách hàng", "SĐT", "Địa chỉ",
+					"CMND/CCCD", "Tổng tiền", "Giảm giá", "Thanh toán", "Tình trạng",
+					"Người thu", "Ghi chú"
+				},
+				data);
+		}
+		catch { }
+	}
+}

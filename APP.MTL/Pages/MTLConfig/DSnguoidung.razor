@@ -1,0 +1,269 @@
+@page "/DSnguoidung"
+@using Blazored.LocalStorage;
+@using Blazored.Toast
+@using Blazored.Toast.Services
+@using MTL.APP.Models;
+@using MTL.APP.Services
+@using MTL.APP.Utils
+@using MudBlazor.Extensions.Options
+
+@inject IJSRuntime JSRuntime
+@inject UserService userService
+@inject ISnackbar SnackbarService
+@inject Configs configs
+@inject MudBlazor.IDialogService DialogService
+@attribute [Authorize]
+
+<style>
+	.my-style {
+		font-weight: bold !important;
+		color: #0d6efd;
+	}
+
+	.price {
+		font-weight: bold !important;
+		color: red;
+	}
+</style>
+
+<AuthorizeView Context="auth">
+	<Authorized>
+		<PageStandardHeader Icon="@Icons.Material.Filled.SupervisorAccount" Title="DANH SÁCH NGƯỜI DÙNG">
+			<Actions>
+				<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="flex-wrap">
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" Class="mtl-header-action-btn"
+							   Disabled=IsLoading OnClick="ThemNguoiDungPopup" Color="Color.Primary">THÊM NGƯỜI DÙNG</MudButton>
+					<MudButton Variant="Variant.Filled" Size="Size.Small" StartIcon="@Icons.Material.Filled.FileDownload" Class="mtl-header-action-btn"
+							   Disabled=IsLoading OnClick="ExportXlsx" Color="Color.Error">XUẤT EXCEL</MudButton>
+				</MudStack>
+			</Actions>
+			<ChildContent>
+				<MudTextField @bind-Value="_searchString" Placeholder="Gõ nội dung cần tìm..." Adornment="Adornment.Start"
+							  Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" FullWidth="true"
+							  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mtl-page-header-search" />
+			</ChildContent>
+		</PageStandardHeader>
+
+		@if (IsLoading)
+		{
+			<Loading IsFullPage="true" PageName="NGƯỜI DÙNG" />
+		}
+		else
+		{
+			<MudPaper Elevation="3" Class="rounded-lg overflow-hidden">
+				<MudDataGrid T="User"
+							 Items="@ListAllUser"
+							 Filterable="true"
+							 FilterMode="@DataGridFilterMode.Simple"
+							 QuickFilterFilter="@_quickFilter"
+							 Sortable="true"
+							 Hover="true"
+							 Striped="true"
+							 Bordered="true"
+							 Dense="true"
+							 RowsPerPage="13"
+							 ShowMenuIcon="false"
+							 Hideable="true"
+							 ShowColumnOptions="true"
+							 HorizontalScrollbar="true"
+							 ColumnResizeMode="ResizeMode.Column"
+							 Loading="IsLoading"
+							 Class="MTLGrid mtl-standard-grid">
+					<NoRecordsContent><MudText Typo="Typo.body1">Không có dữ liệu người dùng.</MudText></NoRecordsContent>
+					<LoadingContent><MudText Typo="Typo.body2">Đang tải dữ liệu...</MudText></LoadingContent>
+					<ToolBarContent>
+						<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="px-2 py-1" Style="width:100%; min-height:48px;">
+							<MudIcon Icon="@Icons.Material.Filled.ViewColumn" Size="Size.Small" Style="opacity:0.85" />
+							<MudText Typo="Typo.subtitle2" Style="font-weight:600">Bảng dữ liệu</MudText>
+							<MudText Typo="Typo.caption" Class="mud-text-secondary">Ẩn/hiện cột: biểu tượng bên phải</MudText>
+							<MudSpacer />
+						</MudStack>
+					</ToolBarContent>
+					<Columns>
+						<TemplateColumn T="User" Title="THAO TÁC" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+							<CellTemplate>
+								<MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" OverrideStyles=false>
+									<MudIconButton @onclick="@(() => SuaNguoiDungPopup(context.Item))"
+												   Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled"
+												   Color="Color.Primary" Size="Size.Small" Title="Sửa" />
+									<MudIconButton @onclick="@(() => XoaNguoiDungPopup(context.Item))"
+												   Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled"
+												   Color="Color.Error" Size="Size.Small" Title="Xóa" />
+								</MudButtonGroup>
+							</CellTemplate>
+						</TemplateColumn>
+
+						<TemplateColumn T="User" Title="KÍCH HOẠT" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+							<CellTemplate>
+								<MudSwitch Value="context.Item.Isactive ?? false" ReadOnly="true" T="bool" Color="Color.Primary" />
+							</CellTemplate>
+						</TemplateColumn>
+
+						<PropertyColumn Property="x => x.Fullname" Title="HỌ TÊN" HeaderStyle="width:200px;" Filterable="true" />
+						<PropertyColumn Property="x => x.EmailAddress" Title="EMAIL" HeaderStyle="width:200px;" Filterable="true" />
+						<PropertyColumn Property="x => x.Phone" Title="SỐ ĐIỆN THOẠI" HeaderStyle="width:150px;" Filterable="true" />
+						<TemplateColumn T="User" Title="VAI TRÒ" HeaderStyle="width:200px;" Filterable="false" Sortable="false">
+							<CellTemplate>
+								@GetRoleDisplayText(context.Item.Role?.RoleId)
+							</CellTemplate>
+						</TemplateColumn>
+						<PropertyColumn Property="x => x.Diachi" Title="ĐỊA CHỈ" HeaderStyle="min-width:200px;" Filterable="true" />
+						<TemplateColumn T="User" Title="ĐÃ XÓA" HeaderStyle="width:100px;" Filterable="false" Sortable="false">
+							<CellTemplate>
+								<MudSwitch Value="context.Item.Isdelete ?? false" ReadOnly="true" T="bool" Color="Color.Error" />
+							</CellTemplate>
+						</TemplateColumn>
+					</Columns>
+					<PagerContent>
+						<MudText Typo="Typo.body2" Class="pa-2">
+							Tổng số: <strong>@(ListAllUser?.Count ?? 0)</strong> người dùng
+						</MudText>
+						<MudDataGridPager T="User" PageSizeOptions="new int[] { 13, 25, 50, 100 }" />
+					</PagerContent>
+				</MudDataGrid>
+			</MudPaper>
+		}
+	</Authorized>
+</AuthorizeView>
+
+@code
+{
+	UserSession userSession { get; set; }
+	MTL.APP.Utils.HandleCommon _HandleCommon = new MTL.APP.Utils.HandleCommon();
+	private string? image_logo = "/images/logo.png";
+	bool IsLoading = true;
+	List<User>? ListAllUser { get; set; }
+	List<Role>? RoleList { get; set; }
+	private ToastParameters _toastParameters;
+
+	User _User { get; set; }
+
+	string _searchString = "";
+	private Func<User, bool> _quickFilter => x =>
+	{
+		if (string.IsNullOrWhiteSpace(_searchString))
+			return true;
+		if (x.Fullname?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.EmailAddress?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Phone?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		if (x.Diachi?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true)
+			return true;
+		return false;
+	};
+
+	DialogOptionsEx options = new DialogOptionsEx
+	{
+		MaxWidth = MaxWidth.Large,
+		MaximizeButton = true,
+		CloseButton = true,
+		Position = DialogPosition.Center,
+		DragMode = MudDialogDragMode.Simple,
+		CloseOnEscapeKey = true,
+	};
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		try
+		{
+			if (firstRender)
+			{
+				userSession = await configs.LoadAllConfig();
+				RoleList = await userService.GetAllRoleAsync();
+				ListAllUser = await userService.GetAllUserAsync();
+				IsLoading = false;
+				StateHasChanged();
+			}
+			await base.OnAfterRenderAsync(firstRender);
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	async Task ExportXlsx()
+	{
+		if (ListAllUser == null || !ListAllUser.Any())
+		{
+			SnackbarService.Add("Không có dữ liệu để xuất.", Severity.Warning);
+			return;
+		}
+		var exportData = ListAllUser.Select(u => new
+		{
+			u.UserId,
+			u.Fullname,
+			u.EmailAddress,
+			u.Phone,
+			Role = GetRoleDisplayText(u.Role?.RoleId),
+			u.Diachi,
+			IsActive = u.Isactive == true ? "Có" : "Không",
+			IsDeleted = u.Isdelete == true ? "Có" : "Không"
+		}).ToList();
+		await JSRuntime.InvokeVoidAsync("exportToExcel",
+			"DSNguoiDung",
+			new[] { "ID", "Họ tên", "Email", "SĐT", "Vai trò", "Địa chỉ", "Kích hoạt", "Đã xóa" },
+			exportData.Select(e => new object[] { e.UserId, e.Fullname, e.EmailAddress, e.Phone, e.Role, e.Diachi, e.IsActive, e.IsDeleted }).ToList()
+		);
+	}
+
+	string GetRoleDisplayText(int? roleId)
+	{
+		if (roleId == null) return "";
+		if (roleId == 1) return "Quản trị phần mềm";
+		var role = RoleList?.FirstOrDefault(p => p.RoleId == roleId);
+		return role?.RoleDesc ?? "";
+	}
+
+	async Task SuaNguoiDungPopup(User user)
+	{
+		_User = user;
+		var parameters = new DialogParameters<AddUser>();
+		parameters.Add(x => x.isNew, false);
+		parameters.Add(x => x.RoleList, RoleList);
+		parameters.Add(x => x.Idcompany, userSession.company.Id);
+		parameters.Add(x => x.UserInfo, _User);
+		string headerText = string.Format("SỬA NGƯỜI DÙNG: {0}", _User.Fullname);
+		var dialog = await DialogService.ShowEx<AddUser>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			ListAllUser = await userService.GetAllUserAsync();
+		}
+	}
+
+	async Task XoaNguoiDungPopup(User user)
+	{
+		_User = user;
+		var parameters = new DialogParameters<DeleteDialog>();
+		parameters.Add(x => x.NoiDung, _User.Fullname);
+		string headerText = "XÓA NGƯỜI DÙNG";
+		var dialog = await DialogService.ShowEx<DeleteDialog>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			await userService.DeleteUserFromCompanyAsync(_User.UserId);
+			string mess = $"Xóa người dùng [{_User.Fullname}] thành công";
+			_HandleCommon.OpenSusscessSnackbarDialog(SnackbarService, mess);
+			ListAllUser = await userService.GetAllUserAsync();
+		}
+	}
+
+	async Task ThemNguoiDungPopup()
+	{
+		_User = new User();
+		var parameters = new DialogParameters<AddUser>();
+		parameters.Add(x => x.isNew, true);
+		parameters.Add(x => x.RoleList, RoleList);
+		parameters.Add(x => x.Idcompany, userSession.company.Id);
+		parameters.Add(x => x.UserInfo, _User);
+		string headerText = "THÊM NGƯỜI DÙNG MỚI";
+		var dialog = await DialogService.ShowEx<AddUser>(headerText, parameters, options);
+		var result = await dialog.Result;
+		if (!result.Canceled)
+		{
+			ListAllUser = await userService.GetAllUserAsync();
+		}
+	}
+}
