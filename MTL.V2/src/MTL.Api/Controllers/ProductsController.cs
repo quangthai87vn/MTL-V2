@@ -617,7 +617,8 @@ public sealed class ProductsController(
         try
         {
             await wooSync.PushAsync(product, cancellationToken);
-            return (product, null);
+            db.ChangeTracker.Clear();
+            return (await LoadProductGraphAsync(product.Id, cancellationToken), null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -628,11 +629,7 @@ public sealed class ProductsController(
             var reason = exception.Message;
             db.ChangeTracker.Clear();
 
-            var persistedProduct = await db.Products
-                .Include(x => x.WooLink)
-                .Include(x => x.CategoryAssignments)
-                .Include(x => x.Images)
-                .SingleAsync(x => x.Id == product.Id, cancellationToken);
+            var persistedProduct = await LoadProductGraphAsync(product.Id, cancellationToken);
             persistedProduct.SyncState = ProductSyncState.Failed;
 
             var connection = await db.WooCommerceConnections.SingleOrDefaultAsync(cancellationToken);
@@ -647,6 +644,13 @@ public sealed class ProductsController(
                 $"Chưa đồng bộ WooCommerce: {reason}");
         }
     }
+
+    private Task<Product> LoadProductGraphAsync(Guid productId, CancellationToken cancellationToken) =>
+        db.Products
+            .Include(item => item.WooLink)
+            .Include(item => item.CategoryAssignments)
+            .Include(item => item.Images)
+            .SingleAsync(item => item.Id == productId, cancellationToken);
 
     private static string? ValidateRequest(SaveProductRequest request)
     {

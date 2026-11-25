@@ -269,14 +269,66 @@ public sealed class WooProductSyncService(
         var woo = await response.Content.ReadFromJsonAsync<WooProductDto>(JsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("WooCommerce trả về dữ liệu không hợp lệ.");
 
+        await SavePushResultAsync(product, woo, cancellationToken);
+    }
+
+    private async Task SavePushResultAsync(
+        Product product,
+        WooProductDto woo,
+        CancellationToken cancellationToken)
+    {
+        ApplyPushResult(product, woo);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // WooCommerce has already accepted the POST/PUT. Reload the latest local graph and
+            // persist the returned Woo ID instead of repeating the remote request and creating a
+            // duplicate product.
+            db.ChangeTracker.Clear();
+            var current = await db.Products
+                .Include(item => item.WooLink)
+                .Include(item => item.CategoryAssignments)
+                .Include(item => item.Images)
+                .SingleAsync(item => item.Id == product.Id, cancellationToken);
+            ApplyPushResult(current, woo);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException retryException)
+            {
+                var conflicts = string.Join("; ", retryException.Entries.Select(entry =>
+                    $"{entry.Metadata.ClrType.Name}[{entry.State}] " +
+                    string.Join(", ", entry.Properties
+                        .Where(property => property.Metadata.IsConcurrencyToken)
+                        .Select(property =>
+                            $"{property.Metadata.Name}: {property.OriginalValue} -> {property.CurrentValue}"))));
+                throw new InvalidOperationException(
+                    $"Không thể lưu kết quả đồng bộ WooCommerce sau khi tải lại dữ liệu. Xung đột: {conflicts}.",
+                    retryException);
+            }
+        }
+    }
+
+    private void ApplyPushResult(Product product, WooProductDto woo)
+    {
         if (product.WooLink is null)
         {
             product.WooLink = new WooProductLink
             {
                 CompanyId = product.CompanyId,
                 ProductId = product.Id,
+                Product = product,
                 WooProductId = woo.Id
             };
+            db.WooProductLinks.Add(product.WooLink);
+        }
+        else
+        {
+            product.WooLink.WooProductId = woo.Id;
         }
 
         product.WooLink.WooPermalink = woo.Permalink;
@@ -288,7 +340,7 @@ public sealed class WooProductSyncService(
             woo.Tags.Select(tag => new ProductTag(tag.Id is > 0 ? tag.Id : null, tag.Name ?? string.Empty)));
         product.SyncState = ProductSyncState.Synced;
         product.LastSyncedAtUtc = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
+        product.ConcurrencyToken = Guid.NewGuid();
     }
 
     private async Task<WooProductDto?> FindExistingWooProductAsync(

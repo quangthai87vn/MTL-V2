@@ -72,6 +72,74 @@ public sealed class WooProductCreationTests
     }
 
     [Fact]
+    public async Task PushPersistedProduct_AddsNewWooLinkInsteadOfUpdatingMissingRow()
+    {
+        var fixture = await TestFixture.CreateAsync();
+        if (fixture is null) return;
+
+        await using var scope = fixture;
+        var product = scope.NewProduct("MTL regression persisted create");
+        scope.Db.Products.Add(product);
+        await scope.Db.SaveChangesAsync();
+
+        var requests = new List<HttpMethod>();
+        var handler = new StubHandler(request =>
+        {
+            requests.Add(request.Method);
+            return request.Method == HttpMethod.Get
+                ? Json(HttpStatusCode.OK, Array.Empty<object>())
+                : Json(HttpStatusCode.Created, WooProduct(product));
+        });
+
+        await scope.CreateService(handler).PushAsync(product);
+
+        Assert.Equal([HttpMethod.Get, HttpMethod.Post], requests);
+        scope.Db.ChangeTracker.Clear();
+        var savedLink = await scope.Db.WooProductLinks.SingleAsync(link => link.ProductId == product.Id);
+        Assert.Equal(RemoteProductId, savedLink.WooProductId);
+    }
+
+    [Fact]
+    public async Task PushPersistedProduct_ConcurrencyAfterWooCreate_ReloadsWithoutPostingDuplicate()
+    {
+        var fixture = await TestFixture.CreateAsync();
+        if (fixture is null) return;
+
+        await using var scope = fixture;
+        var product = scope.NewProduct("MTL regression concurrent create");
+        product.Status = ProductStatus.Active;
+        scope.Db.Products.Add(product);
+        await scope.Db.SaveChangesAsync();
+
+        var requests = new List<HttpMethod>();
+        var handler = new AsyncStubHandler(async (request, cancellationToken) =>
+        {
+            requests.Add(request.Method);
+            if (request.Method == HttpMethod.Get)
+            {
+                return Json(HttpStatusCode.OK, Array.Empty<object>());
+            }
+
+            await scope.Db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"Products\" SET \"ConcurrencyToken\" = {Guid.NewGuid()} WHERE \"Id\" = {product.Id}",
+                cancellationToken);
+            return Json(HttpStatusCode.Created, WooProduct(product));
+        });
+
+        await scope.CreateService(handler).PushAsync(product);
+
+        Assert.Equal([HttpMethod.Get, HttpMethod.Post], requests);
+        Assert.Single(requests, method => method == HttpMethod.Post);
+        scope.Db.ChangeTracker.Clear();
+        var saved = await scope.Db.Products
+            .Include(item => item.WooLink)
+            .SingleAsync(item => item.Id == product.Id);
+        Assert.Equal(ProductSyncState.Synced, saved.SyncState);
+        Assert.Equal(RemoteProductId, saved.WooLink?.WooProductId);
+        Assert.NotNull(saved.WooLink?.LastPushedAtUtc);
+    }
+
+    [Fact]
     public async Task PushNewTrackedProduct_UnmarkedRecentWooProductStopsBeforeCreatingDuplicate()
     {
         var fixture = await TestFixture.CreateAsync();
