@@ -119,20 +119,22 @@ Docker image chỉ chứa mã chương trình, không chứa PostgreSQL local. M
 
 Quy trình này chỉ dùng khi khởi tạo hoặc chủ động reset máy chủ. Nó thay thế toàn bộ database trên server, bao gồm hóa đơn, khách hàng, sản phẩm, nhân viên, mật khẩu và cấu hình nghiệp vụ. Sau khi hệ thống production đã phát sinh dữ liệu thật, không dùng quy trình này để cập nhật code hằng ngày.
 
-Trên Windows, xuất PostgreSQL local thành file custom dump và checksum:
+Trên Windows, xuất PostgreSQL local cùng bộ khóa Data Protection dùng để giải mã cấu hình WooCommerce:
 
 ```powershell
 cd "E:\PROJECT MTL\MTL.V2"
 .\scripts\export-local-postgres.ps1
 ```
 
-Hai file được tạo trong `backups\transfer`. Thư mục này và file `*.dump` đã được Git bỏ qua; không commit dữ liệu hoặc mật khẩu lên GitHub.
+Bốn file được tạo trong `backups\transfer`: dump, checksum của dump, gói khóa `*.data-protection-keys.tar.gz` và checksum của gói khóa. Tất cả đều là dữ liệu nhạy cảm và đã được Git bỏ qua; tuyệt đối không commit lên GitHub.
 
-Chuyển cả dump và checksum lên máy chủ:
+Chuyển dump, gói khóa và hai checksum lên máy chủ:
 
 ```powershell
 ssh mtl@192.168.1.112 "mkdir -p /opt/mtl-v2/incoming"
 scp ".\backups\transfer\mtl-v2-local-YYYYMMDD-HHMMSS.dump*" `
+  "mtl@192.168.1.112:/opt/mtl-v2/incoming/"
+scp ".\backups\transfer\mtl-v2-local-YYYYMMDD-HHMMSS.data-protection-keys.tar.gz*" `
   "mtl@192.168.1.112:/opt/mtl-v2/incoming/"
 ```
 
@@ -147,10 +149,21 @@ chmod +x scripts/*.sh
 ./scripts/initialize-prod-from-dump.sh \
   /opt/mtl-v2/incoming/mtl-v2-local-YYYYMMDD-HHMMSS.dump \
   main \
+  --keys-file /opt/mtl-v2/incoming/mtl-v2-local-YYYYMMDD-HHMMSS.data-protection-keys.tar.gz \
   --confirm-overwrite
 ```
 
-Script sẽ kiểm tra SHA-256 nếu có, pull image, khởi động PostgreSQL, kiểm tra định dạng dump, sao lưu database server hiện tại, dừng API/Web, khôi phục trong một transaction và chỉ khởi động ứng dụng khi restore thành công. Tài khoản đăng nhập sau khi restore là tài khoản nằm trong database local, không phải tài khoản seed mới trong `.env`.
+Script sẽ kiểm tra SHA-256, pull image, khởi động PostgreSQL, kiểm tra định dạng dump, sao lưu database và bộ khóa server hiện tại, dừng API/Web, khôi phục database trong một transaction, nhập thêm bộ khóa tương ứng rồi mới khởi động ứng dụng. Tài khoản đăng nhập sau khi restore là tài khoản nằm trong database local, không phải tài khoản seed mới trong `.env`.
+
+Nếu database đã được khôi phục trước đó nhưng quên chuyển bộ khóa, chỉ cần nhập khóa mà không đụng tới database:
+
+```bash
+./scripts/import-data-protection-keys.sh \
+  /opt/mtl-v2/incoming/mtl-v2-local-YYYYMMDD-HHMMSS.data-protection-keys.tar.gz \
+  --confirm-import
+```
+
+Script giữ nguyên các khóa đang có, sao lưu key ring trước khi nhập và khởi động lại API/Web. Không xóa volume `data-protection-keys` trong quá trình cập nhật code thông thường.
 
 ## Sao lưu và khôi phục PostgreSQL
 

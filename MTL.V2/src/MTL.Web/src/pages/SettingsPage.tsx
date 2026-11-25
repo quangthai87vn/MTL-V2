@@ -1,11 +1,20 @@
-import { Building2, CalendarClock, CheckCircle2, ImagePlus, KeyRound, ReceiptText, RefreshCw, Save, Store, Upload } from 'lucide-react'
+import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ImagePlus, KeyRound, ReceiptText, RefreshCw, Save, Store, Upload } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { api } from '../lib/api'
 import type { CompanySettings, InvoiceSettings } from '../types'
 
-type WooConfiguration = { baseUrl?: string; isEnabled: boolean; hasCredentials: boolean; hasWebhookSecret: boolean; lastSuccessfulSyncAtUtc?: string; lastError?: string }
+type WooConfiguration = {
+  baseUrl?: string
+  isEnabled: boolean
+  hasCredentials: boolean
+  credentialsReadable: boolean
+  hasWebhookSecret: boolean
+  webhookSecretReadable: boolean
+  lastSuccessfulSyncAtUtc?: string
+  lastError?: string
+}
 
 export function SettingsPage() {
   const [tab, setTab] = useState<'woo' | 'company' | 'invoice'>('woo')
@@ -62,22 +71,25 @@ function WooSettingsForm() {
   const [isEnabled, setIsEnabled] = useState<boolean | null>(null)
   const effectiveBaseUrl = baseUrl ?? query.data?.baseUrl ?? 'https://mytholaptop.vn'
   const effectiveIsEnabled = isEnabled ?? query.data?.isEnabled ?? true
+  const credentialsNeedReset = query.data?.hasCredentials === true && query.data.credentialsReadable === false
   const saveMutation = useMutation({ mutationFn: () => api.put<WooConfiguration>('/api/integrations/woocommerce/configuration', { baseUrl: effectiveBaseUrl, consumerKey: consumerKey || null, consumerSecret: consumerSecret || null, webhookSecret: webhookSecret || null, isEnabled: effectiveIsEnabled }), onSuccess: () => { setConsumerKey(''); setConsumerSecret(''); setWebhookSecret(''); setBaseUrl(null); setIsEnabled(null); void queryClient.invalidateQueries({ queryKey: ['woo-config'] }) } })
   const testMutation = useMutation({ mutationFn: () => api.post('/api/integrations/woocommerce/test') })
   function submit(event: FormEvent) { event.preventDefault(); saveMutation.mutate() }
 
   return <form className="panel settings-form" onSubmit={submit}>
-    <div className="panel-heading"><div><span className="eyebrow">TÍCH HỢP WEBSITE</span><h2>WooCommerce</h2><p>Credential được mã hóa trước khi lưu vào PostgreSQL.</p></div>{query.data?.hasCredentials && <span className="status-badge success"><CheckCircle2 size={14} /> Đã cấu hình</span>}</div>
+    <div className="panel-heading"><div><span className="eyebrow">TÍCH HỢP WEBSITE</span><h2>WooCommerce</h2><p>Credential được mã hóa trước khi lưu vào PostgreSQL.</p></div>{query.data?.credentialsReadable ? <span className="status-badge success"><CheckCircle2 size={14} /> Đã cấu hình</span> : credentialsNeedReset ? <span className="status-badge warning"><AlertTriangle size={14} /> Cần nhập lại khóa</span> : null}</div>
     {(saveMutation.isError || testMutation.isError) && <div className="form-alert">{(saveMutation.error ?? testMutation.error)?.message}</div>}
+    {credentialsNeedReset && <div className="form-alert">Bộ khóa bảo mật trên máy chủ không khớp với database. Hãy nhập lại đầy đủ Consumer Key và Consumer Secret, hoặc khôi phục bộ khóa Data Protection đã dùng khi xuất database.</div>}
+    {query.data?.hasWebhookSecret && !query.data.webhookSecretReadable && <div className="form-alert">Webhook Secret hiện tại cũng không thể giải mã. Hãy nhập lại nếu website đang dùng webhook thời gian thực.</div>}
     {(saveMutation.isSuccess || testMutation.isSuccess) && <div className="form-success">Thao tác thành công.</div>}
     <div className="form-stack">
       <label><span>Website URL</span><input value={effectiveBaseUrl} onChange={(event) => setBaseUrl(event.target.value)} type="url" required /></label>
-      <div className="form-grid"><label><span>Consumer Key</span><input value={consumerKey} onChange={(event) => setConsumerKey(event.target.value)} type="password" placeholder={query.data?.hasCredentials ? 'Để trống nếu không đổi' : 'ck_…'} /></label><label><span>Consumer Secret</span><input value={consumerSecret} onChange={(event) => setConsumerSecret(event.target.value)} type="password" placeholder={query.data?.hasCredentials ? 'Để trống nếu không đổi' : 'cs_…'} /></label></div>
+      <div className="form-grid"><label><span>Consumer Key</span><input value={consumerKey} onChange={(event) => setConsumerKey(event.target.value)} type="password" placeholder={query.data?.credentialsReadable ? 'Để trống nếu không đổi' : 'Nhập lại ck_…'} required={query.data ? !query.data.credentialsReadable : false} /></label><label><span>Consumer Secret</span><input value={consumerSecret} onChange={(event) => setConsumerSecret(event.target.value)} type="password" placeholder={query.data?.credentialsReadable ? 'Để trống nếu không đổi' : 'Nhập lại cs_…'} required={query.data ? !query.data.credentialsReadable : false} /></label></div>
       <label><span>Webhook Secret</span><input value={webhookSecret} onChange={(event) => setWebhookSecret(event.target.value)} type="password" placeholder={query.data?.hasWebhookSecret ? 'Để trống nếu không đổi' : 'Chỉ cần khi dùng webhook thời gian thực'} /></label>
       <label className="toggle-row"><span><strong>Bật đồng bộ WooCommerce</strong><small>Cho phép hệ thống đọc và cập nhật sản phẩm website.</small></span><input type="checkbox" checked={effectiveIsEnabled} onChange={(event) => setIsEnabled(event.target.checked)} /></label>
     </div>
     {query.data?.lastSuccessfulSyncAtUtc && <p className="last-sync">Đồng bộ thành công gần nhất: {new Date(query.data.lastSuccessfulSyncAtUtc).toLocaleString('vi-VN')}</p>}
-    <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => testMutation.mutate()} disabled={!query.data?.hasCredentials || testMutation.isPending}><RefreshCw size={17} /> Kiểm tra kết nối</button><button className="primary-button" disabled={saveMutation.isPending}><Save size={17} /> {saveMutation.isPending ? 'Đang lưu…' : 'Lưu cấu hình'}</button></div>
+    <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => testMutation.mutate()} disabled={!query.data?.credentialsReadable || testMutation.isPending}><RefreshCw size={17} /> Kiểm tra kết nối</button><button className="primary-button" disabled={saveMutation.isPending}><Save size={17} /> {saveMutation.isPending ? 'Đang lưu…' : 'Lưu cấu hình'}</button></div>
   </form>
 }
 

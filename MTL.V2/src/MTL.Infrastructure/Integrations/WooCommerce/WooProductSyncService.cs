@@ -21,8 +21,9 @@ public sealed class WooProductRecoveryRequiredException(string message) : Invali
 public sealed class WooCommerceRequestException(
     string message,
     HttpStatusCode statusCode,
-    string? errorCode = null)
-    : InvalidOperationException(message)
+    string? errorCode = null,
+    Exception? innerException = null)
+    : InvalidOperationException(message, innerException)
 {
     public HttpStatusCode StatusCode { get; } = statusCode;
     public string? ErrorCode { get; } = errorCode;
@@ -376,7 +377,10 @@ public sealed class WooProductSyncService(
         var connection = await db.WooCommerceConnections.SingleOrDefaultAsync(cancellationToken);
         if (connection is null || !connection.IsEnabled)
         {
-            throw new InvalidOperationException("WooCommerce chưa được cấu hình hoặc chưa bật.");
+            throw new WooCommerceRequestException(
+                "WooCommerce chưa được cấu hình hoặc chưa bật.",
+                HttpStatusCode.ServiceUnavailable,
+                "woocommerce_not_configured");
         }
 
         return connection;
@@ -387,11 +391,28 @@ public sealed class WooProductSyncService(
         if (!Uri.TryCreate(connection.BaseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri) ||
             (baseUri.Scheme != Uri.UriSchemeHttps && baseUri.Host != "localhost"))
         {
-            throw new InvalidOperationException("WooCommerce URL phải dùng HTTPS.");
+            throw new WooCommerceRequestException(
+                "WooCommerce URL phải dùng HTTPS.",
+                HttpStatusCode.ServiceUnavailable,
+                "woocommerce_invalid_url");
         }
 
-        var key = secretProtector.Unprotect(connection.ConsumerKeyCiphertext);
-        var secret = secretProtector.Unprotect(connection.ConsumerSecretCiphertext);
+        string key;
+        string secret;
+        try
+        {
+            key = secretProtector.Unprotect(connection.ConsumerKeyCiphertext);
+            secret = secretProtector.Unprotect(connection.ConsumerSecretCiphertext);
+        }
+        catch (SecretProtectionException exception)
+        {
+            throw new WooCommerceRequestException(
+                "Không thể đọc thông tin đăng nhập WooCommerce vì bộ khóa bảo mật không khớp với database. " +
+                "Hãy khôi phục bộ khóa Data Protection hoặc nhập lại Consumer Key và Consumer Secret tại Cấu hình > WooCommerce.",
+                HttpStatusCode.ServiceUnavailable,
+                "woocommerce_credentials_unreadable",
+                exception);
+        }
         httpClient.BaseAddress = baseUri;
         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Basic",

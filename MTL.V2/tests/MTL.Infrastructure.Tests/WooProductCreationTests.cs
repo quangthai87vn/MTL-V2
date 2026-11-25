@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MTL.Domain.Catalog;
@@ -178,6 +179,26 @@ public sealed class WooProductCreationTests
         Assert.Contains("Trạng thái kho không hợp lệ.", error.Message);
     }
 
+    [Fact]
+    public async Task PushProduct_MissingDataProtectionKeyReturnsActionableConfigurationError()
+    {
+        var fixture = await TestFixture.CreateAsync();
+        if (fixture is null) return;
+
+        await using var scope = fixture;
+        var product = scope.NewProduct("MTL missing key regression");
+        scope.Db.Products.Add(product);
+
+        var error = await Assert.ThrowsAsync<WooCommerceRequestException>(
+            () => scope.CreateService(new StubHandler(_ => throw new InvalidOperationException()), new UnreadableProtector())
+                .PushAsync(product));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, error.StatusCode);
+        Assert.Equal("woocommerce_credentials_unreadable", error.ErrorCode);
+        Assert.Contains("Data Protection", error.Message);
+        Assert.DoesNotContain("key ring", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static object WooProduct(Product product) => new
     {
         id = RemoteProductId,
@@ -238,6 +259,15 @@ public sealed class WooProductCreationTests
         public string Unprotect(string ciphertext) => ciphertext;
     }
 
+    private sealed class UnreadableProtector : ISecretProtector
+    {
+        public string Protect(string plaintext) => plaintext;
+
+        public string Unprotect(string ciphertext) => throw new SecretProtectionException(
+            "Không thể giải mã thông tin bảo mật đã lưu.",
+            new CryptographicException("The key {test-key-id} was not found in the key ring."));
+    }
+
     private sealed class TestCurrentUser(Guid companyId) : ICurrentUser
     {
         public Guid? UserId { get; } = Guid.NewGuid();
@@ -282,10 +312,10 @@ public sealed class WooProductCreationTests
             SyncState = ProductSyncState.PendingPush
         };
 
-        public WooProductSyncService CreateService(HttpMessageHandler handler) => new(
+        public WooProductSyncService CreateService(HttpMessageHandler handler, ISecretProtector? secretProtector = null) => new(
             new HttpClient(handler),
             Db,
-            new PlaintextProtector(),
+            secretProtector ?? new PlaintextProtector(),
             currentUser);
 
         public async ValueTask DisposeAsync()

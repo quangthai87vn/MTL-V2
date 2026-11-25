@@ -36,7 +36,16 @@ public sealed class WooCommerceWebhookController(
         }
 
         var signature = Request.Headers["X-WC-Webhook-Signature"].ToString();
-        var secret = secretProtector.Unprotect(connection.WebhookSecretCiphertext);
+        string secret;
+        try
+        {
+            secret = secretProtector.Unprotect(connection.WebhookSecretCiphertext);
+        }
+        catch (SecretProtectionException exception)
+        {
+            logger.LogError(exception, "WooCommerce webhook secret cannot be decrypted for company {CompanyId}", companyId);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        }
         if (!IsValidSignature(body, secret, signature))
         {
             logger.LogWarning("Rejected WooCommerce webhook with invalid signature for company {CompanyId}", companyId);

@@ -98,8 +98,19 @@ public sealed class WooMediaService(
             throw new InvalidOperationException("WooCommerce URL phải dùng HTTPS.");
         }
 
-        var key = secretProtector.Unprotect(connection.ConsumerKeyCiphertext);
-        var secret = secretProtector.Unprotect(connection.ConsumerSecretCiphertext);
+        string key;
+        string secret;
+        try
+        {
+            key = secretProtector.Unprotect(connection.ConsumerKeyCiphertext);
+            secret = secretProtector.Unprotect(connection.ConsumerSecretCiphertext);
+        }
+        catch (SecretProtectionException exception)
+        {
+            throw new WooMediaBridgeUnavailableException(
+                "Không thể đọc thông tin đăng nhập WooCommerce. Hãy khôi phục bộ khóa Data Protection hoặc nhập lại Consumer Key và Consumer Secret tại Cấu hình > WooCommerce.",
+                exception);
+        }
         httpClient.BaseAddress = baseUri;
         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Basic",

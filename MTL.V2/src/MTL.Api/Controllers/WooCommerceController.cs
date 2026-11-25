@@ -25,12 +25,14 @@ public sealed class WooCommerceController(
     {
         var connection = await db.WooCommerceConnections.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
         return connection is null
-            ? Ok(new WooConfigurationResponse(null, false, false, false, null, null))
+            ? Ok(new WooConfigurationResponse(null, false, false, false, false, false, null, null))
             : Ok(new WooConfigurationResponse(
                 connection.BaseUrl,
                 connection.IsEnabled,
-                !string.IsNullOrEmpty(connection.ConsumerKeyCiphertext),
-                !string.IsNullOrEmpty(connection.WebhookSecretCiphertext),
+                HasCredentials(connection),
+                CredentialsAreReadable(connection),
+                HasWebhookSecret(connection),
+                WebhookSecretIsReadable(connection),
                 connection.LastSuccessfulSyncAtUtc,
                 connection.LastError));
     }
@@ -47,15 +49,20 @@ public sealed class WooCommerceController(
 
         var companyId = currentUser.CompanyId ?? throw new UnauthorizedAccessException();
         var connection = await db.WooCommerceConnections.SingleOrDefaultAsync(cancellationToken);
+        var storedCredentialsAreReadable = connection is not null && CredentialsAreReadable(connection);
         if (connection is null)
         {
-            if (string.IsNullOrWhiteSpace(request.ConsumerKey) || string.IsNullOrWhiteSpace(request.ConsumerSecret))
-            {
-                return BadRequest(new { message = "Woo Key và Woo Secret là bắt buộc khi cấu hình lần đầu." });
-            }
-
             connection = new WooCommerceConnection { CompanyId = companyId };
             db.WooCommerceConnections.Add(connection);
+        }
+
+        if (!storedCredentialsAreReadable &&
+            (string.IsNullOrWhiteSpace(request.ConsumerKey) || string.IsNullOrWhiteSpace(request.ConsumerSecret)))
+        {
+            return BadRequest(new
+            {
+                message = "Consumer Key và Consumer Secret là bắt buộc vì thông tin đăng nhập hiện tại không thể giải mã. Hãy nhập lại cả hai giá trị."
+            });
         }
 
         connection.BaseUrl = request.BaseUrl.TrimEnd('/');
@@ -73,12 +80,19 @@ public sealed class WooCommerceController(
             connection.WebhookSecretCiphertext = secretProtector.Protect(request.WebhookSecret.Trim());
         }
 
+        if (!string.IsNullOrWhiteSpace(request.ConsumerKey) && !string.IsNullOrWhiteSpace(request.ConsumerSecret))
+        {
+            connection.LastError = null;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return Ok(new WooConfigurationResponse(
             connection.BaseUrl,
             connection.IsEnabled,
-            true,
-            !string.IsNullOrWhiteSpace(connection.WebhookSecretCiphertext),
+            HasCredentials(connection),
+            CredentialsAreReadable(connection),
+            HasWebhookSecret(connection),
+            WebhookSecretIsReadable(connection),
             connection.LastSuccessfulSyncAtUtc,
             connection.LastError));
     }
@@ -86,15 +100,59 @@ public sealed class WooCommerceController(
     [HttpPost("test")]
     public async Task<IActionResult> Test(CancellationToken cancellationToken)
     {
-        var success = await syncService.TestConnectionAsync(cancellationToken);
-        return success ? Ok(new { message = "Kết nối WooCommerce thành công." }) : BadRequest(new { message = "Không thể kết nối WooCommerce." });
+        try
+        {
+            var success = await syncService.TestConnectionAsync(cancellationToken);
+            return success
+                ? Ok(new { message = "Kết nối WooCommerce thành công." })
+                : BadRequest(new { message = "Không thể kết nối WooCommerce." });
+        }
+        catch (WooCommerceRequestException exception)
+        {
+            return StatusCode((int)exception.StatusCode, new { message = exception.Message, code = exception.ErrorCode });
+        }
     }
 
     [HttpPost("sync/products")]
     public async Task<ActionResult<WooSyncResult>> PullProducts(CancellationToken cancellationToken)
     {
-        var result = await syncService.PullAllAsync(cancellationToken);
-        return Ok(result);
+        try
+        {
+            var result = await syncService.PullAllAsync(cancellationToken);
+            return Ok(result);
+        }
+        catch (WooCommerceRequestException exception)
+        {
+            return StatusCode((int)exception.StatusCode, new { message = exception.Message, code = exception.ErrorCode });
+        }
+    }
+
+    private static bool HasCredentials(WooCommerceConnection connection) =>
+        !string.IsNullOrWhiteSpace(connection.ConsumerKeyCiphertext) &&
+        !string.IsNullOrWhiteSpace(connection.ConsumerSecretCiphertext);
+
+    private static bool HasWebhookSecret(WooCommerceConnection connection) =>
+        !string.IsNullOrWhiteSpace(connection.WebhookSecretCiphertext);
+
+    private bool CredentialsAreReadable(WooCommerceConnection connection) =>
+        HasCredentials(connection) &&
+        CanUnprotect(connection.ConsumerKeyCiphertext) &&
+        CanUnprotect(connection.ConsumerSecretCiphertext);
+
+    private bool WebhookSecretIsReadable(WooCommerceConnection connection) =>
+        HasWebhookSecret(connection) && CanUnprotect(connection.WebhookSecretCiphertext);
+
+    private bool CanUnprotect(string ciphertext)
+    {
+        try
+        {
+            _ = secretProtector.Unprotect(ciphertext);
+            return true;
+        }
+        catch (SecretProtectionException)
+        {
+            return false;
+        }
     }
 }
 
@@ -109,7 +167,9 @@ public sealed record WooConfigurationResponse(
     string? BaseUrl,
     bool IsEnabled,
     bool HasCredentials,
+    bool CredentialsReadable,
     bool HasWebhookSecret,
+    bool WebhookSecretReadable,
     DateTimeOffset? LastSuccessfulSyncAtUtc,
     string? LastError);
 

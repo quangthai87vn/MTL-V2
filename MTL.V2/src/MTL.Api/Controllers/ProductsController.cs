@@ -354,7 +354,7 @@ public sealed class ProductsController(
         }
         catch (WooCommerceRequestException exception)
         {
-            return StatusCode(StatusCodes.Status502BadGateway, new { message = exception.Message });
+            return StatusCode((int)exception.StatusCode, new { message = exception.Message, code = exception.ErrorCode });
         }
     }
 
@@ -369,7 +369,7 @@ public sealed class ProductsController(
         }
         catch (WooCommerceRequestException exception)
         {
-            return StatusCode(StatusCodes.Status502BadGateway, new { message = exception.Message });
+            return StatusCode((int)exception.StatusCode, new { message = exception.Message, code = exception.ErrorCode });
         }
     }
 
