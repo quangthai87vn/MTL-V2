@@ -12,6 +12,7 @@ import {
   Pencil,
   Plus,
   Printer,
+  RotateCcw,
   Search,
   Settings2,
   Trash2,
@@ -26,7 +27,7 @@ import { SalesInvoiceDialog } from '../components/SalesInvoiceDialog'
 import { SalesManagementDialog } from '../components/SalesManagementDialog'
 import { StatusBadge } from '../components/StatusBadge'
 import { api } from '../lib/api'
-import type { PagedResult, RepairStatus, SalesInvoice, SalesSummary, ServiceType } from '../types'
+import type { PagedResult, RepairStatus, SalesFilterOptions, SalesInvoice, SalesPaymentSource, SalesSummary, ServiceType } from '../types'
 
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 })
 const dateTime = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -37,6 +38,10 @@ export function SalesPage() {
   const [type, setType] = useState('')
   const [serviceTypeId, setServiceTypeId] = useState('')
   const [repairProgress, setRepairProgress] = useState('')
+  const [saleMode, setSaleMode] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [createdByUserId, setCreatedByUserId] = useState('')
+  const [paymentAccountId, setPaymentAccountId] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [showCreate, setShowCreate] = useState(false)
@@ -49,14 +54,19 @@ export function SalesPage() {
 
   const summaryQuery = useQuery({ queryKey: ['sales-summary'], queryFn: () => api.get<SalesSummary>('/api/sales/summary') })
   const serviceTypesQuery = useQuery({ queryKey: ['sales-service-types'], queryFn: () => api.get<ServiceType[]>('/api/sales/service-types') })
+  const filterOptionsQuery = useQuery({ queryKey: ['sales-filter-options'], queryFn: () => api.get<SalesFilterOptions>('/api/sales/filter-options') })
   const invoicesQuery = useQuery({
-    queryKey: ['sales-invoices', deferredSearch, type, serviceTypeId, repairProgress, page, pageSize],
+    queryKey: ['sales-invoices', deferredSearch, type, serviceTypeId, repairProgress, saleMode, paymentMethod, createdByUserId, paymentAccountId, page, pageSize],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
       if (deferredSearch) params.set('search', deferredSearch)
       if (type) params.set('type', type)
       if (serviceTypeId) params.set('serviceTypeId', serviceTypeId)
       if (repairProgress) params.set('repairProgress', repairProgress)
+      if (saleMode) params.set('saleMode', saleMode)
+      if (paymentMethod) params.set('paymentMethod', paymentMethod)
+      if (createdByUserId) params.set('createdByUserId', createdByUserId)
+      if (paymentAccountId) params.set('paymentAccountId', paymentAccountId)
       return api.get<PagedResult<SalesInvoice>>(`/api/sales?${params.toString()}`)
     },
     placeholderData: (previous) => previous,
@@ -75,6 +85,19 @@ export function SalesPage() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const firstItem = total === 0 ? 0 : (page - 1) * pageSize + 1
   const lastItem = Math.min(page * pageSize, total)
+  const hasFilters = Boolean(search || type || serviceTypeId || repairProgress || saleMode || paymentMethod || createdByUserId || paymentAccountId)
+
+  function clearFilters() {
+    setSearch('')
+    setType('')
+    setServiceTypeId('')
+    setRepairProgress('')
+    setSaleMode('')
+    setPaymentMethod('')
+    setCreatedByUserId('')
+    setPaymentAccountId('')
+    setPage(1)
+  }
 
   function invoiceCreated(id: string) {
     setShowCreate(false)
@@ -102,7 +125,7 @@ export function SalesPage() {
       </>}
     />
 
-    {(summaryQuery.isError || invoicesQuery.isError || deleteMutation.isError) && <div className="form-alert">{(summaryQuery.error ?? invoicesQuery.error ?? deleteMutation.error)?.message}</div>}
+    {(summaryQuery.isError || invoicesQuery.isError || filterOptionsQuery.isError || deleteMutation.isError) && <div className="form-alert">{(summaryQuery.error ?? invoicesQuery.error ?? filterOptionsQuery.error ?? deleteMutation.error)?.message}</div>}
 
     <section className="sales-metrics">
       <article><span className="sales-metric-icon red"><CircleDollarSign size={22} /></span><div><small>Giá trị đã xử lý hôm nay</small><strong>{currency.format(summary?.invoiceTotalToday ?? 0)}</strong><p>Giao dịch đã hoàn tất xử lý</p></div></article>
@@ -117,29 +140,39 @@ export function SalesPage() {
         <label className="sales-filter"><select value={type} onChange={(event) => { setType(event.target.value); setPage(1) }}><option value="">Tất cả nghiệp vụ</option><option value="Sale">Bán hàng</option><option value="Repair">Sửa chữa</option></select><ChevronDown size={15} /></label>
         <label className="sales-filter"><select value={serviceTypeId} onChange={(event) => { setServiceTypeId(event.target.value); setPage(1) }}><option value="">Tất cả loại dịch vụ</option>{serviceTypesQuery.data?.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown size={15} /></label>
         <label className="sales-filter"><select value={repairProgress} onChange={(event) => { setRepairProgress(event.target.value); setPage(1) }}><option value="">Tất cả trạng thái xử lý</option><option value="pending">Đang xử lý</option><option value="processed">Đã xử lý</option></select><ChevronDown size={15} /></label>
+        <label className="sales-filter"><select value={saleMode} onChange={(event) => { setSaleMode(event.target.value); setPage(1) }}><option value="">Trực tiếp & trả góp</option><option value="direct">Bán trực tiếp</option><option value="installment">Trả góp</option></select><ChevronDown size={15} /></label>
+        <label className="sales-filter"><select value={paymentMethod} onChange={(event) => { setPaymentMethod(event.target.value); setPage(1) }}><option value="">Mọi phương thức tiền</option><option value="cash">Có tiền mặt</option><option value="bank">Có chuyển khoản</option><option value="mixed">Tiền mặt + chuyển khoản</option><option value="unallocated">Chưa phân bổ</option></select><ChevronDown size={15} /></label>
+        <label className="sales-filter"><select value={createdByUserId} onChange={(event) => { setCreatedByUserId(event.target.value); setPage(1) }}><option value="">Tất cả người lập</option>{filterOptionsQuery.data?.creators.map((creator) => <option key={creator.id} value={creator.id}>{creator.name}</option>)}</select><ChevronDown size={15} /></label>
+        <label className="sales-filter banking-filter"><select value={paymentAccountId} onChange={(event) => { setPaymentAccountId(event.target.value); setPage(1) }}><option value="">Tất cả tài khoản banking</option>{filterOptionsQuery.data?.paymentAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName}</option>)}</select><ChevronDown size={15} /></label>
+        {hasFilters && <button type="button" className="secondary-button sales-clear-filters" onClick={clearFilters}><RotateCcw size={15} /> Xóa lọc</button>}
         <span className="sales-total"><strong>{invoicesQuery.data?.total ?? 0}</strong> hóa đơn</span>
       </div>
 
       <div className="data-table-wrap sales-table-wrap">
         <table className="data-table sales-table">
-          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Hóa đơn</th><th>Khách hàng</th><th>Nội dung / ghi chú</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th>Tổng tiền</th><th>Đã ghi nhận</th><th>Còn lại</th><th>Nguồn tiền</th><th>Người lập phiếu</th><th>Ngày lập phiếu</th></tr></thead>
+          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Hóa đơn</th><th>Khách hàng</th><th>Nội dung / ghi chú & thẻ</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th>Tổng tiền</th><th>Đã ghi nhận</th><th>Còn lại</th><th>Phương thức tiền</th><th>Tài khoản banking</th><th>Người lập phiếu</th><th>Ngày lập phiếu</th><th>Ngày trả máy</th><th>Ngày cập nhật lần cuối</th></tr></thead>
           <tbody>
-            {invoicesQuery.isLoading && <tr><td colSpan={12} className="empty-cell">Đang tải hóa đơn…</td></tr>}
-            {invoicesQuery.data?.items.map((invoice) => <tr key={invoice.id} className={`sales-invoice-row ${invoice.repairStatus === 'Returned' ? 'repair-is-returned' : invoice.repairStatus === 'ReadyForReturn' ? 'repair-is-ready' : 'repair-is-pending'}`} onClick={() => setSelectedInvoiceId(invoice.id)}>
+            {invoicesQuery.isLoading && <tr><td colSpan={15} className="empty-cell">Đang tải hóa đơn…</td></tr>}
+            {invoicesQuery.data?.items.map((invoice) => {
+              const banking = bankingSummaries(invoice.paymentSources)
+              return <tr key={invoice.id} className={`sales-invoice-row ${invoice.repairStatus === 'Returned' ? 'repair-is-returned' : invoice.repairStatus === 'ReadyForReturn' ? 'repair-is-ready' : 'repair-is-pending'}`} onClick={() => setSelectedInvoiceId(invoice.id)}>
               <td className="sales-actions-column"><div className="invoice-row-actions">{hasPermission('sales.manage') && <button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setEditInvoiceId(invoice.id) }} aria-label={`Sửa ${invoice.number}`} title="Sửa hóa đơn"><Pencil size={16} /></button>}<button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setPrintInvoiceId(invoice.id) }} aria-label={`In ${invoice.number}`} title="In hóa đơn"><Printer size={16} /></button>{hasPermission('sales.manage') && <button type="button" className="icon-button danger" onClick={(event) => { event.stopPropagation(); deleteInvoice(invoice) }} aria-label={`Xóa ${invoice.number}`} title="Xóa hóa đơn" disabled={deleteMutation.isPending}><Trash2 size={16} /></button>}</div></td>
-              <td><button type="button" className="invoice-number" onClick={() => setSelectedInvoiceId(invoice.id)}><FileText size={16} /><span><strong>{invoice.number}</strong><small>{invoice.type === 'Repair' && invoice.repairDeviceModel ? `${invoice.repairDeviceModel}${invoice.repairDeviceCount > 1 ? ` + ${invoice.repairDeviceCount - 1} máy` : ''}` : invoice.isInstallment ? 'Bán trả góp' : 'Bán trực tiếp'}</small></span></button></td>
+              <td><button type="button" className="invoice-number" onClick={() => setSelectedInvoiceId(invoice.id)}><FileText size={16} /><span><strong>{invoice.number}</strong><small>{invoice.type === 'Repair' && invoice.repairDeviceModel ? `${invoice.repairDeviceModel}${invoice.repairDeviceCount > 1 ? ` + ${invoice.repairDeviceCount - 1} máy` : ''}` : invoice.isInstallment && invoice.installmentProvider ? invoice.installmentProvider : 'Bán sản phẩm'}</small><span className={`invoice-sale-mode ${invoice.isInstallment ? 'installment' : 'direct'}`}>{invoice.isInstallment ? 'Trả góp' : 'Bán tiền mặt'}</span></span></button></td>
               <td><div className="sales-customer-cell"><strong>{invoice.customerName}</strong><span>{invoice.customerPhone || 'Chưa có số điện thoại'}</span><small>{invoice.customerInvoiceCount || 0} đơn · Tổng mua {currency.format(invoice.customerTotalSpent || 0)}</small></div></td>
-              <td className="invoice-purpose-cell"><strong>{invoice.notes || (invoice.type === 'Repair' ? `Sửa chữa ${invoice.repairDeviceModel || 'máy khách'}` : 'Bán sản phẩm')}</strong><small>{invoice.type === 'Repair' ? 'Nội dung tiếp nhận / sửa chữa' : 'Nội dung đơn hàng'}</small></td>
-              <td><div className="invoice-service-cell">{invoice.type === 'Sale' ? <span className={`invoice-type sale ${invoice.isInstallment ? 'installment' : ''}`}><PackageCheck size={14} /> {invoice.isInstallment ? 'Bán trả góp' : 'Bán trực tiếp'}</span> : <span className="invoice-type repair"><Wrench size={14} /> Sửa chữa</span>}<div className="invoice-service-tags">{invoice.serviceTypes?.map((item) => <span key={item.id}>{item.name}</span>)}</div></div></td>
+              <td className="invoice-purpose-cell"><strong>{invoice.notes || (invoice.type === 'Repair' ? `Sửa chữa ${invoice.repairDeviceModel || 'máy khách'}` : 'Bán sản phẩm')}</strong><div className="invoice-service-tags">{invoice.serviceTypes?.map((item, index) => <span className={serviceTagTone(item.code, index)} key={item.id}>{item.name}</span>)}{invoice.serviceTypes?.length === 0 && <span className="tag-neutral">Chưa gắn thẻ</span>}</div></td>
+              <td><div className="invoice-service-cell">{invoice.type === 'Sale' ? <span className="invoice-type sale"><PackageCheck size={14} /> Bán sản phẩm</span> : <span className="invoice-type repair"><Wrench size={14} /> Sửa chữa</span>}</div></td>
               <td><div className="repair-progress-cell"><StatusBadge tone={processingTone(invoice.repairStatus)}>{processingLabel(invoice.repairStatus)}</StatusBadge>{invoice.type === 'Repair' && <small>{invoice.repairDeviceCount} máy trong phiếu</small>}</div></td>
               <td className="money">{currency.format(invoice.totalAmount)}</td>
               <td className="collected-money">{invoice.isInstallment ? <span className="installment-money-breakdown"><strong>{currency.format(invoice.paidAmount)}</strong><small>{currency.format(invoice.receivedAmount)} tiền mặt + {currency.format(invoice.scheduledAmount)} banking</small></span> : currency.format(invoice.paidAmount)}</td>
               <td className={invoice.outstandingAmount > 0 ? 'outstanding-money' : 'muted-money'}>{currency.format(invoice.outstandingAmount)}</td>
-              <td><StatusBadge tone={processingTone(invoice.repairStatus)}>{invoice.repairStatus === 'Returned' ? 'Đã ghi nhận' : invoice.repairStatus === 'Cancelled' ? 'Đã hủy' : 'Chờ xử lý'}</StatusBadge>{invoice.paymentDueDateUtc && invoice.isInstallment ? <small className="due-date"><CalendarClock size={12} /> Banking {new Date(invoice.paymentDueDateUtc).toLocaleDateString('vi-VN')}</small> : null}</td>
+              <td><div className="payment-method-cell"><span className={`payment-method-badge ${paymentMethodTone(invoice.paymentSources)}`}>{paymentMethodLabel(invoice.paymentSources)}</span>{invoice.paymentDueDateUtc && invoice.isInstallment ? <small className="due-date"><CalendarClock size={12} /> Dự kiến {new Date(invoice.paymentDueDateUtc).toLocaleDateString('vi-VN')}</small> : null}</div></td>
+              <td><div className="banking-account-cell">{banking.map((account) => <span key={account.key}><strong>{account.name}</strong><small>{account.bankName}{account.accountNumber ? ` · ${maskAccountNumber(account.accountNumber)}` : ''}</small><b>{currency.format(account.amount)}</b></span>)}{banking.length === 0 && <span className="banking-empty">Không có chuyển khoản</span>}</div></td>
               <td><span className="invoice-creator">{invoice.createdByName || 'Dữ liệu cũ'}</span></td>
               <td><span className="date-cell">{dateTime.format(new Date(invoice.invoiceDateUtc))}</span></td>
-            </tr>)}
-            {!invoicesQuery.isLoading && invoicesQuery.data?.items.length === 0 && <tr><td colSpan={12} className="empty-cell"><CreditCard size={22} /> Chưa có hóa đơn phù hợp.</td></tr>}
+              <td><span className={`date-cell return-date ${invoice.expectedReturnAtUtc ? '' : 'is-empty'}`}>{invoice.expectedReturnAtUtc ? dateTime.format(new Date(invoice.expectedReturnAtUtc)) : '—'}</span></td>
+              <td><span className="date-cell updated-date">{dateTime.format(new Date(invoice.updatedAtUtc))}</span></td>
+            </tr>})}
+            {!invoicesQuery.isLoading && invoicesQuery.data?.items.length === 0 && <tr><td colSpan={15} className="empty-cell"><CreditCard size={22} /> Chưa có hóa đơn phù hợp.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -179,6 +212,58 @@ function processingTone(status?: RepairStatus): 'success' | 'danger' | 'warning'
   if (status === 'ReadyForReturn') return 'neutral'
   if (status) return 'warning'
   return 'neutral'
+}
+
+function paymentMethodLabel(sources: SalesPaymentSource[]) {
+  const hasCash = sources.some((source) => source.method === 'Cash')
+  const hasBank = sources.some((source) => source.method === 'BankTransfer')
+  if (hasCash && hasBank) return 'Tiền mặt + chuyển khoản'
+  if (hasCash) return 'Tiền mặt'
+  if (hasBank) return 'Chuyển khoản'
+  return 'Chưa phân bổ'
+}
+
+function paymentMethodTone(sources: SalesPaymentSource[]) {
+  const hasCash = sources.some((source) => source.method === 'Cash')
+  const hasBank = sources.some((source) => source.method === 'BankTransfer')
+  if (hasCash && hasBank) return 'mixed'
+  if (hasCash) return 'cash'
+  if (hasBank) return 'bank'
+  return 'empty'
+}
+
+function bankingSummaries(sources: SalesPaymentSource[]) {
+  const summaries = new Map<string, { key: string; name: string; bankName: string; accountNumber?: string; amount: number }>()
+  for (const source of sources.filter((item) => item.method === 'BankTransfer')) {
+    const key = source.paymentAccountId || `${source.bankName || 'bank'}:${source.accountNumber || source.paymentAccountName || 'unknown'}`
+    const current = summaries.get(key)
+    if (current) {
+      current.amount += source.amount
+      continue
+    }
+    summaries.set(key, {
+      key,
+      name: source.paymentAccountName || 'Chưa chọn tài khoản',
+      bankName: source.bankName || 'Banking',
+      accountNumber: source.accountNumber,
+      amount: source.amount,
+    })
+  }
+  return [...summaries.values()]
+}
+
+function maskAccountNumber(value: string) {
+  const compact = value.replace(/\s+/g, '')
+  return compact.length <= 6 ? compact : `•••• ${compact.slice(-6)}`
+}
+
+function serviceTagTone(code: string, index: number) {
+  const normalized = code.toUpperCase()
+  if (normalized.includes('LAPTOP') || normalized.includes('LCD')) return 'tag-blue'
+  if (normalized.includes('POWER') || normalized.includes('PIN') || normalized.includes('NGUON')) return 'tag-amber'
+  if (normalized.includes('PHIM') || normalized.includes('KEYBOARD')) return 'tag-red'
+  if (normalized.includes('VE-SINH') || normalized.includes('SOFTWARE') || normalized.includes('PHAN-MEM')) return 'tag-green'
+  return ['tag-slate', 'tag-blue', 'tag-amber', 'tag-green', 'tag-red'][index % 5]
 }
 
 function paginationItems(current: number, total: number): Array<number | '…'> {

@@ -25,6 +25,10 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
         [FromQuery] InvoiceStatus? status,
         [FromQuery] Guid? serviceTypeId,
         [FromQuery] string? repairProgress,
+        [FromQuery] string? saleMode,
+        [FromQuery] string? paymentMethod,
+        [FromQuery] Guid? createdByUserId,
+        [FromQuery] Guid? paymentAccountId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         CancellationToken cancellationToken = default)
@@ -47,6 +51,30 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
         if (type.HasValue) query = query.Where(x => x.Type == type.Value);
         if (status.HasValue) query = query.Where(x => x.Status == status.Value);
         if (serviceTypeId.HasValue) query = query.Where(x => x.ServiceTypes.Any(link => link.ServiceTypeId == serviceTypeId.Value));
+        if (createdByUserId.HasValue) query = query.Where(x => x.CreatedByUserId == createdByUserId.Value);
+        if (paymentAccountId.HasValue)
+            query = query.Where(x => x.InstallmentPaymentAccountId == paymentAccountId.Value ||
+                x.Payments.Any(payment => payment.PaymentAccountId == paymentAccountId.Value));
+        if (string.Equals(saleMode, "installment", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(x => x.IsInstallment);
+        else if (string.Equals(saleMode, "direct", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(x => !x.IsInstallment);
+
+        var hasCashPayment = (System.Linq.Expressions.Expression<Func<SalesInvoice, bool>>)(invoice =>
+            invoice.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.Cash));
+        var hasBankPayment = (System.Linq.Expressions.Expression<Func<SalesInvoice, bool>>)(invoice =>
+            invoice.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.BankTransfer));
+        if (string.Equals(paymentMethod, "cash", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(hasCashPayment);
+        else if (string.Equals(paymentMethod, "bank", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(hasBankPayment);
+        else if (string.Equals(paymentMethod, "mixed", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(invoice =>
+                invoice.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.Cash) &&
+                invoice.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.BankTransfer));
+        else if (string.Equals(paymentMethod, "unallocated", StringComparison.OrdinalIgnoreCase))
+            query = query.Where(invoice => !invoice.Payments.Any(payment => payment.Amount > 0));
+
         if (string.Equals(repairProgress, "pending", StringComparison.OrdinalIgnoreCase))
             query = query.Where(x => x.RepairStatus != RepairStatus.Returned && x.RepairStatus != RepairStatus.Cancelled);
         else if (string.Equals(repairProgress, "returned", StringComparison.OrdinalIgnoreCase) || string.Equals(repairProgress, "processed", StringComparison.OrdinalIgnoreCase))
@@ -83,6 +111,21 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
                 RepairReturnedCount = x.RepairStatus == RepairStatus.Returned ? x.Repairs.Count : 0,
                 ReceivedAmount = x.RepairStatus == RepairStatus.Returned ? x.Payments.Where(payment => !payment.IsScheduled).Sum(payment => payment.Amount) : 0,
                 ScheduledAmount = x.RepairStatus == RepairStatus.Returned ? x.Payments.Where(payment => payment.IsScheduled).Sum(payment => payment.Amount) : 0,
+                UpdatedAtUtc = x.UpdatedAtUtc,
+                InstallmentProvider = x.InstallmentProvider,
+                PaymentSources = x.Payments
+                    .Where(payment => payment.Amount > 0)
+                    .OrderBy(payment => payment.IsScheduled)
+                    .ThenBy(payment => payment.PaidAtUtc)
+                    .Select(payment => new SalesPaymentSourceListItem(
+                        payment.Method,
+                        payment.PaymentAccountId,
+                        payment.PaymentAccount == null ? null : payment.PaymentAccount.Name,
+                        payment.PaymentAccount == null ? null : payment.PaymentAccount.BankName,
+                        payment.PaymentAccount == null ? null : payment.PaymentAccount.AccountNumber,
+                        payment.Amount,
+                        payment.IsScheduled))
+                    .ToList(),
                 ServiceTypes = x.ServiceTypes.OrderBy(link => link.ServiceType.DisplayOrder).ThenBy(link => link.ServiceType.Name)
                     .Select(link => new ServiceTypeItem(link.ServiceType.Id, link.ServiceType.Name, link.ServiceType.Code, link.ServiceType.IsActive, link.ServiceType.DisplayOrder)).ToList()
             })
@@ -119,6 +162,37 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
         }
 
         return Ok(new PagedResult<SalesInvoiceListItem>(items, total, page, pageSize));
+    }
+
+    [Authorize(Policy = Permissions.SalesRead)]
+    [HttpGet("filter-options")]
+    public async Task<ActionResult<SalesFilterOptions>> GetFilterOptions(CancellationToken cancellationToken)
+    {
+        var creatorIds = await db.SalesInvoices.AsNoTracking()
+            .Where(invoice => invoice.CreatedByUserId.HasValue)
+            .Select(invoice => invoice.CreatedByUserId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var creators = await db.Users.AsNoTracking()
+            .Where(user => creatorIds.Contains(user.Id))
+            .OrderBy(user => user.FullName)
+            .Select(user => new SalesCreatorFilterItem(user.Id, user.FullName))
+            .ToListAsync(cancellationToken);
+        var paymentAccounts = await db.PaymentAccounts.AsNoTracking()
+            .OrderByDescending(account => account.IsActive)
+            .ThenBy(account => account.DisplayOrder)
+            .ThenBy(account => account.Name)
+            .Select(account => new PaymentAccountItem(
+                account.Id,
+                account.Name,
+                account.BankName,
+                account.AccountNumber,
+                account.AccountHolder,
+                account.IsActive,
+                account.DisplayOrder))
+            .ToListAsync(cancellationToken);
+
+        return Ok(new SalesFilterOptions(creators, paymentAccounts));
     }
 
     [Authorize(Policy = Permissions.SalesRead)]
@@ -1677,8 +1751,14 @@ public sealed record SalesInvoiceListItem(Guid Id, string Number, SalesInvoiceTy
     public int RepairPendingCount { get; init; }
     public int RepairReadyCount { get; init; }
     public int RepairReturnedCount { get; init; }
+    public DateTimeOffset UpdatedAtUtc { get; init; }
+    public string? InstallmentProvider { get; init; }
+    public IReadOnlyList<SalesPaymentSourceListItem> PaymentSources { get; init; } = [];
     public IReadOnlyList<ServiceTypeItem> ServiceTypes { get; init; } = [];
 }
+public sealed record SalesPaymentSourceListItem(PaymentMethod Method, Guid? PaymentAccountId, string? PaymentAccountName, string? BankName, string? AccountNumber, decimal Amount, bool IsScheduled);
+public sealed record SalesCreatorFilterItem(Guid Id, string Name);
+public sealed record SalesFilterOptions(IReadOnlyList<SalesCreatorFilterItem> Creators, IReadOnlyList<PaymentAccountItem> PaymentAccounts);
 public sealed record SalesInvoiceDetails(Guid Id, string Number, SalesInvoiceType Type, Guid? CustomerId, string CustomerName, string? CustomerPhone, string? CustomerEmail, string? CustomerAddress, DateTimeOffset InvoiceDateUtc, InvoiceStatus Status, decimal Subtotal, decimal DiscountAmount, Guid? PromotionId, string? PromotionName, decimal PromotionDiscountAmount, string? VoucherCode, decimal VoucherDiscountAmount, decimal TotalAmount, decimal PaidAmount, decimal OutstandingAmount, bool IsInstallment, string? InstallmentProvider, string? InstallmentReference, DateTimeOffset? PaymentDueDateUtc, string? Notes, InvoiceCompanyItem Company, InvoiceIssuerItem Issuer, IReadOnlyList<SalesDiscountItem> Discounts, IReadOnlyList<SalesInvoiceLineItem> Lines, IReadOnlyList<SalesPaymentItem> Payments, RepairOrderItem? Repair)
 {
     public Guid? InstallmentPaymentAccountId { get; init; }

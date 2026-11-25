@@ -165,6 +165,24 @@ export type SalesInvoice = {
   notes?: string
   customerTotalSpent: number
   customerInvoiceCount: number
+  updatedAtUtc: string
+  installmentProvider?: string
+  paymentSources: SalesPaymentSource[]
+}
+
+export type SalesPaymentSource = {
+  method: PaymentMethod
+  paymentAccountId?: string
+  paymentAccountName?: string
+  bankName?: string
+  accountNumber?: string
+  amount: number
+  isScheduled: boolean
+}
+
+export type SalesFilterOptions = {
+  creators: Array<{ id: string; name: string }>
+  paymentAccounts: PaymentAccount[]
 }
 
 export type SalesInvoiceDetails = SalesInvoice & {

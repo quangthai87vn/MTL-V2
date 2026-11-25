@@ -672,11 +672,13 @@ a { color: inherit; text-decoration: none; }
 .sales-metric-icon.amber { color: #a86b08; background: #fff6df; }
 .sales-metric-icon.blue { color: #2864b4; background: #edf4ff; }
 .sales-browser { overflow: hidden; }
-.sales-toolbar { min-height: 70px; padding: 13px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+.sales-toolbar { min-height: 70px; padding: 13px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
 .sales-search { width: min(440px, 100%); }
 .sales-filter { position: relative; min-width: 170px; }
+.sales-filter.banking-filter { min-width: 230px; }
 .sales-filter select { width: 100%; min-height: 42px; padding: 0 34px 0 12px; appearance: none; color: #343943; background: white; border: 1px solid #d8dbe1; border-radius: 9px; outline: 0; font-size: 13px; }
 .sales-filter svg { position: absolute; top: 14px; right: 11px; color: #858b95; pointer-events: none; }
+.sales-clear-filters { min-height: 42px; padding-inline: 13px; }
 .sales-total { margin-left: auto; color: #777d88; font-size: 12px; }
 .sales-total strong { color: #252a32; }
 .sales-invoice-row { cursor: pointer; }
@@ -689,6 +691,9 @@ a { color: inherit; text-decoration: none; }
 .invoice-number svg { color: var(--red); }
 .invoice-number span, .invoice-number strong, .invoice-number small { display: block; }
 .invoice-number small { margin-top: 3px; color: #858a94; font-size: 10px; }
+.invoice-sale-mode { width: fit-content; margin-top: 7px; padding: 3px 7px; border-radius: 999px; font-size: 9px; font-weight: 850; line-height: 1.25; }
+.invoice-sale-mode.direct { color: #8f171d; background: #ffe8e9; }
+.invoice-sale-mode.installment { color: #8b5a06; background: #fff0ce; }
 .invoice-purpose-cell { min-width: 250px; max-width: 430px; white-space: normal; }
 .invoice-purpose-cell strong { display: -webkit-box; overflow: hidden; color: #2d323a; font-size: 13px; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .invoice-purpose-cell small { margin-top: 4px; display: block; color: #8a9099; font-size: 10px; }
@@ -707,6 +712,24 @@ a { color: inherit; text-decoration: none; }
 .outstanding-money { color: #cb2028; font-weight: 800; }
 .muted-money { color: var(--red-dark); font-weight: 800; }
 .due-date { margin-top: 5px; display: flex; align-items: center; gap: 4px; color: #9a6510; font-size: 10px; }
+.sales-table { min-width: 2640px; }
+.sales-table th { position: sticky; top: 0; z-index: 1; }
+.payment-method-cell { min-width: 175px; display: grid; justify-items: start; gap: 5px; }
+.payment-method-badge { padding: 5px 8px; border-radius: 7px; font-size: 10px; font-weight: 850; }
+.payment-method-badge.cash { color: #176c52; background: #e5f7f0; }
+.payment-method-badge.bank { color: #225ca8; background: #eaf2ff; }
+.payment-method-badge.mixed { color: #8b4e08; background: #fff0d4; }
+.payment-method-badge.empty { color: #707680; background: #eef0f2; }
+.banking-account-cell { min-width: 205px; display: grid; gap: 5px; }
+.banking-account-cell > span:not(.banking-empty) { position: relative; min-width: 200px; padding: 7px 72px 7px 9px; display: grid; gap: 2px; background: #f5f8fc; border: 1px solid #e1e7ef; border-radius: 8px; }
+.banking-account-cell strong { overflow: hidden; color: #313844; font-size: 10px; text-overflow: ellipsis; }
+.banking-account-cell small { color: #737c89; font-size: 9px; }
+.banking-account-cell b { position: absolute; top: 50%; right: 8px; color: #b51d23; font-size: 9px; transform: translateY(-50%); }
+.banking-empty { color: #90959e; font-size: 10px; }
+.date-cell { min-width: 112px; display: inline-block; }
+.date-cell.return-date { color: #86570c; font-weight: 700; }
+.date-cell.updated-date { color: #626a76; }
+.date-cell.is-empty { color: #a5a9af; font-weight: 500; }
 
 .sales-editor-backdrop { position: fixed; inset: 0; z-index: 80; padding: 0; display: grid; place-items: center; overflow: hidden; background: #171a20b8; backdrop-filter: blur(5px); }
 .sales-editor { width: 100vw; height: 100vh; min-height: 0; overflow-y: auto; color: #252a32; background: #eceef1; border-radius: 0; box-shadow: none; }
@@ -917,6 +940,12 @@ a { color: inherit; text-decoration: none; }
 .invoice-service-cell { display: grid; gap: 7px; justify-items: start; }
 .invoice-service-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .invoice-service-tags span { padding: 3px 6px; color: #5f6671; background: #f0f2f4; border-radius: 5px; font-size: 9px; font-weight: 750; }
+.invoice-purpose-cell .invoice-service-tags { margin-top: 7px; }
+.invoice-service-tags .tag-red { color: #a71b22; background: #ffe6e8; }
+.invoice-service-tags .tag-blue { color: #245d9e; background: #e8f1ff; }
+.invoice-service-tags .tag-amber { color: #8a5907; background: #fff0ce; }
+.invoice-service-tags .tag-green { color: #147052; background: #e2f6ee; }
+.invoice-service-tags .tag-slate, .invoice-service-tags .tag-neutral { color: #58616d; background: #eceff2; }
 
 .sales-management-dialog { width: min(1180px, 100%); padding: 0; overflow: hidden; }
 .sales-management-dialog .modal-head { margin: 0; padding: 22px 24px 17px; }
