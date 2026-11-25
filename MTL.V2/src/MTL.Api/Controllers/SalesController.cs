@@ -40,12 +40,81 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
+            var pattern = $"%{term}%";
+            var normalizedTerm = NormalizeSearchKeyword(term);
+            var hasBusinessDate = TryParseBusinessDate(term, out var dateStartUtc, out var dateEndUtc);
+            var hasMoney = TryParseMoneySearch(term, out var money);
+            var matchesSale = normalizedTerm.Contains("ban san pham", StringComparison.Ordinal) || normalizedTerm == "ban hang";
+            var matchesRepair = normalizedTerm.Contains("sua chua", StringComparison.Ordinal);
+            var matchesInstallment = normalizedTerm.Contains("tra gop", StringComparison.Ordinal);
+            var matchesDirect = normalizedTerm.Contains("ban tien mat", StringComparison.Ordinal) || normalizedTerm.Contains("ban truc tiep", StringComparison.Ordinal);
+            var matchesMixedPayment = normalizedTerm.Contains("tien mat + chuyen khoan", StringComparison.Ordinal);
+            var matchesCashPayment = normalizedTerm.Contains("tien mat", StringComparison.Ordinal);
+            var matchesBankPayment = normalizedTerm.Contains("chuyen khoan", StringComparison.Ordinal) || normalizedTerm.Contains("banking", StringComparison.Ordinal);
+            var matchesUnallocated = normalizedTerm.Contains("chua phan bo", StringComparison.Ordinal);
+            var matchesNoBank = normalizedTerm.Contains("khong co chuyen khoan", StringComparison.Ordinal);
+            var matchesProcessed = normalizedTerm.Contains("da xu ly", StringComparison.Ordinal);
+            var matchesPending = normalizedTerm.Contains("dang xu ly", StringComparison.Ordinal);
+            var matchesCancelled = normalizedTerm.Contains("da huy", StringComparison.Ordinal);
+            var matchesLegacyCreator = normalizedTerm.Contains("du lieu cu", StringComparison.Ordinal);
+            var matchesMissingPhone = normalizedTerm.Contains("chua co so dien thoai", StringComparison.Ordinal);
+            var matchesNoServiceTag = normalizedTerm.Contains("chua gan the", StringComparison.Ordinal);
             query = query.Where(x =>
-                EF.Functions.ILike(x.Number, $"%{term}%") ||
-                EF.Functions.ILike(x.CustomerName, $"%{term}%") ||
+                EF.Functions.ILike(x.Number, pattern) ||
+                EF.Functions.ILike(x.CustomerName, pattern) ||
                 (x.CustomerPhone != null && x.CustomerPhone.Contains(term)) ||
-                (x.Notes != null && EF.Functions.ILike(x.Notes, $"%{term}%")) ||
-                x.Lines.Any(line => EF.Functions.ILike(line.ProductName, $"%{term}%")));
+                (x.Notes != null && EF.Functions.ILike(x.Notes, pattern)) ||
+                (x.InstallmentProvider != null && EF.Functions.ILike(x.InstallmentProvider, pattern)) ||
+                x.Lines.Any(line =>
+                    EF.Functions.ILike(line.ProductName, pattern) ||
+                    EF.Functions.ILike(line.Sku, pattern) ||
+                    (line.Notes != null && EF.Functions.ILike(line.Notes, pattern))) ||
+                x.Repairs.Any(repair =>
+                    EF.Functions.ILike(repair.DeviceModel, pattern) ||
+                    (repair.SerialNumber != null && EF.Functions.ILike(repair.SerialNumber, pattern)) ||
+                    EF.Functions.ILike(repair.CustomerRequest, pattern) ||
+                    (repair.Notes != null && EF.Functions.ILike(repair.Notes, pattern))) ||
+                x.ServiceTypes.Any(link =>
+                    EF.Functions.ILike(link.ServiceType.Name, pattern) ||
+                    EF.Functions.ILike(link.ServiceType.Code, pattern)) ||
+                x.Payments.Any(payment =>
+                    (payment.Reference != null && EF.Functions.ILike(payment.Reference, pattern)) ||
+                    (payment.PaymentAccount != null &&
+                        (EF.Functions.ILike(payment.PaymentAccount.Name, pattern) ||
+                         EF.Functions.ILike(payment.PaymentAccount.BankName, pattern) ||
+                         EF.Functions.ILike(payment.PaymentAccount.AccountNumber, pattern) ||
+                         EF.Functions.ILike(payment.PaymentAccount.AccountHolder, pattern)))) ||
+                (x.InstallmentPaymentAccount != null &&
+                    (EF.Functions.ILike(x.InstallmentPaymentAccount.Name, pattern) ||
+                     EF.Functions.ILike(x.InstallmentPaymentAccount.BankName, pattern) ||
+                     EF.Functions.ILike(x.InstallmentPaymentAccount.AccountNumber, pattern) ||
+                     EF.Functions.ILike(x.InstallmentPaymentAccount.AccountHolder, pattern))) ||
+                (x.CreatedByUserId.HasValue && db.Users.Any(user =>
+                    user.Id == x.CreatedByUserId.Value && EF.Functions.ILike(user.FullName, pattern))) ||
+                (matchesLegacyCreator && !x.CreatedByUserId.HasValue) ||
+                (matchesMissingPhone && x.CustomerPhone == null) ||
+                (matchesNoServiceTag && !x.ServiceTypes.Any()) ||
+                (matchesSale && x.Type == SalesInvoiceType.Sale) ||
+                (matchesRepair && x.Type == SalesInvoiceType.Repair) ||
+                (matchesInstallment && x.IsInstallment) ||
+                (matchesDirect && !x.IsInstallment) ||
+                (matchesMixedPayment &&
+                    x.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.Cash) &&
+                    x.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.BankTransfer)) ||
+                (!matchesMixedPayment && matchesCashPayment &&
+                    x.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.Cash)) ||
+                (!matchesMixedPayment && !matchesNoBank && matchesBankPayment &&
+                    x.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.BankTransfer)) ||
+                (matchesUnallocated && !x.Payments.Any(payment => payment.Amount > 0)) ||
+                (matchesNoBank && !x.Payments.Any(payment => payment.Amount > 0 && payment.Method == PaymentMethod.BankTransfer)) ||
+                (matchesProcessed && x.RepairStatus == RepairStatus.Returned) ||
+                (matchesPending && x.RepairStatus != RepairStatus.Returned && x.RepairStatus != RepairStatus.Cancelled) ||
+                (matchesCancelled && x.RepairStatus == RepairStatus.Cancelled) ||
+                (hasMoney &&
+                    (x.TotalAmount == money || x.PaidAmount == money || x.TotalAmount - x.PaidAmount == money ||
+                     x.Payments.Any(payment => payment.Amount == money))) ||
+                (hasBusinessDate &&
+                    x.InvoiceDateUtc >= dateStartUtc && x.InvoiceDateUtc < dateEndUtc));
         }
 
         if (type.HasValue) query = query.Where(x => x.Type == type.Value);
@@ -82,7 +151,9 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
 
         var total = await query.CountAsync(cancellationToken);
         var items = await query
-            .OrderByDescending(x => x.InvoiceDateUtc)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ThenByDescending(x => x.InvoiceDateUtc)
+            .ThenByDescending(x => x.Number)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(x => new SalesInvoiceListItem(
@@ -1643,6 +1714,48 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
     };
     private static bool IsProcessed(SalesInvoice invoice) => invoice.RepairStatus == RepairStatus.Returned;
     private static TimeZoneInfo GetBusinessTimeZone() => TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+
+    private static bool TryParseBusinessDate(string value, out DateTimeOffset startUtc, out DateTimeOffset endUtc)
+    {
+        var formats = new[] { "d/M/yyyy", "dd/MM/yyyy", "d-M-yyyy", "dd-MM-yyyy", "yyyy-M-d", "yyyy-MM-dd" };
+        if (!DateTime.TryParseExact(value.Trim(), formats, CultureInfo.GetCultureInfo("vi-VN"), DateTimeStyles.AllowWhiteSpaces, out var date))
+        {
+            startUtc = default;
+            endUtc = default;
+            return false;
+        }
+
+        var localStart = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
+        startUtc = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localStart, GetBusinessTimeZone()), TimeSpan.Zero);
+        endUtc = startUtc.AddDays(1);
+        return true;
+    }
+
+    private static bool TryParseMoneySearch(string value, out decimal amount)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0 || trimmed.Any(character =>
+                !char.IsDigit(character) && !char.IsWhiteSpace(character) && character is not '.' and not ',' and not 'đ' and not 'Đ' and not '₫'))
+        {
+            amount = default;
+            return false;
+        }
+
+        var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+        return decimal.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out amount);
+    }
+
+    private static string NormalizeSearchKeyword(string value)
+    {
+        var decomposed = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(decomposed.Length);
+        foreach (var character in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+                builder.Append(character is 'đ' or 'Đ' ? 'd' : char.ToLowerInvariant(character));
+        }
+        return builder.ToString().Normalize(NormalizationForm.FormC);
+    }
 
     private async Task<SalesInvoiceDetails> ToDetailsAsync(SalesInvoice invoice, CancellationToken cancellationToken)
     {
