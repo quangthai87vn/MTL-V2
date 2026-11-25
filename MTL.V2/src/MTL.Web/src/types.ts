@@ -19,6 +19,7 @@ export type Product = {
   id: string
   sku: string
   name: string
+  slug?: string
   salePrice: number
   regularPrice?: number
   costPrice: number
@@ -31,6 +32,8 @@ export type Product = {
   primaryImageUrl?: string
   brand?: string
   categoryName?: string
+  categoryNames: string[]
+  tags: ProductTag[]
   wooCategoryId?: number
   wooProductId?: number
   wooPermalink?: string
@@ -39,13 +42,13 @@ export type Product = {
   concurrencyToken: string
 }
 
-export type ProductDetails = Omit<Product, 'createdAtUtc' | 'updatedAtUtc'> & {
+export type ProductDetails = Omit<Product, 'createdAtUtc' | 'updatedAtUtc' | 'categoryNames'> & {
+  categoryNames?: string[]
   shortDescription?: string
   description?: string
   unit: string
   wooCategoryIds: number[]
   images: ProductImage[]
-  tags: ProductTag[]
   publishedAtUtc?: string
   syncWarning?: string
 }

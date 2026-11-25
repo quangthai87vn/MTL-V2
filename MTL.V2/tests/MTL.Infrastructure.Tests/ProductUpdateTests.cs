@@ -140,6 +140,7 @@ public sealed class ProductUpdateTests
             scope.Db,
             scope.CurrentUser,
             new FailingWooSyncService());
+        var publishedAt = new DateTimeOffset(2026, 11, 25, 14, 30, 0, TimeSpan.Zero);
         var request = new SaveProductRequest(
             Sku: null,
             Name: "Tên mới",
@@ -166,7 +167,9 @@ public sealed class ProductUpdateTests
             ConcurrencyToken: originalToken,
             ClientRequestId: null,
             CatalogVisibility: ProductCatalogVisibility.Search,
-            Tags: [new ProductTag(21, "Laptop văn phòng"), new ProductTag(null, "Mỏng nhẹ")]);
+            Tags: [new ProductTag(21, "Laptop văn phòng"), new ProductTag(null, "Mỏng nhẹ")],
+            Slug: "Tên mới tối ưu SEO",
+            PublishedAtUtc: publishedAt);
 
         var result = await controller.Update(product.Id, request);
 
@@ -185,6 +188,8 @@ public sealed class ProductUpdateTests
 
         Assert.Equal(product.Sku, saved.Sku);
         Assert.Equal("Tên mới", saved.Name);
+        Assert.Equal("ten-moi-toi-uu-seo", saved.Slug);
+        Assert.Equal(publishedAt, saved.PublishedAtUtc);
         Assert.Equal("Mô tả ngắn mới", saved.ShortDescription);
         Assert.Equal("Mô tả chi tiết mới", saved.Description);
         Assert.Equal("Thương hiệu mới", saved.Brand);

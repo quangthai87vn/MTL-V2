@@ -73,6 +73,7 @@ public sealed class Product : CompanyOwnedEntity
     public string Sku { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Slug { get; set; }
+    public DateTimeOffset? PublishedAtUtc { get; set; }
     public string? ShortDescription { get; set; }
     public string? Description { get; set; }
     public string? Brand { get; set; }

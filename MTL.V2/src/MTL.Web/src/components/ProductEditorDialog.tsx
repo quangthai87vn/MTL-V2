@@ -1,4 +1,7 @@
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   Bold,
   CalendarDays,
   Code2,
@@ -7,20 +10,25 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Eraser,
   ExternalLink,
   Globe2,
   Images,
   ImageOff,
+  ImagePlus,
   Italic,
   Link,
   List,
   ListOrdered,
   PackagePlus,
   PackageCheck,
+  Redo2,
   Save,
   Star,
   Tag,
   Trash2,
+  Underline,
+  Undo2,
   Upload,
   X,
 } from 'lucide-react'
@@ -41,6 +49,7 @@ const emptyProduct: ProductDetails = {
   id: '',
   sku: '',
   name: '',
+  slug: '',
   salePrice: 0,
   costPrice: 0,
   stockQuantity: 0,
@@ -51,6 +60,7 @@ const emptyProduct: ProductDetails = {
   unit: 'Cái',
   concurrencyToken: '',
   wooCategoryIds: [],
+  categoryNames: [],
   images: [],
   tags: [],
   catalogVisibility: 'Visible',
@@ -89,6 +99,9 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
       : [])
   const [description, setDescription] = useState(product.description ?? '')
   const [shortDescription, setShortDescription] = useState(product.shortDescription ?? '')
+  const [title, setTitle] = useState(product.name)
+  const [slug, setSlug] = useState(product.slug || createSeoSlug(product.name))
+  const [publishedAt, setPublishedAt] = useState(toDateTimeLocal(product.publishedAtUtc ?? new Date().toISOString()))
   const [trackInventory, setTrackInventory] = useState(product.trackInventory)
   const [tags, setTags] = useState<ProductTag[]>(product.tags ?? [])
   const [tagInput, setTagInput] = useState('')
@@ -109,6 +122,8 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
     const primaryCategory = filterOptions?.categories.find((item) => item.wooCategoryId === categoryIds[0])
     const payload = {
       name: String(form.get('name') ?? '').trim(),
+      slug: String(form.get('slug') ?? '').trim() || createSeoSlug(String(form.get('name') ?? '')),
+      publishedAtUtc: publishedAt ? new Date(publishedAt).toISOString() : null,
       brand: String(form.get('brand') ?? '').trim() || null,
       categoryName: primaryCategory?.name ?? null,
       wooCategoryId: primaryCategory?.wooCategoryId ?? null,
@@ -251,8 +266,14 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
       <div className="product-editor-grid wordpress-editor-grid">
         <main className="product-editor-main">
           <section className="editor-title-block">
-            <input className="wordpress-title-input" name="name" defaultValue={product.name} required autoFocus placeholder="Tên sản phẩm" aria-label="Tên sản phẩm" />
-            <div className="product-permalink"><span>Đường dẫn:</span>{product.wooPermalink ? <a href={product.wooPermalink} target="_blank" rel="noreferrer">{product.wooPermalink}</a> : <em>Sẽ được tạo sau khi lưu lên WooCommerce</em>}</div>
+            <input className="wordpress-title-input" name="name" value={title} onChange={(event) => { const nextTitle = event.target.value; setTitle(nextTitle); setSlug(createSeoSlug(nextTitle)) }} required autoFocus placeholder="Tên sản phẩm" aria-label="Tên sản phẩm" />
+            <div className="product-permalink">
+              <span>Đường dẫn:</span>
+              <span className="product-permalink-prefix">{productPermalinkBase(product.wooPermalink)}/</span>
+              <input name="slug" value={slug} onChange={(event) => setSlug(createSeoSlug(event.target.value))} aria-label="Đường dẫn rút gọn của sản phẩm" />
+              <button type="button" onClick={() => setSlug(createSeoSlug(title))}>Tạo lại</button>
+              {product.wooPermalink && <a href={product.wooPermalink} target="_blank" rel="noreferrer" aria-label="Mở đường dẫn hiện tại"><ExternalLink size={13} /></a>}
+            </div>
           </section>
 
           <RichHtmlEditor label="Mô tả sản phẩm" value={description} onChange={setDescription} minHeight={430} />
@@ -304,11 +325,11 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
                 <span>Hiển thị</span>
                 <select name="catalogVisibility" defaultValue={product.catalogVisibility ?? 'Visible'}><option value="Visible">Cửa hàng và tìm kiếm</option><option value="Catalog">Chỉ trong cửa hàng</option><option value="Search">Chỉ trong tìm kiếm</option><option value="Hidden">Ẩn khỏi cửa hàng</option></select>
               </label>
-              <div className="publish-setting-row is-static">
+              <label className="publish-setting-row publish-date-row">
                 <CalendarDays size={16} />
-                <span>{product.publishedAtUtc ? 'Đã xuất bản lúc' : 'Ngày xuất bản'}</span>
-                <strong>{product.publishedAtUtc ? formatPublishedAt(product.publishedAtUtc) : 'Khi cập nhật'}</strong>
-              </div>
+                <span>Xuất bản</span>
+                <input type="datetime-local" value={publishedAt} onChange={(event) => setPublishedAt(event.target.value)} aria-label="Ngày giờ xuất bản" />
+              </label>
             </div>
             <div className="woo-editor-state"><span className={product.wooProductId ? 'connected' : ''} /><div><strong>{product.wooProductId ? `Woo #${product.wooProductId}` : 'Chưa có trên Woo'}</strong><small>{product.syncState === 'Synced' ? 'Dữ liệu đã đồng bộ' : 'Sẽ đồng bộ khi lưu'}</small></div></div>
             <div className="publish-actions">
@@ -404,6 +425,8 @@ function editableProductSnapshot(product: ProductDetails) {
   return {
     sku: product.sku,
     name: product.name,
+    slug: product.slug ?? null,
+    publishedAtUtc: product.publishedAtUtc ?? null,
     shortDescription: product.shortDescription ?? null,
     description: product.description ?? null,
     brand: product.brand ?? null,
@@ -440,15 +463,6 @@ function EditorSideCard({ title, className = '', children }: { title: string; cl
     <summary><strong>{title}</strong><ChevronDown size={18} /></summary>
     <div className="wp-side-card-body">{children}</div>
   </details>
-}
-
-function formatPublishedAt(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Không xác định'
-  return new Intl.DateTimeFormat('vi-VN', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date)
 }
 
 function CategoryTree({ categories, selectedIds, onToggle }: { categories: ProductFilterOptions['categories']; selectedIds: Set<number>; onToggle: (id: number) => void }) {
@@ -586,17 +600,93 @@ function MediaLibraryDialog({ mode, selectedImages, onClose, onConfirm }: {
 
 function RichHtmlEditor({ label, value, onChange, minHeight }: { label: string; value: string; onChange: (value: string) => void; minHeight: number }) {
   const [mode, setMode] = useState<'visual' | 'code'>('visual')
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<{ index: number; width: string; alt: string } | null>(null)
   const visualRef = useRef<HTMLDivElement>(null)
+  const selectionRef = useRef<Range | null>(null)
+
+  function getSelectedImage() {
+    if (!selectedImage) return null
+    return visualRef.current?.querySelectorAll<HTMLImageElement>('img').item(selectedImage.index) ?? null
+  }
+
+  function syncVisualValue() {
+    if (visualRef.current) onChange(visualRef.current.innerHTML)
+  }
 
   function applyCommand(command: string, commandValue?: string) {
     visualRef.current?.focus()
     document.execCommand(command, false, commandValue)
-    if (visualRef.current) onChange(visualRef.current.innerHTML)
+    syncVisualValue()
   }
 
   function addLink() {
     const url = window.prompt('Nhập đường dẫn liên kết:')
     if (url) applyCommand('createLink', url)
+  }
+
+  function openMediaPicker() {
+    const selection = window.getSelection()
+    if (selection?.rangeCount && visualRef.current?.contains(selection.anchorNode)) {
+      selectionRef.current = selection.getRangeAt(0).cloneRange()
+    }
+    setMediaPickerOpen(true)
+  }
+
+  function insertImage(items: MediaItem[]) {
+    const image = items[0]
+    if (!image) return
+    setMediaPickerOpen(false)
+    visualRef.current?.focus()
+    const selection = window.getSelection()
+    if (selectionRef.current && selection) {
+      selection.removeAllRanges()
+      selection.addRange(selectionRef.current)
+    }
+    const alt = escapeAttribute(image.altText || image.title)
+    const source = escapeAttribute(image.url)
+    document.execCommand('insertHTML', false, `<img src="${source}" alt="${alt}" style="display:block;width:100%;max-width:100%;height:auto;margin:12px auto" />`)
+    selectionRef.current = null
+    syncVisualValue()
+  }
+
+  function updateSelectedImage(update: (image: HTMLImageElement) => void) {
+    const image = getSelectedImage()
+    if (!image) return
+    update(image)
+    syncVisualValue()
+    setSelectedImage({ index: selectedImage!.index, width: image.style.width || '100%', alt: image.alt })
+  }
+
+  function alignSelectedImage(alignment: 'left' | 'center' | 'right') {
+    updateSelectedImage((image) => {
+      image.style.display = 'block'
+      image.style.float = 'none'
+      image.style.marginTop = '12px'
+      image.style.marginBottom = '12px'
+      image.style.marginLeft = alignment === 'left' ? '0' : 'auto'
+      image.style.marginRight = alignment === 'right' ? '0' : 'auto'
+    })
+  }
+
+  function removeSelectedImage() {
+    const image = getSelectedImage()
+    if (!image) return
+    image.remove()
+    setSelectedImage(null)
+    syncVisualValue()
+  }
+
+  function selectImage(target: EventTarget | null) {
+    if (!(target instanceof HTMLImageElement) || !visualRef.current) {
+      setSelectedImage(null)
+      return
+    }
+    setSelectedImage({
+      index: [...visualRef.current.querySelectorAll('img')].indexOf(target),
+      width: target.style.width || '100%',
+      alt: target.alt,
+    })
   }
 
   return <section className="editor-section rich-editor-section">
@@ -612,15 +702,35 @@ function RichHtmlEditor({ label, value, onChange, minHeight }: { label: string; 
         <select aria-label="Kiểu văn bản" defaultValue="p" onChange={(event) => applyCommand('formatBlock', event.target.value)}><option value="p">Đoạn văn</option><option value="h2">Tiêu đề 2</option><option value="h3">Tiêu đề 3</option><option value="blockquote">Trích dẫn</option></select>
         <button type="button" onClick={() => applyCommand('bold')} title="In đậm"><Bold size={17} /></button>
         <button type="button" onClick={() => applyCommand('italic')} title="In nghiêng"><Italic size={17} /></button>
+        <button type="button" onClick={() => applyCommand('underline')} title="Gạch chân"><Underline size={17} /></button>
         <button type="button" onClick={() => applyCommand('insertUnorderedList')} title="Danh sách"><List size={17} /></button>
         <button type="button" onClick={() => applyCommand('insertOrderedList')} title="Danh sách đánh số"><ListOrdered size={17} /></button>
         <button type="button" onClick={addLink} title="Chèn liên kết"><Link size={17} /></button>
+        <span className="rich-editor-separator" />
+        <button type="button" onClick={() => applyCommand('justifyLeft')} title="Căn trái"><AlignLeft size={17} /></button>
+        <button type="button" onClick={() => applyCommand('justifyCenter')} title="Căn giữa"><AlignCenter size={17} /></button>
+        <button type="button" onClick={() => applyCommand('justifyRight')} title="Căn phải"><AlignRight size={17} /></button>
+        <span className="rich-editor-separator" />
+        <button type="button" onClick={openMediaPicker} title="Thêm ảnh từ WordPress"><ImagePlus size={17} /></button>
+        <button type="button" onClick={() => applyCommand('removeFormat')} title="Xóa định dạng"><Eraser size={17} /></button>
+        <button type="button" onClick={() => applyCommand('undo')} title="Hoàn tác"><Undo2 size={17} /></button>
+        <button type="button" onClick={() => applyCommand('redo')} title="Làm lại"><Redo2 size={17} /></button>
       </div>
-      <div ref={visualRef} className="rich-editor-visual" style={{ minHeight }} contentEditable suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(value) }} onInput={(event) => onChange(event.currentTarget.innerHTML)} />
+      {selectedImage && <div className="rich-image-tools" aria-label="Tùy chọn ảnh đã chọn">
+        <strong>Tùy chọn ảnh</strong>
+        <button type="button" onClick={() => alignSelectedImage('left')} title="Căn trái"><AlignLeft size={15} /></button>
+        <button type="button" onClick={() => alignSelectedImage('center')} title="Căn giữa"><AlignCenter size={15} /></button>
+        <button type="button" onClick={() => alignSelectedImage('right')} title="Căn phải"><AlignRight size={15} /></button>
+        <label><span>Kích thước</span><select value={selectedImage.width} onChange={(event) => updateSelectedImage((image) => { image.style.width = event.target.value; image.style.maxWidth = '100%'; image.style.height = 'auto' })}><option value="25%">25%</option><option value="50%">50%</option><option value="75%">75%</option><option value="100%">100%</option><option value="auto">Nguyên bản</option></select></label>
+        <label className="rich-image-alt"><span>Văn bản thay thế</span><input value={selectedImage.alt} onChange={(event) => updateSelectedImage((image) => { image.alt = event.target.value })} /></label>
+        <button type="button" className="rich-image-remove" onClick={removeSelectedImage}><Trash2 size={15} /> Xóa ảnh</button>
+      </div>}
+      <div ref={visualRef} className="rich-editor-visual" style={{ minHeight }} contentEditable suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(value) }} onInput={(event) => onChange(event.currentTarget.innerHTML)} onClick={(event) => selectImage(event.target)} />
     </> : <>
       <textarea className="rich-editor-code" style={{ minHeight }} value={value} onChange={(event) => onChange(event.target.value)} spellCheck={false} aria-label={`Mã HTML ${label}`} />
       <small className="html-code-note"><Code2 size={13} /> Chỉnh trực tiếp HTML; chuyển sang “Trực quan” để xem kết quả đã render.</small>
     </>}
+    {mediaPickerOpen && <MediaLibraryDialog mode="single" selectedImages={[]} onClose={() => setMediaPickerOpen(false)} onConfirm={insertImage} />}
   </section>
 }
 
@@ -650,4 +760,40 @@ function mediaKey(item: MediaItem) {
 function nullableNumber(value: FormDataEntryValue | null) {
   if (value === null || String(value).trim() === '') return null
   return Number(value)
+}
+
+function createSeoSlug(value: string) {
+  return value
+    .trim()
+    .toLocaleLowerCase('vi')
+    .replace(/đ/g, 'd')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120)
+    .replace(/-+$/g, '')
+}
+
+function toDateTimeLocal(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function productPermalinkBase(permalink?: string) {
+  if (!permalink) return 'https://mytholaptop.vn/san-pham'
+  try {
+    const url = new URL(permalink)
+    const parts = url.pathname.split('/').filter(Boolean)
+    parts.pop()
+    return `${url.origin}/${parts.join('/')}`
+  } catch {
+    return 'https://mytholaptop.vn/san-pham'
+  }
+}
+
+function escapeAttribute(value: string) {
+  return value.replace(/[&<>"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[character] ?? character)
 }

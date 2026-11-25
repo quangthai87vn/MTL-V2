@@ -127,6 +127,9 @@ namespace MTL.Infrastructure.Persistence.Migrations
                     b.Property<string>("PrimaryImageUrl")
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<decimal?>("RegularPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");

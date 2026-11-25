@@ -15,9 +15,10 @@ import {
   Plus,
   Printer,
   RefreshCw,
+  RotateCcw,
   Rows3,
   Search,
-  SlidersHorizontal,
+  Settings2,
   Trash2,
   UploadCloud,
   X,
@@ -51,6 +52,7 @@ export function ProductsPage() {
   const [sort, setSort] = useState('newest')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(24)
+  const [showFilters, setShowFilters] = useState(false)
   const [editorProductId, setEditorProductId] = useState<string | 'new' | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const selectedProductsRef = useRef<Map<string, Product>>(new Map())
@@ -106,7 +108,7 @@ export function ProductsPage() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const firstItem = total === 0 ? 0 : (page - 1) * pageSize + 1
   const lastItem = Math.min(page * pageSize, total)
-  const hasActiveFilters = Boolean(search || stock !== 'all' || status || syncState || category || brand || warning !== 'all' || sort !== 'newest')
+  const activeFilterCount = [stock !== 'all', Boolean(status), Boolean(syncState), Boolean(category), Boolean(brand), warning !== 'all', sort !== 'newest'].filter(Boolean).length
 
   function changeView(mode: ViewMode) {
     setViewMode(mode)
@@ -204,38 +206,29 @@ export function ProductsPage() {
 
           <div className="product-toolbar-right">
             <span className="product-total"><strong>{total.toLocaleString('vi-VN')}</strong> sản phẩm</span>
+            <button type="button" className={`secondary-button sales-filter-toggle ${showFilters ? 'is-open' : ''}`} onClick={() => setShowFilters((value) => !value)} aria-expanded={showFilters} aria-controls="product-filter-panel"><Settings2 size={16} /><span>Bộ lọc</span>{activeFilterCount > 0 && <b>{activeFilterCount}</b>}<ChevronDown className="sales-filter-toggle-chevron" size={15} /></button>
             <div className="view-switcher" aria-label="Kiểu hiển thị">
-              <button className={viewMode === 'grid' ? 'is-active' : ''} onClick={() => changeView('grid')} aria-pressed={viewMode === 'grid'} title="Hiển thị dạng bảng"><Rows3 size={17} /> Grid</button>
-              <button className={viewMode === 'card' ? 'is-active' : ''} onClick={() => changeView('card')} aria-pressed={viewMode === 'card'} title="Hiển thị dạng thẻ"><LayoutGrid size={17} /> Card</button>
+              <button className={viewMode === 'grid' ? 'is-active' : ''} onClick={() => changeView('grid')} aria-pressed={viewMode === 'grid'} title="Hiển thị dạng danh sách"><Rows3 size={17} /> Danh sách</button>
+              <button className={viewMode === 'card' ? 'is-active' : ''} onClick={() => changeView('card')} aria-pressed={viewMode === 'card'} title="Hiển thị dạng thẻ"><LayoutGrid size={17} /> Thẻ</button>
             </div>
           </div>
         </div>
 
-        <div className="product-filters">
-          <div className="filter-heading"><SlidersHorizontal size={17} /><span>Bộ lọc</span></div>
-          <FilterSelect label="Tồn kho" value={stock} onChange={(value) => { setStock(value as StockFilter); setPage(1) }}>
-            <option value="all">Tất cả tồn kho</option><option value="in_stock">Còn hàng</option><option value="out_of_stock">Hết hàng</option><option value="on_backorder">Cho phép đặt trước</option>
-          </FilterSelect>
-          <FilterSelect label="Trạng thái" value={status} onChange={(value) => { setStatus(value); setPage(1) }}>
-            <option value="">Tất cả trạng thái</option><option value="Active">Đang bán</option><option value="Draft">Bản nháp</option><option value="Inactive">Tạm ẩn</option><option value="Discontinued">Ngừng kinh doanh</option>
-          </FilterSelect>
-          <FilterSelect label="Đồng bộ" value={syncState} onChange={(value) => { setSyncState(value); setPage(1) }}>
-            <option value="">Tất cả đồng bộ</option><option value="Synced">Đã đồng bộ</option><option value="NotLinked">Chưa liên kết</option><option value="PendingPush">Chờ đẩy lên Woo</option><option value="PendingPull">Chờ lấy từ Woo</option><option value="Conflict">Xung đột</option><option value="Failed">Đồng bộ lỗi</option>
-          </FilterSelect>
-          <FilterSelect label="Danh mục" value={category} onChange={(value) => { setCategory(value); setPage(1) }}>
-            <option value="">Tất cả danh mục</option>{filterOptionsQuery.data?.categories.map((item) => <option key={`${item.wooCategoryId}-${item.path}`} value={item.wooCategoryId ? `id:${item.wooCategoryId}` : `name:${item.name}`}>{`${'— '.repeat(item.depth)}${item.name}`} ({item.count})</option>)}
-          </FilterSelect>
-          <FilterSelect label="Thương hiệu" value={brand} onChange={(value) => { setBrand(value); setPage(1) }}>
-            <option value="">Tất cả thương hiệu</option>{filterOptionsQuery.data?.brands.map((item) => <option key={item.name} value={item.name}>{item.name} ({item.count})</option>)}
-          </FilterSelect>
-          <FilterSelect label="Cảnh báo" value={warning} onChange={(value) => { setWarning(value); setPage(1) }}>
-            <option value="all">Tất cả dữ liệu</option><option value="missing_any">Thiếu ảnh hoặc giá</option><option value="missing_image">Thiếu ảnh</option><option value="missing_price">Thiếu giá bán</option>
-          </FilterSelect>
-          <FilterSelect label="Sắp xếp" value={sort} onChange={(value) => { setSort(value); setPage(1) }}>
-            <option value="newest">Mới tạo gần đây</option><option value="oldest">Cũ nhất trước</option><option value="price_desc">Giá cao đến thấp</option><option value="price_asc">Giá thấp đến cao</option><option value="name_asc">Tên A–Z</option><option value="stock_desc">Tồn kho nhiều nhất</option>
-          </FilterSelect>
-          {hasActiveFilters && <button className="clear-filters" type="button" onClick={resetFilters}><X size={15} /> Xóa lọc</button>}
-        </div>
+        {showFilters && <div className="sales-filter-panel product-filter-panel" id="product-filter-panel">
+          <div className="sales-filter-panel-head">
+            <div><strong>Lọc danh mục sản phẩm</strong><span>Thu hẹp danh sách theo kho, trạng thái xuất bản và dữ liệu WooCommerce.</span></div>
+            {activeFilterCount > 0 && <button type="button" className="sales-filter-reset" onClick={resetFilters}><RotateCcw size={14} /> Đặt lại bộ lọc</button>}
+          </div>
+          <div className="sales-filter-grid product-filter-grid">
+            <FilterSelect label="Tồn kho" value={stock} onChange={(value) => { setStock(value as StockFilter); setPage(1) }}><option value="all">Tất cả tồn kho</option><option value="in_stock">Còn hàng</option><option value="out_of_stock">Hết hàng</option><option value="on_backorder">Cho phép đặt trước</option></FilterSelect>
+            <FilterSelect label="Trạng thái" value={status} onChange={(value) => { setStatus(value); setPage(1) }}><option value="">Tất cả trạng thái</option><option value="Active">Đang bán</option><option value="Draft">Bản nháp</option><option value="Inactive">Tạm ẩn</option><option value="Discontinued">Ngừng kinh doanh</option></FilterSelect>
+            <FilterSelect label="Đồng bộ" value={syncState} onChange={(value) => { setSyncState(value); setPage(1) }}><option value="">Tất cả đồng bộ</option><option value="Synced">Đã đồng bộ</option><option value="NotLinked">Chưa liên kết</option><option value="PendingPush">Chờ đẩy lên Woo</option><option value="PendingPull">Chờ lấy từ Woo</option><option value="Conflict">Xung đột</option><option value="Failed">Đồng bộ lỗi</option></FilterSelect>
+            <FilterSelect label="Danh mục" value={category} onChange={(value) => { setCategory(value); setPage(1) }}><option value="">Tất cả danh mục</option>{filterOptionsQuery.data?.categories.map((item) => <option key={`${item.wooCategoryId}-${item.path}`} value={item.wooCategoryId ? `id:${item.wooCategoryId}` : `name:${item.name}`}>{`${'— '.repeat(item.depth)}${item.name}`} ({item.count})</option>)}</FilterSelect>
+            <FilterSelect label="Thương hiệu" value={brand} onChange={(value) => { setBrand(value); setPage(1) }}><option value="">Tất cả thương hiệu</option>{filterOptionsQuery.data?.brands.map((item) => <option key={item.name} value={item.name}>{item.name} ({item.count})</option>)}</FilterSelect>
+            <FilterSelect label="Cảnh báo dữ liệu" value={warning} onChange={(value) => { setWarning(value); setPage(1) }}><option value="all">Tất cả dữ liệu</option><option value="missing_any">Thiếu ảnh hoặc giá</option><option value="missing_image">Thiếu ảnh</option><option value="missing_price">Thiếu giá bán</option></FilterSelect>
+            <FilterSelect label="Sắp xếp" value={sort} onChange={(value) => { setSort(value); setPage(1) }}><option value="newest">Mới xuất bản gần đây</option><option value="oldest">Cũ nhất trước</option><option value="price_desc">Giá cao đến thấp</option><option value="price_asc">Giá thấp đến cao</option><option value="name_asc">Tên A–Z</option><option value="stock_desc">Tồn kho nhiều nhất</option></FilterSelect>
+          </div>
+        </div>}
 
         {hasPermission('products.manage') && selectedIds.size > 0 && <BulkActionBar count={selectedIds.size} pending={bulkMutation.isPending} onAction={runBulk} onPrint={openLabelPrint} onClear={clearSelection} />}
 
@@ -283,29 +276,37 @@ export function ProductsPage() {
 }
 
 function FilterSelect({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: ReactNode }) {
-  return <label className="filter-select"><span>{label}</span><span className="select-shell"><select value={value} onChange={(event) => onChange(event.target.value)}>{children}</select><ChevronDown size={15} /></span></label>
+  return <label className="sales-filter-field"><span>{label}</span><span className="sales-filter"><select value={value} onChange={(event) => onChange(event.target.value)}>{children}</select><ChevronDown size={15} /></span></label>
 }
 
 function ProductTable({ products, isLoading, canPush, canEdit, selectedIds, onToggle, onTogglePage, onEdit, onPush }: { products: Product[]; isLoading: boolean; canPush: boolean; canEdit: boolean; selectedIds: Set<string>; onToggle: (id: string) => void; onTogglePage: (products: Product[]) => void; onEdit: (id: string) => void; onPush: (id: string) => void }) {
   const allSelected = products.length > 0 && products.every((product) => selectedIds.has(product.id))
-  return <div className="data-table-wrap product-table-wrap"><table className="data-table product-table"><thead><tr><th className="select-column"><input type="checkbox" checked={allSelected} disabled={!canEdit || products.length === 0} onChange={() => onTogglePage(products)} aria-label="Chọn tất cả sản phẩm trang này" /></th><th>Sản phẩm</th><th>Giá bán</th><th>Giá vốn</th><th>Tồn kho</th><th>Trạng thái</th><th>Đồng bộ</th><th>Ngày tạo</th><th /></tr></thead><tbody>
-    {isLoading && <tr><td colSpan={9} className="empty-cell"><RefreshCw className="spin" /> Đang tải dữ liệu…</td></tr>}
+  return <div className="data-table-wrap product-table-wrap"><table className="data-table product-table wordpress-product-table"><thead><tr><th className="select-column"><input type="checkbox" checked={allSelected} disabled={!canEdit || products.length === 0} onChange={() => onTogglePage(products)} aria-label="Chọn tất cả sản phẩm trang này" /></th><th>Tên sản phẩm</th><th>SKU</th><th>Tồn kho</th><th>Giá</th><th>Danh mục</th><th>Thẻ</th><th>Thương hiệu</th><th>Xuất bản</th><th>Đồng bộ</th><th /></tr></thead><tbody>
+    {isLoading && <tr><td colSpan={11} className="empty-cell"><RefreshCw className="spin" /> Đang tải dữ liệu…</td></tr>}
     {!isLoading && products.map((product) => {
       const outOfStock = product.availability === 'OutOfStock'
       const onBackorder = product.availability === 'OnBackorder'
       return <tr key={product.id} className={`product-row${outOfStock ? ' is-out-of-stock' : ''}${onBackorder ? ' is-backorder' : ''}`}>
         <td className="select-column"><input type="checkbox" checked={selectedIds.has(product.id)} disabled={!canEdit} onChange={() => onToggle(product.id)} aria-label={`Chọn ${product.name}`} /></td>
-        <td><div className="product-cell"><ProductThumbnail product={product} canEdit={canEdit} onEdit={onEdit} /><span className="product-identity"><button type="button" onClick={() => canEdit && onEdit(product.id)} disabled={!canEdit}>{product.name}</button><small>{product.sku}{product.categoryName ? ` · ${product.categoryName}` : ''}</small><ProductWarnings product={product} /></span></div></td>
-        <td><strong className="sale-price">{currency.format(product.salePrice)}</strong>{product.regularPrice && product.regularPrice > product.salePrice ? <small className="regular-price">{currency.format(product.regularPrice)}</small> : null}</td>
-        <td className="muted-money">{currency.format(product.costPrice)}</td>
+        <td><div className="product-cell"><ProductThumbnail product={product} canEdit={canEdit} onEdit={onEdit} /><span className="product-identity"><button type="button" onClick={() => canEdit && onEdit(product.id)} disabled={!canEdit}>{product.name}</button><small>{product.slug ? `/${product.slug}` : 'Chưa có đường dẫn'}</small><ProductWarnings product={product} /></span></div></td>
+        <td className="product-sku">{product.sku || '—'}</td>
         <td><AvailabilityBadge product={product} /></td>
-        <td><StatusBadge tone={product.status === 'Active' ? 'success' : 'neutral'}>{statusLabel(product.status)}</StatusBadge></td>
+        <td><strong className="sale-price">{currency.format(product.salePrice)}</strong>{product.regularPrice && product.regularPrice > product.salePrice ? <small className="regular-price">{currency.format(product.regularPrice)}</small> : null}</td>
+        <td><ProductTaxonomy values={product.categoryNames?.length ? product.categoryNames : product.categoryName ? [product.categoryName] : []} empty="Chưa phân loại" /></td>
+        <td><ProductTaxonomy values={(product.tags ?? []).map((tag) => tag.name)} empty="—" compact /></td>
+        <td>{product.brand || '—'}</td>
+        <td><StatusBadge tone={product.status === 'Active' ? 'success' : 'neutral'}>{statusLabel(product.status)}</StatusBadge><span className="date-cell"><CalendarDays size={13} /> {dateFormat.format(new Date(product.createdAtUtc))}</span></td>
         <td><StatusBadge tone={syncTone(product.syncState)}>{syncLabel(product.syncState)}</StatusBadge></td>
-        <td><span className="date-cell"><CalendarDays size={14} /> {dateFormat.format(new Date(product.createdAtUtc))}</span></td>
         <td><div className="product-row-actions">{product.wooPermalink && <a className="icon-button" href={product.wooPermalink} target="_blank" rel="noreferrer" title="Mở trên website"><ExternalLink size={17} /></a>}{canEdit && <button className="icon-button" title="Chỉnh sửa" onClick={() => onEdit(product.id)}><Pencil size={17} /></button>}{canPush && <button className="icon-button" title="Đẩy lên WooCommerce" onClick={() => onPush(product.id)}><UploadCloud size={18} /></button>}</div></td>
       </tr>
     })}
   </tbody></table></div>
+}
+
+function ProductTaxonomy({ values, empty, compact = false }: { values: string[]; empty: string; compact?: boolean }) {
+  if (values.length === 0) return <span className="product-taxonomy-empty">{empty}</span>
+  const visible = values.slice(0, compact ? 2 : 3)
+  return <div className={`product-taxonomy${compact ? ' compact' : ''}`}>{visible.map((value) => <span key={value}>{value}</span>)}{values.length > visible.length && <small>+{values.length - visible.length}</small>}</div>
 }
 
 function ProductCards({ products, isLoading, canPush, canEdit, selectedIds, onToggle, onEdit, onPush, onResetFilters }: { products: Product[]; isLoading: boolean; canPush: boolean; canEdit: boolean; selectedIds: Set<string>; onToggle: (id: string) => void; onEdit: (id: string) => void; onPush: (id: string) => void; onResetFilters: () => void }) {

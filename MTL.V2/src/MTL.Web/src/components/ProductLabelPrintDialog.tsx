@@ -6,9 +6,9 @@ import type { Product } from '../types'
 type LabelSizeKey = '80x40' | '70x40' | '50x30'
 
 const labelSizes: Record<LabelSizeKey, { label: string; width: number; height: number }> = {
-  '80x40': { label: '80 × 40 mm (khuyên dùng)', width: 80, height: 40 },
+  '80x40': { label: '80 × 40 mm', width: 80, height: 40 },
   '70x40': { label: '70 × 40 mm', width: 70, height: 40 },
-  '50x30': { label: '50 × 30 mm', width: 50, height: 30 },
+  '50x30': { label: '50 × 30 mm (mặc định)', width: 50, height: 30 },
 }
 
 const priceFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 })
@@ -24,7 +24,7 @@ function escapeHtml(value: string) {
 }
 
 export function ProductLabelPrintDialog({ products, onClose }: { products: Product[]; onClose: () => void }) {
-  const [sizeKey, setSizeKey] = useState<LabelSizeKey>('80x40')
+  const [sizeKey, setSizeKey] = useState<LabelSizeKey>('50x30')
   const [copies, setCopies] = useState(1)
   const size = labelSizes[sizeKey]
   const labels = useMemo(
@@ -44,7 +44,7 @@ export function ProductLabelPrintDialog({ products, onClose }: { products: Produ
     frame.style.border = '0'
 
     const labelMarkup = labels.map(({ product }) => {
-      const nameSize = product.name.length > 90 ? '3.25mm' : product.name.length > 60 ? '3.65mm' : '4mm'
+      const nameSize = labelTitleSize(product.name, sizeKey)
       const price = product.salePrice > 0 ? `${priceFormat.format(product.salePrice)} đ` : 'Liên hệ'
 
       return `<div class="label-sheet"><article class="product-price-label size-${sizeKey}">
@@ -60,16 +60,16 @@ export function ProductLabelPrintDialog({ products, onClose }: { products: Produ
         * { box-sizing: border-box; }
         html, body { width: ${size.width}mm; margin: 0; padding: 0; background: #fff; }
         body { font-family: "Roboto", Arial, sans-serif; }
-        .label-sheet { width: ${size.width}mm; height: ${size.height}mm; margin: 0; padding: 2mm; display: block; overflow: hidden; break-inside: avoid; break-after: page; page-break-inside: avoid; page-break-after: always; }
-        .label-sheet:last-child { break-after: auto; page-break-after: auto; }
+        .label-sheet { width: ${size.width}mm; height: ${size.height}mm; margin: 0; padding: 2mm; display: block; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+        .label-sheet + .label-sheet { break-before: page; page-break-before: always; }
         .product-price-label { width: 100%; height: 100%; padding: 2.2mm 3mm 1.8mm; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; border: .3mm solid #111; color: #111; background: #fff; text-align: center; }
-        h3 { width: 100%; max-height: 9.2mm; margin: 0; display: -webkit-box; overflow: hidden; font-weight: 700; line-height: 1.08; letter-spacing: -.08mm; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+        h3 { width: 100%; min-height: 0; margin: 0; flex: 1 1 auto; display: flex; align-items: center; justify-content: center; overflow: visible; overflow-wrap: anywhere; font-weight: 700; line-height: 1.04; letter-spacing: -.06mm; white-space: normal; }
         strong { margin-top: 1.1mm; font-size: 6.2mm; line-height: 1; letter-spacing: .05mm; }
         em { margin-top: 1.3mm; font-size: 3.1mm; line-height: 1; font-style: normal; }
         .size-50x30 { padding: 1.5mm 2mm 1.2mm; }
-        .size-50x30 h3 { max-height: 7.2mm; font-size: 2.75mm !important; }
-        .size-50x30 strong { margin-top: .8mm; font-size: 4.7mm; }
-        .size-50x30 em { margin-top: .9mm; font-size: 2.5mm; }
+        .size-50x30 h3 { font-size: inherit; }
+        .size-50x30 strong { flex: 0 0 auto; margin-top: .65mm; font-size: 4.5mm; }
+        .size-50x30 em { flex: 0 0 auto; margin-top: .7mm; font-size: 2.35mm; }
       </style></head><body>${labelMarkup}</body></html>`
 
     frame.addEventListener('load', () => {
@@ -133,7 +133,7 @@ export function ProductLabelPrintDialog({ products, onClose }: { products: Produ
           key={`${product.id}-${copyIndex}`}
         >
           <article className={`product-price-label size-${sizeKey}`}>
-            <h3 style={{ fontSize: product.name.length > 90 ? '3.25mm' : product.name.length > 60 ? '3.65mm' : '4mm' }}>{product.name}</h3>
+            <h3 style={{ fontSize: labelTitleSize(product.name, sizeKey) }}>{product.name}</h3>
             <strong>{product.salePrice > 0 ? `${priceFormat.format(product.salePrice)} đ` : 'Liên hệ'}</strong>
             <em>www.mytholaptop.vn</em>
           </article>
@@ -149,4 +149,18 @@ export function ProductLabelPrintDialog({ products, onClose }: { products: Produ
       </footer>
     </section>
   </div>, document.body)
+}
+
+function labelTitleSize(name: string, size: LabelSizeKey) {
+  if (size === '50x30') {
+    if (name.length > 145) return '1.65mm'
+    if (name.length > 110) return '1.9mm'
+    if (name.length > 80) return '2.2mm'
+    if (name.length > 52) return '2.55mm'
+    return '2.9mm'
+  }
+  if (name.length > 150) return '2.25mm'
+  if (name.length > 105) return '2.7mm'
+  if (name.length > 70) return '3.2mm'
+  return '3.8mm'
 }

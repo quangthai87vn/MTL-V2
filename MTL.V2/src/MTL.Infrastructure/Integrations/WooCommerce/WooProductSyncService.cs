@@ -211,6 +211,8 @@ public sealed class WooProductSyncService(
         var payload = new
         {
             name = product.Name,
+            slug = product.Slug,
+            date_created_gmt = product.PublishedAtUtc?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture),
             sku = IsGeneratedSku(product.Sku) ? null : product.Sku,
             status = product.Status == ProductStatus.Active ? "publish" : "draft",
             catalog_visibility = product.CatalogVisibility switch
@@ -333,6 +335,8 @@ public sealed class WooProductSyncService(
 
         product.WooLink.WooPermalink = woo.Permalink;
         product.WooLink.WooCreatedAtUtc = woo.DateCreatedGmt;
+        product.Slug = woo.Slug ?? product.Slug;
+        product.PublishedAtUtc = woo.DateCreatedGmt ?? product.PublishedAtUtc;
         product.WooLink.LastPushedAtUtc = DateTimeOffset.UtcNow;
         SyncProductCategories(product, woo.Categories);
         SyncProductImages(product, woo.Images);
@@ -520,6 +524,7 @@ public sealed class WooProductSyncService(
         product.Sku = string.IsNullOrWhiteSpace(woo.Sku) ? $"WOO-{woo.Id}" : woo.Sku;
         product.Name = woo.Name;
         product.Slug = woo.Slug;
+        product.PublishedAtUtc = woo.DateCreatedGmt ?? product.PublishedAtUtc;
         product.ShortDescription = woo.ShortDescription;
         product.Description = woo.Description;
         product.RegularPrice = ParseMoney(woo.RegularPrice);

@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 using MTL.Domain.Catalog;
 using MTL.Domain.Identity;
 using MTL.Infrastructure.Identity;
@@ -104,31 +107,42 @@ public sealed class ProductsController(
             _ => query.OrderByDescending(x => x.WooLink != null && x.WooLink.WooCreatedAtUtc.HasValue ? x.WooLink.WooCreatedAtUtc.Value : x.CreatedAtUtc).ThenBy(x => x.Name)
         };
 
-        var items = await query
+        var rows = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new ProductListItem(
-                x.Id,
-                x.Sku,
-                x.Name,
-                x.SalePrice,
-                x.RegularPrice,
-                x.CostPrice,
-                x.StockQuantity,
-                x.TrackInventory,
-                x.Availability,
-                x.Status,
-                x.SyncState,
-                x.PrimaryImageUrl,
-                x.Brand,
-                x.CategoryName,
-                x.WooCategoryId,
-                x.WooLink != null ? x.WooLink.WooProductId : null,
-                x.WooLink != null ? x.WooLink.WooPermalink : null,
-                x.WooLink != null && x.WooLink.WooCreatedAtUtc.HasValue ? x.WooLink.WooCreatedAtUtc.Value : x.CreatedAtUtc,
-                x.UpdatedAtUtc,
-                x.ConcurrencyToken))
+            .Select(x => new
+            {
+                Product = x,
+                CategoryNames = x.CategoryAssignments.OrderBy(category => category.Name).Select(category => category.Name).ToList(),
+                WooProductId = x.WooLink != null ? (long?)x.WooLink.WooProductId : null,
+                WooPermalink = x.WooLink != null ? x.WooLink.WooPermalink : null,
+                WooCreatedAtUtc = x.WooLink != null ? x.WooLink.WooCreatedAtUtc : null
+            })
             .ToListAsync(cancellationToken);
+        var items = rows.Select(row => new ProductListItem(
+            row.Product.Id,
+            row.Product.Sku,
+            row.Product.Name,
+            row.Product.Slug,
+            row.Product.SalePrice,
+            row.Product.RegularPrice,
+            row.Product.CostPrice,
+            row.Product.StockQuantity,
+            row.Product.TrackInventory,
+            row.Product.Availability,
+            row.Product.Status,
+            row.Product.SyncState,
+            row.Product.PrimaryImageUrl,
+            row.Product.Brand,
+            row.Product.CategoryName,
+            row.CategoryNames.Count > 0 ? row.CategoryNames : row.Product.CategoryName is null ? [] : [row.Product.CategoryName],
+            ProductTagCollection.Deserialize(row.Product.TagsJson),
+            row.Product.WooCategoryId,
+            row.WooProductId,
+            row.WooPermalink,
+            row.Product.PublishedAtUtc ?? row.WooCreatedAtUtc ?? row.Product.CreatedAtUtc,
+            row.Product.UpdatedAtUtc,
+            row.Product.ConcurrencyToken)).ToList();
 
         return Ok(new PagedResult<ProductListItem>(items, total, page, pageSize));
     }
@@ -243,6 +257,8 @@ public sealed class ProductsController(
             CompanyId = companyId,
             Sku = normalizedSku,
             Name = request.Name.Trim(),
+            Slug = await BuildUniqueSlugAsync(request.Slug, request.Name, null, cancellationToken),
+            PublishedAtUtc = request.PublishedAtUtc ?? DateTimeOffset.UtcNow,
             ShortDescription = request.ShortDescription,
             Description = request.Description,
             Brand = request.Brand,
@@ -307,6 +323,8 @@ public sealed class ProductsController(
 
         product.Sku = normalizedSku;
         product.Name = request.Name.Trim();
+        product.Slug = await BuildUniqueSlugAsync(request.Slug, request.Name, product.Id, cancellationToken);
+        product.PublishedAtUtc = request.PublishedAtUtc ?? product.PublishedAtUtc ?? product.WooLink?.WooCreatedAtUtc ?? product.CreatedAtUtc;
         product.ShortDescription = request.ShortDescription;
         product.Description = request.Description;
         product.Brand = request.Brand;
@@ -673,10 +691,52 @@ public sealed class ProductsController(
         return null;
     }
 
+    private async Task<string> BuildUniqueSlugAsync(
+        string? requestedSlug,
+        string productName,
+        Guid? productId,
+        CancellationToken cancellationToken)
+    {
+        var baseSlug = NormalizeSlug(string.IsNullOrWhiteSpace(requestedSlug) ? productName : requestedSlug);
+        if (string.IsNullOrWhiteSpace(baseSlug)) baseSlug = "san-pham";
+
+        var slug = baseSlug;
+        for (var suffix = 2; suffix < 1000; suffix++)
+        {
+            var exists = await db.Products.AsNoTracking().AnyAsync(
+                product => (!productId.HasValue || product.Id != productId.Value) && product.Slug == slug,
+                cancellationToken);
+            if (!exists) return slug;
+            slug = $"{baseSlug[..Math.Min(baseSlug.Length, 110)]}-{suffix}";
+        }
+
+        var fallback = $"{baseSlug[..Math.Min(baseSlug.Length, 100)]}-{Guid.NewGuid():N}";
+        return fallback[..Math.Min(fallback.Length, 120)];
+    }
+
+    private static string NormalizeSlug(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant()
+            .Replace('đ', 'd')
+            .Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(character);
+            }
+        }
+
+        var slug = Regex.Replace(builder.ToString().Normalize(NormalizationForm.FormC), "[^a-z0-9]+", "-").Trim('-');
+        return slug.Length <= 120 ? slug : slug[..120].TrimEnd('-');
+    }
+
     private static ProductDetails ToDetails(Product x, string? syncWarning = null) => new(
         x.Id,
         x.Sku,
         x.Name,
+        x.Slug,
         x.ShortDescription,
         x.Description,
         x.Brand,
@@ -706,7 +766,7 @@ public sealed class ProductsController(
         syncWarning,
         x.CatalogVisibility,
         ProductTagCollection.Deserialize(x.TagsJson),
-        x.WooLink?.WooCreatedAtUtc);
+        x.PublishedAtUtc ?? x.WooLink?.WooCreatedAtUtc ?? x.CreatedAtUtc);
 }
 
 public sealed record SaveProductRequest(
@@ -731,7 +791,9 @@ public sealed record SaveProductRequest(
     Guid? ConcurrencyToken,
     Guid? ClientRequestId,
     ProductCatalogVisibility CatalogVisibility = ProductCatalogVisibility.Visible,
-    IReadOnlyList<ProductTag>? Tags = null);
+    IReadOnlyList<ProductTag>? Tags = null,
+    string? Slug = null,
+    DateTimeOffset? PublishedAtUtc = null);
 
 public sealed record SaveProductImageRequest(
     long? WooMediaId,
@@ -745,6 +807,7 @@ public sealed record ProductListItem(
     Guid Id,
     string Sku,
     string Name,
+    string? Slug,
     decimal SalePrice,
     decimal? RegularPrice,
     decimal CostPrice,
@@ -756,6 +819,8 @@ public sealed record ProductListItem(
     string? PrimaryImageUrl,
     string? Brand,
     string? CategoryName,
+    IReadOnlyList<string> CategoryNames,
+    IReadOnlyList<ProductTag> Tags,
     long? WooCategoryId,
     long? WooProductId,
     string? WooPermalink,
@@ -767,6 +832,7 @@ public sealed record ProductDetails(
     Guid Id,
     string Sku,
     string Name,
+    string? Slug,
     string? ShortDescription,
     string? Description,
     string? Brand,
