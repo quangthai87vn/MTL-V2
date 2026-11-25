@@ -99,6 +99,9 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
   const [manualLinePrice, setManualLinePrice] = useState(0)
   const [promotionId, setPromotionId] = useState('')
   const [voucherCode, setVoucherCode] = useState('')
+  const [showManualDiscount, setShowManualDiscount] = useState(false)
+  const [manualDiscountName, setManualDiscountName] = useState('')
+  const [manualDiscountAmount, setManualDiscountAmount] = useState(0)
   const [discounts, setDiscounts] = useState<DiscountDraft[]>([])
   const [payments, setPayments] = useState<PaymentDraft[]>([newPayment()])
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash')
@@ -304,6 +307,21 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
       : 0
     setDiscounts((current) => [...current, { key: crypto.randomUUID(), source: 'Promotion', promotionId: promotion.id, name: promotion.name, amount }])
     setPromotionId('')
+  }
+
+  function addManualDiscount() {
+    const name = manualDiscountName.trim()
+    const amount = Math.max(0, manualDiscountAmount)
+    if (!name || amount <= 0) return
+    setDiscounts((current) => [...current, {
+      key: crypto.randomUUID(),
+      source: 'Manual',
+      name,
+      amount,
+    }])
+    setManualDiscountName('')
+    setManualDiscountAmount(0)
+    setShowManualDiscount(false)
   }
 
   function customerSaved(customer: CustomerDetails) {
@@ -628,6 +646,15 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
               <label><span>Chương trình khuyến mãi</span><div className="discount-add-control"><span className="select-shell"><select value={promotionId} onChange={(event) => setPromotionId(event.target.value)}><option value="">Chọn chương trình…</option>{promotionsQuery.data?.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.name} ({discountText(item.value, item.discountType)})</option>)}</select><ChevronDown size={15} /></span><button type="button" className="secondary-button" disabled={!selectedPromotion || subtotal < selectedPromotion.minimumOrderAmount || discounts.some((item) => item.source === 'Promotion' && item.promotionId === promotionId)} onClick={addPromotionDiscount}><Plus size={16} /> Thêm</button></div></label>
               <label><span>Mã voucher</span><div className="voucher-input"><input value={voucherCode} onChange={(event) => setVoucherCode(event.target.value.toUpperCase())} placeholder="Nhập mã…" /><button type="button" className="secondary-button" disabled={!voucherCode.trim() || subtotal <= 0 || voucherMutation.isPending || discounts.some((item) => item.source === 'Voucher' && item.voucherCode === voucherCode.trim())} onClick={() => voucherMutation.mutate()}>{voucherMutation.isPending ? 'Đang kiểm tra…' : 'Thêm voucher'}</button></div></label>
             </div>
+            <div className="manual-discount-toolbar">
+              <button type="button" className="secondary-button" onClick={() => setShowManualDiscount((current) => !current)}><Plus size={16} /> Thêm khuyến mãi nhập tay</button>
+              <small>Dùng cho thu lại hàng hoặc khoản giảm linh hoạt. Nhập số tiền dương, hệ thống tự trừ khỏi hóa đơn.</small>
+            </div>
+            {showManualDiscount && <div className="manual-discount-entry">
+              <label><span>Nội dung / lý do *</span><input value={manualDiscountName} onChange={(event) => setManualDiscountName(event.target.value)} placeholder="Ví dụ: Thu lại SSD của khách" /></label>
+              <label><span>Số tiền giảm *</span><MoneyInput value={manualDiscountAmount} onChange={setManualDiscountAmount} ariaLabel="Số tiền khuyến mãi nhập tay" /></label>
+              <button type="button" className="primary-button" disabled={!manualDiscountName.trim() || manualDiscountAmount <= 0 || subtotal <= 0} onClick={addManualDiscount}><Plus size={16} /> Thêm vào hóa đơn</button>
+            </div>}
             <div className="sales-discount-lines">
               {resolvedDiscounts.map((discount) => <article key={discount.key}>
                 <span className={`discount-source source-${discount.source.toLowerCase()}`}>{discount.source === 'Promotion' ? 'Khuyến mãi' : discount.source === 'Voucher' ? 'Voucher' : 'Nhập tay'}</span>
