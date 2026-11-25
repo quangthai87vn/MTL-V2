@@ -114,7 +114,9 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
                     (x.TotalAmount == money || x.PaidAmount == money || x.TotalAmount - x.PaidAmount == money ||
                      x.Payments.Any(payment => payment.Amount == money))) ||
                 (hasBusinessDate &&
-                    x.InvoiceDateUtc >= dateStartUtc && x.InvoiceDateUtc < dateEndUtc));
+                    ((x.InvoiceDateUtc >= dateStartUtc && x.InvoiceDateUtc < dateEndUtc) ||
+                     (x.ExpectedReturnAtUtc.HasValue && x.ExpectedReturnAtUtc.Value >= dateStartUtc && x.ExpectedReturnAtUtc.Value < dateEndUtc) ||
+                     (x.UpdatedAtUtc >= dateStartUtc && x.UpdatedAtUtc < dateEndUtc))));
         }
 
         if (type.HasValue) query = query.Where(x => x.Type == type.Value);

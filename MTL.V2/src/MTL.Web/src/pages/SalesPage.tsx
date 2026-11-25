@@ -42,6 +42,7 @@ export function SalesPage() {
   const [paymentMethod, setPaymentMethod] = useState('')
   const [createdByUserId, setCreatedByUserId] = useState('')
   const [paymentAccountId, setPaymentAccountId] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [showCreate, setShowCreate] = useState(false)
@@ -85,10 +86,10 @@ export function SalesPage() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const firstItem = total === 0 ? 0 : (page - 1) * pageSize + 1
   const lastItem = Math.min(page * pageSize, total)
-  const hasFilters = Boolean(search || type || serviceTypeId || repairProgress || saleMode || paymentMethod || createdByUserId || paymentAccountId)
+  const activeFilterCount = [type, serviceTypeId, repairProgress, saleMode, paymentMethod, createdByUserId, paymentAccountId].filter(Boolean).length
+  const hasFilters = Boolean(search || activeFilterCount)
 
-  function clearFilters() {
-    setSearch('')
+  function clearAdvancedFilters() {
     setType('')
     setServiceTypeId('')
     setRepairProgress('')
@@ -97,6 +98,11 @@ export function SalesPage() {
     setCreatedByUserId('')
     setPaymentAccountId('')
     setPage(1)
+  }
+
+  function clearFilters() {
+    setSearch('')
+    clearAdvancedFilters()
   }
 
   function invoiceCreated(id: string) {
@@ -136,17 +142,26 @@ export function SalesPage() {
 
     <section className="panel sales-browser">
       <div className="sales-toolbar">
-        <label className="search-box sales-search"><Search size={18} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Tìm toàn bộ danh sách hoặc ngày lập phiếu (25/11/2026)…" /></label>
-        <label className="sales-filter"><select value={type} onChange={(event) => { setType(event.target.value); setPage(1) }}><option value="">Tất cả nghiệp vụ</option><option value="Sale">Bán hàng</option><option value="Repair">Sửa chữa</option></select><ChevronDown size={15} /></label>
-        <label className="sales-filter"><select value={serviceTypeId} onChange={(event) => { setServiceTypeId(event.target.value); setPage(1) }}><option value="">Tất cả loại dịch vụ</option>{serviceTypesQuery.data?.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown size={15} /></label>
-        <label className="sales-filter"><select value={repairProgress} onChange={(event) => { setRepairProgress(event.target.value); setPage(1) }}><option value="">Tất cả trạng thái xử lý</option><option value="pending">Đang xử lý</option><option value="processed">Đã xử lý</option></select><ChevronDown size={15} /></label>
-        <label className="sales-filter"><select value={saleMode} onChange={(event) => { setSaleMode(event.target.value); setPage(1) }}><option value="">Trực tiếp & trả góp</option><option value="direct">Bán trực tiếp</option><option value="installment">Trả góp</option></select><ChevronDown size={15} /></label>
-        <label className="sales-filter"><select value={paymentMethod} onChange={(event) => { setPaymentMethod(event.target.value); setPage(1) }}><option value="">Mọi phương thức tiền</option><option value="cash">Có tiền mặt</option><option value="bank">Có chuyển khoản</option><option value="mixed">Tiền mặt + chuyển khoản</option><option value="unallocated">Chưa phân bổ</option></select><ChevronDown size={15} /></label>
-        <label className="sales-filter"><select value={createdByUserId} onChange={(event) => { setCreatedByUserId(event.target.value); setPage(1) }}><option value="">Tất cả người lập</option>{filterOptionsQuery.data?.creators.map((creator) => <option key={creator.id} value={creator.id}>{creator.name}</option>)}</select><ChevronDown size={15} /></label>
-        <label className="sales-filter banking-filter"><select value={paymentAccountId} onChange={(event) => { setPaymentAccountId(event.target.value); setPage(1) }}><option value="">Tất cả tài khoản banking</option>{filterOptionsQuery.data?.paymentAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName}</option>)}</select><ChevronDown size={15} /></label>
-        {hasFilters && <button type="button" className="secondary-button sales-clear-filters" onClick={clearFilters}><RotateCcw size={15} /> Xóa lọc</button>}
+        <label className="search-box sales-search"><Search size={18} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Nhập thông tin tìm kiếm" aria-label="Nhập thông tin tìm kiếm" /></label>
+        <button type="button" className={`secondary-button sales-filter-toggle ${showFilters ? 'is-open' : ''}`} onClick={() => setShowFilters((value) => !value)} aria-expanded={showFilters} aria-controls="sales-filter-panel"><Settings2 size={16} /><span>Bộ lọc</span>{activeFilterCount > 0 && <b>{activeFilterCount}</b>}<ChevronDown className="sales-filter-toggle-chevron" size={15} /></button>
+        {hasFilters && <button type="button" className="secondary-button sales-clear-filters" onClick={clearFilters}><RotateCcw size={15} /> Xóa điều kiện</button>}
         <span className="sales-total"><strong>{invoicesQuery.data?.total ?? 0}</strong> hóa đơn</span>
       </div>
+      {showFilters && <div className="sales-filter-panel" id="sales-filter-panel">
+        <div className="sales-filter-panel-head">
+          <div><strong>Bộ lọc hóa đơn</strong><span>Thu hẹp danh sách theo nghiệp vụ, nguồn tiền và người lập phiếu.</span></div>
+          {activeFilterCount > 0 && <button type="button" className="sales-filter-reset" onClick={clearAdvancedFilters}><RotateCcw size={14} /> Đặt lại bộ lọc</button>}
+        </div>
+        <div className="sales-filter-grid">
+          <label className="sales-filter-field"><span>Nghiệp vụ</span><div className="sales-filter"><select value={type} onChange={(event) => { setType(event.target.value); setPage(1) }}><option value="">Tất cả nghiệp vụ</option><option value="Sale">Bán hàng</option><option value="Repair">Sửa chữa</option></select><ChevronDown size={15} /></div></label>
+          <label className="sales-filter-field"><span>Loại dịch vụ</span><div className="sales-filter"><select value={serviceTypeId} onChange={(event) => { setServiceTypeId(event.target.value); setPage(1) }}><option value="">Tất cả loại dịch vụ</option>{serviceTypesQuery.data?.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown size={15} /></div></label>
+          <label className="sales-filter-field"><span>Trạng thái xử lý</span><div className="sales-filter"><select value={repairProgress} onChange={(event) => { setRepairProgress(event.target.value); setPage(1) }}><option value="">Tất cả trạng thái xử lý</option><option value="pending">Đang xử lý</option><option value="processed">Đã xử lý</option></select><ChevronDown size={15} /></div></label>
+          <label className="sales-filter-field"><span>Hình thức bán</span><div className="sales-filter"><select value={saleMode} onChange={(event) => { setSaleMode(event.target.value); setPage(1) }}><option value="">Trực tiếp & trả góp</option><option value="direct">Bán trực tiếp</option><option value="installment">Trả góp</option></select><ChevronDown size={15} /></div></label>
+          <label className="sales-filter-field"><span>Phương thức tiền</span><div className="sales-filter"><select value={paymentMethod} onChange={(event) => { setPaymentMethod(event.target.value); setPage(1) }}><option value="">Mọi phương thức tiền</option><option value="cash">Có tiền mặt</option><option value="bank">Có chuyển khoản</option><option value="mixed">Tiền mặt + chuyển khoản</option><option value="unallocated">Chưa phân bổ</option></select><ChevronDown size={15} /></div></label>
+          <label className="sales-filter-field"><span>Người lập phiếu</span><div className="sales-filter"><select value={createdByUserId} onChange={(event) => { setCreatedByUserId(event.target.value); setPage(1) }}><option value="">Tất cả người lập</option>{filterOptionsQuery.data?.creators.map((creator) => <option key={creator.id} value={creator.id}>{creator.name}</option>)}</select><ChevronDown size={15} /></div></label>
+          <label className="sales-filter-field sales-filter-field-wide"><span>Tài khoản banking</span><div className="sales-filter banking-filter"><select value={paymentAccountId} onChange={(event) => { setPaymentAccountId(event.target.value); setPage(1) }}><option value="">Tất cả tài khoản banking</option>{filterOptionsQuery.data?.paymentAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName}</option>)}</select><ChevronDown size={15} /></div></label>
+        </div>
+      </div>}
 
       <div className="data-table-wrap sales-table-wrap">
         <table className="data-table sales-table">
