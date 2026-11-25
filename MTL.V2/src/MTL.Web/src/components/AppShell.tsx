@@ -69,7 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={() => setMenuOpen(false)}
                 className={({ isActive }) => (isActive ? 'nav-item is-active' : 'nav-item')}
               >
-                <Icon size={19} strokeWidth={1.9} />
+                <Icon size={18} strokeWidth={1.5} />
                 <span>{item.label}</span>
               </NavLink>
             )
@@ -93,7 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Menu size={22} />
           </button>
           <div className="topbar-context">
-            <span className="eyebrow">Không gian làm việc</span>
+            <span className="topbar-label">Không gian làm việc</span>
             <strong>MỸ THO LAPTOP</strong>
           </div>
           <div className="profile-wrap">
