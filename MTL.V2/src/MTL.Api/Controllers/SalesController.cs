@@ -1121,8 +1121,8 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
     [HttpPost("promotions")]
     public async Task<ActionResult<PromotionItem>> CreatePromotion(SavePromotionRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name) || request.Value <= 0)
-            return BadRequest(new { message = "Tên và giá trị khuyến mãi không hợp lệ." });
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Value < 0)
+            return BadRequest(new { message = "Tên chương trình không được để trống và giá trị khuyến mãi không được âm." });
         var promotion = new Promotion
         {
             CompanyId = currentUser.CompanyId ?? throw new UnauthorizedAccessException(),
@@ -1145,8 +1145,8 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
     [HttpPut("promotions/{id:guid}")]
     public async Task<ActionResult<PromotionItem>> UpdatePromotion(Guid id, SavePromotionRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name) || request.Value <= 0)
-            return BadRequest(new { message = "Tên và giá trị khuyến mãi không hợp lệ." });
+        if (string.IsNullOrWhiteSpace(request.Name) || request.Value < 0)
+            return BadRequest(new { message = "Tên chương trình không được để trống và giá trị khuyến mãi không được âm." });
         if (request.StartsAtUtc.HasValue && request.EndsAtUtc.HasValue && request.EndsAtUtc < request.StartsAtUtc)
             return BadRequest(new { message = "Ngày kết thúc phải sau ngày bắt đầu." });
         var promotion = await db.Promotions.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);

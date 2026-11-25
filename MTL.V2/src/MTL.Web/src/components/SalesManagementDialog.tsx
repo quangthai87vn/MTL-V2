@@ -192,7 +192,7 @@ export function SalesManagementDialog({ onClose }: { onClose: () => void }) {
       {tab === 'promotions' && <div className="sales-management-content">
         <form className="sales-management-form" onSubmit={createPromotion}>
           <h3><Plus size={17} /> Thêm chương trình khuyến mãi</h3>
-          <DiscountFields />
+          <DiscountFields allowZero />
           <div className="form-grid management-dates">
             <label><span>Bắt đầu</span><input name="startsAtUtc" type="datetime-local" /></label>
             <label><span>Kết thúc</span><input name="endsAtUtc" type="datetime-local" /></label>
@@ -326,7 +326,7 @@ function CatalogEditorDialog({ editor, pending, onClose, onSave }: { editor: Cat
           <label><span>Tên chương trình *</span><input name="name" required defaultValue={discountItem?.name} /></label>
           {promotion && <label><span>Mô tả</span><input name="description" defaultValue={promotion.description ?? ''} /></label>}
           <label><span>Loại giảm</span><select name="discountType" defaultValue={discountItem?.discountType}><option value="FixedAmount">Số tiền cố định</option><option value="Percentage">Phần trăm</option></select></label>
-          <label><span>Giá trị *</span><input name="value" type="number" min={1} required defaultValue={discountItem?.value} /></label>
+          <label><span>Giá trị *</span><input name="value" type="number" min={promotion ? 0 : 1} required defaultValue={discountItem?.value} /></label>
           <label><span>Đơn tối thiểu</span><input name="minimumOrderAmount" type="number" min={0} defaultValue={discountItem?.minimumOrderAmount} /></label>
           <label><span>Giảm tối đa</span><input name="maximumDiscountAmount" type="number" min={0} defaultValue={discountItem?.maximumDiscountAmount ?? ''} /></label>
           <label><span>Bắt đầu</span><input name="startsAtUtc" type="datetime-local" defaultValue={toDateTimeInput(discountItem?.startsAtUtc)} /></label>
@@ -340,11 +340,11 @@ function CatalogEditorDialog({ editor, pending, onClose, onSave }: { editor: Cat
   </div>
 }
 
-function DiscountFields({ hideName = false }: { hideName?: boolean }) {
+function DiscountFields({ hideName = false, allowZero = false }: { hideName?: boolean; allowZero?: boolean }) {
   return <div className="form-grid discount-fields">
     {!hideName && <><label><span>Tên chương trình *</span><input name="name" required /></label><label><span>Mô tả</span><input name="description" placeholder="Điều kiện áp dụng…" /></label></>}
     <label><span>Loại giảm</span><select name="discountType"><option value="FixedAmount">Số tiền cố định</option><option value="Percentage">Phần trăm</option></select></label>
-    <label><span>Giá trị *</span><input name="value" type="number" min={1} step={1} required /></label>
+    <label><span>Giá trị *</span><input name="value" type="number" min={allowZero ? 0 : 1} step={1} required defaultValue={allowZero ? 0 : undefined} /></label>
     <label><span>Đơn tối thiểu</span><input name="minimumOrderAmount" type="number" min={0} step={1000} defaultValue={0} /></label>
     <label><span>Giảm tối đa</span><input name="maximumDiscountAmount" type="number" min={0} step={1000} placeholder="Không giới hạn" /></label>
   </div>
