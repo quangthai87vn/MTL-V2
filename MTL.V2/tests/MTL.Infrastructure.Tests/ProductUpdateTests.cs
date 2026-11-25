@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MTL.Api.Controllers;
@@ -12,6 +13,65 @@ namespace MTL.Infrastructure.Tests;
 
 public sealed class ProductUpdateTests
 {
+    [Fact]
+    public async Task Update_StaleToken_ReturnsCurrentProductForSafeClientRetry()
+    {
+        var fixture = await TestFixture.CreateAsync();
+        if (fixture is null) return;
+
+        await using var scope = fixture;
+        var product = new Product
+        {
+            CompanyId = scope.CompanyId,
+            Sku = $"REGRESSION-{Guid.NewGuid():N}",
+            Name = "Sản phẩm hiện tại",
+            SalePrice = 100,
+            CostPrice = 80,
+            StockQuantity = 0,
+            Unit = "Cái",
+            TrackInventory = false,
+            Availability = ProductAvailability.InStock,
+            Status = ProductStatus.Active,
+            ConcurrencyToken = Guid.NewGuid()
+        };
+        scope.Db.Products.Add(product);
+        await scope.Db.SaveChangesAsync();
+
+        var request = new SaveProductRequest(
+            Sku: product.Sku,
+            Name: product.Name,
+            ShortDescription: null,
+            Description: null,
+            Brand: null,
+            CategoryName: null,
+            WooCategoryId: null,
+            WooCategoryIds: [],
+            SalePrice: product.SalePrice,
+            RegularPrice: null,
+            CostPrice: product.CostPrice,
+            StockQuantity: product.StockQuantity,
+            Unit: product.Unit,
+            TrackInventory: product.TrackInventory,
+            Availability: product.Availability,
+            Status: product.Status,
+            PrimaryImageUrl: null,
+            Images: [],
+            ConcurrencyToken: Guid.NewGuid(),
+            ClientRequestId: null);
+
+        var controller = new ProductsController(scope.Db, scope.CurrentUser, new FailingWooSyncService());
+        var result = await controller.Update(product.Id, request);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result.Result);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(
+            conflict.Value,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        Assert.Equal("product_concurrency", json.RootElement.GetProperty("code").GetString());
+        Assert.Equal(
+            product.ConcurrencyToken,
+            json.RootElement.GetProperty("currentProduct").GetProperty("concurrencyToken").GetGuid());
+    }
+
     [Fact]
     public async Task Update_SavesEveryEditableField_WhenWooSynchronizationFails()
     {

@@ -295,7 +295,7 @@ public sealed class ProductsController(
 
         if (product.ConcurrencyToken != request.ConcurrencyToken)
         {
-            return Conflict(new { message = "Sản phẩm đã được người khác cập nhật. Hãy tải lại dữ liệu." });
+            return ProductConflict(product);
         }
 
         var normalizedSku = string.IsNullOrWhiteSpace(request.Sku) ? product.Sku : request.Sku.Trim();
@@ -334,7 +334,9 @@ public sealed class ProductsController(
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Conflict(new { message = "Sản phẩm đã được người khác cập nhật. Hãy tải lại dữ liệu." });
+            db.ChangeTracker.Clear();
+            var currentProduct = await LoadProductGraphAsync(id, cancellationToken);
+            return ProductConflict(currentProduct);
         }
 
         var syncResult = await PushOrMarkFailedAsync(product, cancellationToken);
@@ -651,6 +653,13 @@ public sealed class ProductsController(
             .Include(item => item.CategoryAssignments)
             .Include(item => item.Images)
             .SingleAsync(item => item.Id == productId, cancellationToken);
+
+    private ConflictObjectResult ProductConflict(Product product) => Conflict(new
+    {
+        message = "Sản phẩm đã được cập nhật trong lúc bạn chỉnh sửa. Hệ thống sẽ tự tải bản mới nhất nếu các trường dữ liệu không thay đổi.",
+        code = "product_concurrency",
+        currentProduct = ToDetails(product)
+    });
 
     private static string? ValidateRequest(SaveProductRequest request)
     {

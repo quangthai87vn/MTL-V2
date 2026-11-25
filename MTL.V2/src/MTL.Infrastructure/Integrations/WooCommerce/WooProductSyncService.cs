@@ -340,7 +340,6 @@ public sealed class WooProductSyncService(
             woo.Tags.Select(tag => new ProductTag(tag.Id is > 0 ? tag.Id : null, tag.Name ?? string.Empty)));
         product.SyncState = ProductSyncState.Synced;
         product.LastSyncedAtUtc = DateTimeOffset.UtcNow;
-        product.ConcurrencyToken = Guid.NewGuid();
     }
 
     private async Task<WooProductDto?> FindExistingWooProductAsync(

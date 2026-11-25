@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
-import { api, apiFetch } from '../lib/api'
+import { api, apiFetch, ApiError } from '../lib/api'
 import type { MediaItem, MediaPage, ProductDetails, ProductFilterOptions, ProductImage, ProductTag } from '../types'
 
 type ProductEditorDialogProps = {
@@ -61,9 +61,11 @@ export function ProductEditorDialog({ productId, filterOptions, onClose, onSaved
     queryKey: ['product-details', productId],
     queryFn: () => api.get<ProductDetails>(`/api/products/${productId}`),
     enabled: Boolean(productId),
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
-  if (productId && query.isLoading) {
+  if (productId && (query.isLoading || query.isFetching)) {
     return <div className="modal-backdrop"><div className="product-editor-modal editor-loading">Đang tải thông tin sản phẩm…</div></div>
   }
 
@@ -131,9 +133,21 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
     }
 
     try {
-      const savedProduct = isEditing
-        ? await api.put<ProductDetails>(`/api/products/${product.id}`, payload)
-        : await api.post<ProductDetails>('/api/products', payload)
+      let savedProduct: ProductDetails
+      if (isEditing) {
+        try {
+          savedProduct = await api.put<ProductDetails>(`/api/products/${product.id}`, payload)
+        } catch (reason) {
+          const currentProduct = getCurrentProductFromConflict(reason)
+          if (!currentProduct || !sameEditableProduct(product, currentProduct)) throw reason
+          savedProduct = await api.put<ProductDetails>(`/api/products/${product.id}`, {
+            ...payload,
+            concurrencyToken: currentProduct.concurrencyToken,
+          })
+        }
+      } else {
+        savedProduct = await api.post<ProductDetails>('/api/products', payload)
+      }
       onSaved(savedProduct, isEditing)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể lưu sản phẩm.')
@@ -369,6 +383,56 @@ function ProductEditorForm({ product, filterOptions, onClose, onSaved, onDeleted
       onConfirm={chooseMedia}
     />}
   </div>
+}
+
+function getCurrentProductFromConflict(reason: unknown): ProductDetails | null {
+  if (!(reason instanceof ApiError) || reason.status !== 409 || typeof reason.details !== 'object' || reason.details === null) {
+    return null
+  }
+
+  const details = reason.details as { code?: unknown; currentProduct?: unknown }
+  return details.code === 'product_concurrency' && details.currentProduct
+    ? details.currentProduct as ProductDetails
+    : null
+}
+
+function sameEditableProduct(left: ProductDetails, right: ProductDetails) {
+  return JSON.stringify(editableProductSnapshot(left)) === JSON.stringify(editableProductSnapshot(right))
+}
+
+function editableProductSnapshot(product: ProductDetails) {
+  return {
+    sku: product.sku,
+    name: product.name,
+    shortDescription: product.shortDescription ?? null,
+    description: product.description ?? null,
+    brand: product.brand ?? null,
+    categoryName: product.categoryName ?? null,
+    wooCategoryIds: [...product.wooCategoryIds].sort((a, b) => a - b),
+    salePrice: product.salePrice,
+    regularPrice: product.regularPrice ?? null,
+    costPrice: product.costPrice,
+    stockQuantity: product.stockQuantity,
+    unit: product.unit,
+    trackInventory: product.trackInventory,
+    availability: product.availability,
+    catalogVisibility: product.catalogVisibility ?? 'Visible',
+    status: product.status,
+    primaryImageUrl: product.primaryImageUrl ?? null,
+    images: [...product.images]
+      .sort((a, b) => a.position - b.position)
+      .map((image) => ({
+        wooMediaId: image.wooMediaId ?? null,
+        url: image.url,
+        thumbnailUrl: image.thumbnailUrl ?? null,
+        name: image.name ?? null,
+        altText: image.altText ?? null,
+        position: image.position,
+      })),
+    tags: [...(product.tags ?? [])]
+      .map((tag) => ({ wooTagId: tag.wooTagId ?? null, name: tag.name.trim().toLocaleLowerCase('vi') }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi')),
+  }
 }
 
 function EditorSideCard({ title, className = '', children }: { title: string; className?: string; children: ReactNode }) {

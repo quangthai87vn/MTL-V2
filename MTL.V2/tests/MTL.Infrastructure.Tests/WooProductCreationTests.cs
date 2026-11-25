@@ -81,6 +81,7 @@ public sealed class WooProductCreationTests
         var product = scope.NewProduct("MTL regression persisted create");
         scope.Db.Products.Add(product);
         await scope.Db.SaveChangesAsync();
+        var originalToken = product.ConcurrencyToken;
 
         var requests = new List<HttpMethod>();
         var handler = new StubHandler(request =>
@@ -97,6 +98,10 @@ public sealed class WooProductCreationTests
         scope.Db.ChangeTracker.Clear();
         var savedLink = await scope.Db.WooProductLinks.SingleAsync(link => link.ProductId == product.Id);
         Assert.Equal(RemoteProductId, savedLink.WooProductId);
+        Assert.Equal(originalToken, await scope.Db.Products
+            .Where(item => item.Id == product.Id)
+            .Select(item => item.ConcurrencyToken)
+            .SingleAsync());
     }
 
     [Fact]
