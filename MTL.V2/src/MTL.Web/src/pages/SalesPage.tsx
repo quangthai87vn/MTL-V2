@@ -30,7 +30,6 @@ import { api } from '../lib/api'
 import type { PagedResult, RepairStatus, SalesFilterOptions, SalesInvoice, SalesPaymentSource, SalesSummary, ServiceType } from '../types'
 
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 })
-const dateTime = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 export function SalesPage() {
   const [search, setSearch] = useState('')
@@ -165,27 +164,27 @@ export function SalesPage() {
 
       <div className="data-table-wrap sales-table-wrap">
         <table className="data-table sales-table">
-          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Ngày lập phiếu</th><th>Hóa đơn</th><th>Khách hàng</th><th>Nội dung / ghi chú & thẻ</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th>Tổng tiền</th><th>Đã ghi nhận</th><th>Còn lại</th><th>Phương thức tiền</th><th>Tài khoản banking</th><th>Người lập phiếu</th><th>Ngày trả máy</th><th>Ngày cập nhật lần cuối</th></tr></thead>
+          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Ngày lập phiếu</th><th>Hóa đơn</th><th className="sales-customer-column">Khách hàng</th><th className="sales-purpose-column">Nội dung / ghi chú & thẻ</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th className="sales-money-column">Tổng tiền</th><th className="sales-money-column">Đã ghi nhận</th><th className="sales-money-column">Còn lại</th><th>Phương thức tiền</th><th>Tài khoản banking</th><th>Người lập phiếu</th><th>Ngày trả máy</th><th>Ngày cập nhật lần cuối</th></tr></thead>
           <tbody>
             {invoicesQuery.isLoading && <tr><td colSpan={15} className="empty-cell">Đang tải hóa đơn…</td></tr>}
             {invoicesQuery.data?.items.map((invoice) => {
               const banking = bankingSummaries(invoice.paymentSources)
               return <tr key={invoice.id} className={`sales-invoice-row ${invoice.repairStatus === 'Returned' ? 'repair-is-returned' : invoice.repairStatus === 'ReadyForReturn' ? 'repair-is-ready' : 'repair-is-pending'}`} onClick={() => setSelectedInvoiceId(invoice.id)}>
               <td className="sales-actions-column"><div className="invoice-row-actions">{hasPermission('sales.manage') && <button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setEditInvoiceId(invoice.id) }} aria-label={`Sửa ${invoice.number}`} title="Sửa hóa đơn"><Pencil size={16} /></button>}<button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setPrintInvoiceId(invoice.id) }} aria-label={`In ${invoice.number}`} title="In hóa đơn"><Printer size={16} /></button>{hasPermission('sales.manage') && <button type="button" className="icon-button danger" onClick={(event) => { event.stopPropagation(); deleteInvoice(invoice) }} aria-label={`Xóa ${invoice.number}`} title="Xóa hóa đơn" disabled={deleteMutation.isPending}><Trash2 size={16} /></button>}</div></td>
-              <td><span className="date-cell created-date">{dateTime.format(new Date(invoice.invoiceDateUtc))}</span></td>
-              <td><button type="button" className="invoice-number" onClick={() => setSelectedInvoiceId(invoice.id)}><FileText size={16} /><span><strong>{invoice.number}</strong><small>{invoice.type === 'Repair' && invoice.repairDeviceModel ? `${invoice.repairDeviceModel}${invoice.repairDeviceCount > 1 ? ` + ${invoice.repairDeviceCount - 1} máy` : ''}` : invoice.isInstallment && invoice.installmentProvider ? invoice.installmentProvider : 'Bán sản phẩm'}</small><span className={`invoice-sale-mode ${invoice.isInstallment ? 'installment' : 'direct'}`}>{invoice.isInstallment ? 'Trả góp' : 'Bán tiền mặt'}</span></span></button></td>
-              <td><div className="sales-customer-cell"><strong>{invoice.customerName}</strong><span>{invoice.customerPhone || 'Chưa có số điện thoại'}</span><small>{invoice.customerInvoiceCount || 0} đơn · Tổng mua {currency.format(invoice.customerTotalSpent || 0)}</small></div></td>
-              <td className="invoice-purpose-cell"><strong>{invoice.notes || (invoice.type === 'Repair' ? `Sửa chữa ${invoice.repairDeviceModel || 'máy khách'}` : 'Bán sản phẩm')}</strong><div className="invoice-service-tags">{invoice.serviceTypes?.map((item, index) => <span className={serviceTagTone(item.code, index)} key={item.id}>{item.name}</span>)}{invoice.serviceTypes?.length === 0 && <span className="tag-neutral">Chưa gắn thẻ</span>}</div></td>
+              <td><span className="date-cell created-date">{formatDateTime(invoice.invoiceDateUtc)}</span></td>
+              <td><button type="button" className="invoice-number" onClick={() => setSelectedInvoiceId(invoice.id)}><FileText size={16} /><span><strong>{invoice.number}</strong><small>{invoice.type === 'Repair' && invoice.repairDeviceModel ? `${invoice.repairDeviceModel}${invoice.repairDeviceCount > 1 ? ` + ${invoice.repairDeviceCount - 1} máy` : ''}` : invoice.isInstallment && invoice.installmentProvider ? invoice.installmentProvider : 'Bán sản phẩm'}</small>{invoice.isInstallment && <span className="invoice-sale-mode installment">Trả góp</span>}</span></button></td>
+              <td className="sales-customer-column"><div className="sales-customer-cell"><strong>{invoice.customerName}</strong><span>{invoice.customerPhone || 'Chưa có số điện thoại'}</span><small>{invoice.customerInvoiceCount || 0} đơn · Tổng mua {currency.format(invoice.customerTotalSpent || 0)}</small></div></td>
+              <td className="invoice-purpose-cell sales-purpose-column"><strong>{invoice.notes || (invoice.type === 'Repair' ? `Sửa chữa ${invoice.repairDeviceModel || 'máy khách'}` : 'Bán sản phẩm')}</strong><div className="invoice-service-tags">{invoice.serviceTypes?.map((item, index) => <span className={serviceTagTone(item.code, index)} key={item.id}>{item.name}</span>)}{invoice.serviceTypes?.length === 0 && <span className="tag-neutral">Chưa gắn thẻ</span>}</div></td>
               <td><div className="invoice-service-cell">{invoice.type === 'Sale' ? <span className="invoice-type sale"><PackageCheck size={14} /> Bán sản phẩm</span> : <span className="invoice-type repair"><Wrench size={14} /> Sửa chữa</span>}</div></td>
               <td><div className="repair-progress-cell"><StatusBadge tone={processingTone(invoice.repairStatus)}>{processingLabel(invoice.repairStatus)}</StatusBadge>{invoice.type === 'Repair' && <small>{invoice.repairDeviceCount} máy trong phiếu</small>}</div></td>
-              <td className="money">{currency.format(invoice.totalAmount)}</td>
-              <td className="collected-money">{invoice.isInstallment ? <span className="installment-money-breakdown"><strong>{currency.format(invoice.paidAmount)}</strong><small>{currency.format(invoice.receivedAmount)} tiền mặt + {currency.format(invoice.scheduledAmount)} banking</small></span> : currency.format(invoice.paidAmount)}</td>
-              <td className={invoice.outstandingAmount > 0 ? 'outstanding-money' : 'muted-money'}>{currency.format(invoice.outstandingAmount)}</td>
+              <td className="money sales-money-column">{currency.format(invoice.totalAmount)}</td>
+              <td className="collected-money sales-money-column">{invoice.isInstallment ? <span className="installment-money-breakdown"><strong>{currency.format(invoice.paidAmount)}</strong><small>{currency.format(invoice.receivedAmount)} tiền mặt + {currency.format(invoice.scheduledAmount)} banking</small></span> : currency.format(invoice.paidAmount)}</td>
+              <td className={`${invoice.outstandingAmount > 0 ? 'outstanding-money' : 'muted-money'} sales-money-column`}>{currency.format(invoice.outstandingAmount)}</td>
               <td><div className="payment-method-cell"><span className={`payment-method-badge ${paymentMethodTone(invoice.paymentSources)}`}>{paymentMethodLabel(invoice.paymentSources)}</span>{invoice.paymentDueDateUtc && invoice.isInstallment ? <small className="due-date"><CalendarClock size={12} /> Dự kiến {new Date(invoice.paymentDueDateUtc).toLocaleDateString('vi-VN')}</small> : null}</div></td>
               <td><div className="banking-account-cell">{banking.map((account) => <span key={account.key}><strong>{account.name}</strong><small>{account.bankName}{account.accountNumber ? ` · ${maskAccountNumber(account.accountNumber)}` : ''}</small><b>{currency.format(account.amount)}</b></span>)}{banking.length === 0 && <span className="banking-empty">Không có chuyển khoản</span>}</div></td>
               <td><span className="invoice-creator">{invoice.createdByName || 'Dữ liệu cũ'}</span></td>
-              <td><span className={`date-cell return-date ${invoice.expectedReturnAtUtc ? '' : 'is-empty'}`}>{invoice.expectedReturnAtUtc ? dateTime.format(new Date(invoice.expectedReturnAtUtc)) : '—'}</span></td>
-              <td><span className="date-cell updated-date">{dateTime.format(new Date(invoice.updatedAtUtc))}</span></td>
+              <td><span className={`date-cell return-date ${invoice.expectedReturnAtUtc ? '' : 'is-empty'}`}>{invoice.expectedReturnAtUtc ? formatDateTime(invoice.expectedReturnAtUtc) : '—'}</span></td>
+              <td><span className="date-cell updated-date">{formatDateTime(invoice.updatedAtUtc)}</span></td>
             </tr>})}
             {!invoicesQuery.isLoading && invoicesQuery.data?.items.length === 0 && <tr><td colSpan={15} className="empty-cell"><CreditCard size={22} /> Chưa có hóa đơn phù hợp.</td></tr>}
           </tbody>
@@ -270,6 +269,13 @@ function bankingSummaries(sources: SalesPaymentSource[]) {
 function maskAccountNumber(value: string) {
   const compact = value.replace(/\s+/g, '')
   return compact.length <= 6 ? compact : `•••• ${compact.slice(-6)}`
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function serviceTagTone(code: string, index: number) {

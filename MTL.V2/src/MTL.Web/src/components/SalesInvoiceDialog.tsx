@@ -575,13 +575,13 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
             <div className="sales-section-title"><span><ClipboardPenLine size={19} /></span><div><h3>THÔNG TIN HOÁ ĐƠN</h3></div></div>
             <div className={`invoice-meta-grid ${invoiceType === 'Sale' ? 'is-sale' : ''}`}>
               <label><span>Người lập phiếu</span><input value={invoiceQuery.data?.issuer.name ?? user?.fullName ?? 'Nhân viên'} readOnly /></label>
-              <label><span>Ngày lập phiếu</span><input type="datetime-local" value={invoiceDate} onChange={(event) => changeInvoiceDate(event.target.value)} /></label>
+              <label><span>Ngày lập phiếu</span><VietnameseDateTimeInput key={`invoice-date-${invoiceDate}`} ariaLabel="Ngày lập phiếu" value={invoiceDate} onChange={changeInvoiceDate} required /></label>
               <label><span>Trạng thái xử lý phiếu</span><select value={repairStatus} onChange={(event) => setRepairStatus(event.target.value as RepairStatus)}>
                 <option value="InProgress">Đang xử lý</option>
                 <option value="Returned">Đã xử lý</option>
                 <option value="Cancelled">Đã hủy</option>
               </select></label>
-              {invoiceType === 'Repair' && <label><span>Ngày dự kiến trả máy</span><input type="datetime-local" value={expectedReturnAt} onChange={(event) => setExpectedReturnAt(event.target.value)} required /></label>}
+              {invoiceType === 'Repair' && <label><span>Ngày dự kiến trả máy</span><VietnameseDateTimeInput key={`expected-return-${expectedReturnAt}`} ariaLabel="Ngày dự kiến trả máy" value={expectedReturnAt} onChange={setExpectedReturnAt} required /></label>}
             </div>
             <label className="invoice-notes-field"><span>Nội dung / ghi chú</span><textarea value={notes || suggestedNotes} onChange={(event) => setNotes(event.target.value === suggestedNotes ? '' : event.target.value)} placeholder="Nội dung hóa đơn" rows={2} /></label>
           </section>
@@ -616,7 +616,6 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
                 <header><div><span className="repair-device-number">Máy {index + 1}</span><strong>{device.deviceModel.trim() || 'Chưa nhập model'}</strong></div>{repairDevices.length > 1 && <button type="button" className="icon-button danger" onClick={() => setRepairDevices((current) => current.filter((item) => item.key !== device.key))} aria-label={`Xóa máy ${index + 1}`}><Trash2 size={17} /></button>}</header>
                 <div className="sales-form-grid repair-device-fields">
                   <label><span>Model máy *</span><input value={device.deviceModel} onChange={(event) => updateRepairDevice(device.key, { deviceModel: event.target.value })} placeholder="Ví dụ: Dell Latitude 7420" required /></label>
-                  <label><span>Serial / Service Tag</span><input value={device.serialNumber} onChange={(event) => updateRepairDevice(device.key, { serialNumber: event.target.value })} /></label>
                   <label><span>Phụ kiện nhận kèm</span><input value={device.accessories} onChange={(event) => updateRepairDevice(device.key, { accessories: event.target.value })} placeholder="Sạc, túi, chuột…" /></label>
                   <label><span>Tình trạng</span><input value={device.deviceCondition} onChange={(event) => updateRepairDevice(device.key, { deviceCondition: event.target.value })} placeholder="Có thể để trống" /></label>
                 </div>
@@ -643,12 +642,8 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
           <section className="sales-section">
             <div className="sales-section-title"><span><Percent size={19} /></span><div><h3>Khuyến mãi & voucher</h3></div></div>
             <div className="sales-discount-grid">
-              <label><span>Chương trình khuyến mãi</span><div className="discount-add-control"><span className="select-shell"><select value={promotionId} onChange={(event) => setPromotionId(event.target.value)}><option value="">Chọn chương trình…</option>{promotionsQuery.data?.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.name} ({discountText(item.value, item.discountType)})</option>)}</select><ChevronDown size={15} /></span><button type="button" className="secondary-button" disabled={!selectedPromotion || subtotal < selectedPromotion.minimumOrderAmount || discounts.some((item) => item.source === 'Promotion' && item.promotionId === promotionId)} onClick={addPromotionDiscount}><Plus size={16} /> Thêm</button></div></label>
+              <label><span>Chương trình khuyến mãi</span><div className="discount-add-control"><span className="select-shell"><select value={promotionId} onChange={(event) => setPromotionId(event.target.value)}><option value="">Chọn chương trình…</option>{promotionsQuery.data?.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.name} ({discountText(item.value, item.discountType)})</option>)}</select><ChevronDown size={15} /></span><button type="button" className="secondary-button" disabled={!selectedPromotion || subtotal < selectedPromotion.minimumOrderAmount || discounts.some((item) => item.source === 'Promotion' && item.promotionId === promotionId)} onClick={addPromotionDiscount}><Plus size={16} /> Thêm</button><button type="button" className="secondary-button manual-discount-button" onClick={() => setShowManualDiscount((current) => !current)}><Plus size={16} /> Thêm khuyến mãi nhập tay</button></div></label>
               <label><span>Mã voucher</span><div className="voucher-input"><input value={voucherCode} onChange={(event) => setVoucherCode(event.target.value.toUpperCase())} placeholder="Nhập mã…" /><button type="button" className="secondary-button" disabled={!voucherCode.trim() || subtotal <= 0 || voucherMutation.isPending || discounts.some((item) => item.source === 'Voucher' && item.voucherCode === voucherCode.trim())} onClick={() => voucherMutation.mutate()}>{voucherMutation.isPending ? 'Đang kiểm tra…' : 'Thêm voucher'}</button></div></label>
-            </div>
-            <div className="manual-discount-toolbar">
-              <button type="button" className="secondary-button" onClick={() => setShowManualDiscount((current) => !current)}><Plus size={16} /> Thêm khuyến mãi nhập tay</button>
-              <small>Dùng cho thu lại hàng hoặc khoản giảm linh hoạt. Nhập số tiền dương, hệ thống tự trừ khỏi hóa đơn.</small>
             </div>
             {showManualDiscount && <div className="manual-discount-entry">
               <label><span>Nội dung / lý do *</span><input value={manualDiscountName} onChange={(event) => setManualDiscountName(event.target.value)} placeholder="Ví dụ: Thu lại SSD của khách" /></label>
@@ -684,7 +679,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
                 <label><span>Đơn vị trả góp *</span><select value={installmentProvider} onChange={(event) => setInstallmentProvider(event.target.value)}><option value="">Chọn đơn vị trả góp…</option>{installmentProvidersQuery.data?.filter((provider) => provider.isActive).map((provider) => <option key={provider.id} value={provider.name}>{provider.name}</option>)}{installmentProvider && !installmentProvidersQuery.data?.some((provider) => provider.name === installmentProvider) && <option value={installmentProvider}>{installmentProvider}</option>}</select></label>
                 <label><span>Mã hồ sơ</span><input value={installmentReference} onChange={(event) => setInstallmentReference(event.target.value)} /></label>
                 <label><span>Tài khoản nhận tiền góp *</span><select value={installmentPaymentAccountId} onChange={(event) => setInstallmentPaymentAccountId(event.target.value)} required={outstanding > 0}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label>
-                <label><span>Ngày dự kiến nhận tiền góp *</span><input type="datetime-local" value={paymentDueDate} onChange={(event) => { paymentDueCustomized.current = true; setPaymentDueDate(event.target.value) }} required={outstanding > 0} /><small>Mặc định sau 2 ngày kể từ ngày lập hóa đơn.</small></label>
+                <label><span>Ngày dự kiến nhận tiền góp *</span><VietnameseDateTimeInput key={`payment-due-${paymentDueDate}`} ariaLabel="Ngày dự kiến nhận tiền góp" value={paymentDueDate} onChange={(value) => { paymentDueCustomized.current = true; setPaymentDueDate(value) }} required={outstanding > 0} /><small>Mặc định sau 2 ngày kể từ ngày lập hóa đơn.</small></label>
               </div>
             </div>}
 
@@ -708,7 +703,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
             {invoicePurpose && <div className="summary-purpose"><ClipboardPenLine size={15} /><span>{invoicePurpose}</span></div>}
             <dl><div><dt>Tạm tính</dt><dd>{currency.format(subtotal)}</dd></div>{promotionDiscount > 0 && <div className="discount"><dt>Khuyến mãi</dt><dd>− {currency.format(promotionDiscount)}</dd></div>}{voucherDiscount > 0 && <div className="discount"><dt>Voucher</dt><dd>− {currency.format(voucherDiscount)}</dd></div>}<div className="grand-total"><dt>Khách cần trả</dt><dd>{currency.format(total)}</dd></div><div><dt>{repairStatus === 'Returned' ? 'Đã ghi nhận' : 'Phân bổ dự kiến'}</dt><dd className="paid">{currency.format(paid)}</dd></div><div className="remaining"><dt>{isInstallment ? 'Banking dự kiến' : 'Còn phải thu'}</dt><dd>{currency.format(outstanding)}</dd></div></dl>
             {paid > total && <div className="inline-note danger">Số tiền nhận đang vượt tổng hóa đơn.</div>}
-            {isInstallment && outstanding > 0 && <div className="installment-summary"><Clock3 size={17} /><span><strong>Khoản banking tự động</strong><small>{paymentDueDate ? `Lên lịch: ${new Date(paymentDueDate).toLocaleString('vi-VN')}` : 'Chưa chọn ngày dự kiến'}</small></span></div>}
+            {isInstallment && outstanding > 0 && <div className="installment-summary"><Clock3 size={17} /><span><strong>Khoản banking tự động</strong><small>{paymentDueDate ? `Lên lịch: ${formatVietnameseDateTime(paymentDueDate)}` : 'Chưa chọn ngày dự kiến'}</small></span></div>}
             <button className="primary-button summary-save" disabled={createMutation.isPending}><Save size={18} /> {createMutation.isPending ? 'Đang lưu…' : invoiceId ? 'Cập nhật hóa đơn' : invoiceType === 'Repair' ? 'Lưu phiếu tiếp nhận' : 'Lưu hóa đơn'}</button>
           </div>
         </aside>
@@ -721,12 +716,48 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
 
 function MoneyInput({ value, onChange, ariaLabel }: { value: number; onChange: (value: number) => void; ariaLabel?: string }) {
   return <input
+    className="money-input"
     type="text"
     inputMode="numeric"
     aria-label={ariaLabel}
     value={money.format(Math.max(0, Math.round(value || 0)))}
     onChange={(event) => onChange(parseMoney(event.target.value))}
     onFocus={(event) => event.currentTarget.select()}
+  />
+}
+
+function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { value: string; onChange: (value: string) => void; required?: boolean; ariaLabel: string }) {
+  const [draft, setDraft] = useState(() => formatVietnameseDateTime(value))
+
+  function updateDraft(next: string) {
+    setDraft(next)
+    if (!next.trim()) {
+      onChange('')
+      return
+    }
+    const parsed = parseVietnameseDateTime(next)
+    if (parsed) onChange(parsed)
+  }
+
+  function normalizeDraft() {
+    if (!draft.trim()) {
+      onChange('')
+      return
+    }
+    const parsed = parseVietnameseDateTime(draft)
+    setDraft(parsed ? formatVietnameseDateTime(parsed) : formatVietnameseDateTime(value))
+  }
+
+  return <input
+    type="text"
+    inputMode="numeric"
+    aria-label={ariaLabel}
+    title="Định dạng: ngày/tháng/năm giờ:phút"
+    placeholder="dd/MM/yyyy HH:mm"
+    value={draft}
+    required={required}
+    onChange={(event) => updateDraft(event.target.value)}
+    onBlur={normalizeDraft}
   />
 }
 
@@ -779,6 +810,27 @@ function discountText(value: number, type: Promotion['discountType']) {
 function toDateTimeLocal(date: Date) {
   const offset = date.getTimezoneOffset()
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16)
+}
+
+function formatVietnameseDateTime(value: string) {
+  if (!value) return ''
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (!match) return ''
+  return `${match[3]}/${match[2]}/${match[1]} ${match[4]}:${match[5]}`
+}
+
+function parseVietnameseDateTime(value: string) {
+  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const [, dayText, monthText, yearText, hourText, minuteText] = match
+  const day = Number(dayText)
+  const month = Number(monthText)
+  const year = Number(yearText)
+  const hour = Number(hourText)
+  const minute = Number(minuteText)
+  const date = new Date(year, month - 1, day, hour, minute)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day || date.getHours() !== hour || date.getMinutes() !== minute) return null
+  return toDateTimeLocal(date)
 }
 
 function addDaysToLocalDateTime(value: string, days: number) {
