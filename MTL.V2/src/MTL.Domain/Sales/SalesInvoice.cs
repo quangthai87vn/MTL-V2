@@ -188,6 +188,7 @@ public sealed class RepairOrder : CompanyOwnedEntity
     public string? SerialNumber { get; set; }
     public string? Accessories { get; set; }
     public string DeviceCondition { get; set; } = string.Empty;
+    public string WarrantyPeriod { get; set; } = "3 tháng";
     public string CustomerRequest { get; set; } = string.Empty;
     public string? TechnicianAssessment { get; set; }
     public decimal EstimatedCost { get; set; }

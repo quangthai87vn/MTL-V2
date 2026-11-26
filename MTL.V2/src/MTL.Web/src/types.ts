@@ -329,6 +329,7 @@ export type RepairOrder = {
   serialNumber?: string
   accessories?: string
   deviceCondition: string
+  warrantyPeriod?: string
   customerRequest: string
   technicianAssessment?: string
   estimatedCost: number

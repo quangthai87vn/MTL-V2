@@ -261,6 +261,7 @@ public sealed class AppDbContext(
             entity.HasIndex(x => x.SalesInvoiceId);
             entity.Property(x => x.DeviceModel).HasMaxLength(300);
             entity.Property(x => x.SerialNumber).HasMaxLength(200);
+            entity.Property(x => x.WarrantyPeriod).HasMaxLength(50);
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
             entity.Property(x => x.EstimatedCost).HasPrecision(18, 2);
             entity.HasOne(x => x.SalesInvoice).WithMany(x => x.Repairs).HasForeignKey(x => x.SalesInvoiceId);

@@ -50,6 +50,7 @@ type RepairDeviceDraft = {
   serialNumber: string
   accessories: string
   deviceCondition: string
+  warrantyPeriod: string
   services: { serviceTypeId: string; notes: string; amount: number }[]
 }
 
@@ -73,7 +74,7 @@ type DiscountDraft = {
 }
 
 const newPayment = (method: PaymentMethod = 'Cash'): PaymentDraft => ({ key: crypto.randomUUID(), method, paymentAccountId: '', amount: 0, reference: '' })
-const newRepairDevice = (): RepairDeviceDraft => ({ key: crypto.randomUUID(), deviceModel: '', serialNumber: '', accessories: '', deviceCondition: '', services: [] })
+const newRepairDevice = (): RepairDeviceDraft => ({ key: crypto.randomUUID(), deviceModel: '', serialNumber: '', accessories: '', deviceCondition: '', warrantyPeriod: '3 tháng', services: [] })
 
 export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceId?: string; onClose: () => void; onCreated: (id: string) => void }) {
   const { user } = useAuth()
@@ -224,6 +225,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
       serialNumber: repair.serialNumber ?? '',
       accessories: repair.accessories ?? '',
       deviceCondition: repair.deviceCondition,
+      warrantyPeriod: repair.warrantyPeriod || '3 tháng',
       services: repair.services?.length
         ? repair.services.map((service) => ({ serviceTypeId: service.id, notes: service.notes ?? '', amount: service.amount }))
         : (repair.serviceTypes ?? []).map((service, index) => ({ serviceTypeId: service.id, notes: '', amount: index === 0 ? repair.estimatedCost : 0 })),
@@ -501,6 +503,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
         serialNumber: device.serialNumber || null,
         accessories: device.accessories || null,
         deviceCondition: device.deviceCondition || null,
+        warrantyPeriod: device.warrantyPeriod || '3 tháng',
         customerRequest: null,
         technicianAssessment: null,
         estimatedCost: device.services.reduce((sum, service) => sum + service.amount, 0),
@@ -661,6 +664,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
                   <label><span>Model máy *</span><input value={device.deviceModel} onChange={(event) => updateRepairDevice(device.key, { deviceModel: event.target.value })} placeholder="Ví dụ: Dell Latitude 7420" required /></label>
                   <label><span>Phụ kiện nhận kèm</span><input value={device.accessories} onChange={(event) => updateRepairDevice(device.key, { accessories: event.target.value })} placeholder="Sạc, túi, chuột…" /></label>
                   <label><span>Tình trạng</span><input value={device.deviceCondition} onChange={(event) => updateRepairDevice(device.key, { deviceCondition: event.target.value })} placeholder="Có thể để trống" /></label>
+                  <label><span>Bảo hành</span><select value={device.warrantyPeriod} onChange={(event) => updateRepairDevice(device.key, { warrantyPeriod: event.target.value })}>{withCurrentOption(warrantyOptions, device.warrantyPeriod).map((warranty) => <option key={warranty}>{warranty}</option>)}</select></label>
                 </div>
                 <div className="repair-service-types">
                   <span>Loại dịch vụ *</span>

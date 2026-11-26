@@ -164,9 +164,9 @@ export function SalesPage() {
 
       <div className="data-table-wrap sales-table-wrap">
         <table className="data-table sales-table">
-          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Ngày lập phiếu</th><th>Hóa đơn</th><th className="sales-customer-column">Khách hàng</th><th className="sales-purpose-column">Nội dung nội bộ & thẻ</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th className="sales-money-column">Tổng tiền</th><th className="sales-money-column">Đã ghi nhận</th><th className="sales-money-column">Còn lại</th><th>Phương thức tiền</th><th>Tài khoản banking</th><th>Người lập phiếu</th><th>Ngày trả máy</th><th>Ngày cập nhật lần cuối</th></tr></thead>
+          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Ngày lập phiếu</th><th>Hóa đơn</th><th className="sales-customer-column">Khách hàng</th><th className="sales-purpose-column">Nội dung nội bộ & thẻ</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th className="sales-money-column">Tổng tiền</th><th className="sales-money-column">Đã ghi nhận</th><th className="sales-money-column">Còn lại</th><th className="sales-payment-column">Thanh toán</th><th>Người lập phiếu</th><th>Ngày trả máy</th><th>Ngày cập nhật lần cuối</th></tr></thead>
           <tbody>
-            {invoicesQuery.isLoading && <tr><td colSpan={15} className="empty-cell">Đang tải hóa đơn…</td></tr>}
+            {invoicesQuery.isLoading && <tr><td colSpan={14} className="empty-cell">Đang tải hóa đơn…</td></tr>}
             {invoicesQuery.data?.items.map((invoice) => {
               const banking = bankingSummaries(invoice.paymentSources)
               return <tr key={invoice.id} className={`sales-invoice-row ${invoiceRowStatusClass(invoice)}`} onClick={() => setSelectedInvoiceId(invoice.id)}>
@@ -180,13 +180,12 @@ export function SalesPage() {
               <td className="money sales-money-column">{currency.format(invoice.totalAmount)}</td>
               <td className="collected-money sales-money-column">{invoice.isInstallment ? <span className="installment-money-breakdown"><strong>{currency.format(invoice.paidAmount)}</strong><small>{currency.format(invoice.receivedAmount)} tiền mặt + {currency.format(invoice.scheduledAmount)} banking</small></span> : currency.format(invoice.paidAmount)}</td>
               <td className={`${invoice.outstandingAmount > 0 ? 'outstanding-money' : 'muted-money'} sales-money-column`}>{currency.format(invoice.outstandingAmount)}</td>
-              <td><div className="payment-method-cell"><span className={`payment-method-badge ${paymentMethodTone(invoice.paymentSources)}`}>{paymentMethodLabel(invoice.paymentSources)}</span>{invoice.paymentDueDateUtc && invoice.isInstallment ? <small className="due-date"><CalendarClock size={12} /> Dự kiến {new Date(invoice.paymentDueDateUtc).toLocaleDateString('vi-VN')}</small> : null}</div></td>
-              <td><div className="banking-account-cell">{banking.map((account) => <span key={account.key}><strong>{account.name}</strong><small>{account.bankName}{account.accountNumber ? ` · ${maskAccountNumber(account.accountNumber)}` : ''}</small><b>{currency.format(account.amount)}</b></span>)}{banking.length === 0 && <span className="banking-empty">Không có chuyển khoản</span>}</div></td>
+              <td className="sales-payment-column"><div className="sales-payment-cell"><div className="payment-method-cell"><span className={`payment-method-badge ${paymentMethodTone(invoice.paymentSources)}`}>{paymentMethodLabel(invoice.paymentSources)}</span>{invoice.paymentDueDateUtc && invoice.isInstallment ? <small className="due-date"><CalendarClock size={12} /> Dự kiến {new Date(invoice.paymentDueDateUtc).toLocaleDateString('vi-VN')}</small> : null}</div><div className="banking-account-cell">{banking.map((account) => <span key={account.key}><strong>{account.name}</strong><small>{account.bankName}{account.accountNumber ? ` · ${maskAccountNumber(account.accountNumber)}` : ''}</small><b>{currency.format(account.amount)}</b></span>)}{banking.length === 0 && <span className="banking-empty">Không có chuyển khoản</span>}</div></div></td>
               <td><span className="invoice-creator">{invoice.createdByName || 'Dữ liệu cũ'}</span></td>
               <td><span className={`date-cell return-date ${invoice.expectedReturnAtUtc ? '' : 'is-empty'}`}>{invoice.expectedReturnAtUtc ? formatDateTime(invoice.expectedReturnAtUtc) : '—'}</span></td>
               <td><span className="date-cell updated-date">{formatDateTime(invoice.updatedAtUtc)}</span></td>
             </tr>})}
-            {!invoicesQuery.isLoading && invoicesQuery.data?.items.length === 0 && <tr><td colSpan={15} className="empty-cell"><CreditCard size={22} /> Chưa có hóa đơn phù hợp.</td></tr>}
+            {!invoicesQuery.isLoading && invoicesQuery.data?.items.length === 0 && <tr><td colSpan={14} className="empty-cell"><CreditCard size={22} /> Chưa có hóa đơn phù hợp.</td></tr>}
           </tbody>
         </table>
       </div>

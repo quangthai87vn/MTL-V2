@@ -425,6 +425,7 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
                     SerialNumber = Clean(repairRequest.SerialNumber),
                     Accessories = Clean(repairRequest.Accessories),
                     DeviceCondition = Clean(repairRequest.DeviceCondition) ?? string.Empty,
+                    WarrantyPeriod = Clean(repairRequest.WarrantyPeriod) ?? "3 tháng",
                     CustomerRequest = string.Empty,
                     TechnicianAssessment = null,
                     EstimatedCost = repairTotal,
@@ -777,6 +778,7 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
                     SerialNumber = Clean(repairRequest.SerialNumber),
                     Accessories = Clean(repairRequest.Accessories),
                     DeviceCondition = Clean(repairRequest.DeviceCondition) ?? string.Empty,
+                    WarrantyPeriod = Clean(repairRequest.WarrantyPeriod) ?? "3 tháng",
                     CustomerRequest = string.Empty,
                     TechnicianAssessment = null,
                     EstimatedCost = repairTotal,
@@ -1805,6 +1807,7 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
             repair.SerialNumber,
             repair.Accessories,
             repair.DeviceCondition,
+            repair.WarrantyPeriod,
             repair.CustomerRequest,
             repair.TechnicianAssessment,
             repair.EstimatedCost,
@@ -1900,7 +1903,7 @@ public sealed record SalesInvoiceLineItem(Guid Id, Guid? ProductId, string Sku, 
     public string WarrantyPeriod { get; init; } = string.Empty;
 }
 public sealed record SalesPaymentItem(Guid Id, PaymentMethod Method, Guid? PaymentAccountId, string? PaymentAccountName, decimal Amount, DateTimeOffset PaidAtUtc, bool IsScheduled, string? Reference, string? Notes);
-public sealed record RepairOrderItem(string DeviceModel, string? SerialNumber, string? Accessories, string DeviceCondition, string CustomerRequest, string? TechnicianAssessment, decimal EstimatedCost, DateTimeOffset? ExpectedReturnAtUtc, RepairStatus Status, string? Notes)
+public sealed record RepairOrderItem(string DeviceModel, string? SerialNumber, string? Accessories, string DeviceCondition, string WarrantyPeriod, string CustomerRequest, string? TechnicianAssessment, decimal EstimatedCost, DateTimeOffset? ExpectedReturnAtUtc, RepairStatus Status, string? Notes)
 {
     public Guid Id { get; init; }
     public IReadOnlyList<ServiceTypeItem> ServiceTypes { get; init; } = [];
@@ -1928,6 +1931,7 @@ public sealed record CreateSalesDiscountRequest(SalesDiscountSource Source, Guid
 public sealed record CreateSalesPaymentRequest(PaymentMethod Method, Guid? PaymentAccountId, decimal Amount, DateTimeOffset? PaidAtUtc, string? Reference, string? Notes);
 public sealed record CreateRepairOrderRequest(string DeviceModel, string? SerialNumber, string? Accessories, string? DeviceCondition, string? CustomerRequest, string? TechnicianAssessment, decimal EstimatedCost, DateTimeOffset? ExpectedReturnAtUtc, string? Notes)
 {
+    public string? WarrantyPeriod { get; init; }
     public IReadOnlyList<Guid>? ServiceTypeIds { get; init; }
     public IReadOnlyList<CreateRepairServiceRequest>? Services { get; init; }
     public RepairStatus? Status { get; init; }
