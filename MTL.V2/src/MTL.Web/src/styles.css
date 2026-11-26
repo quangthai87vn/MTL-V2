@@ -818,10 +818,12 @@ a { color: inherit; text-decoration: none; }
 .invoice-note-card > small { margin-top: 8px; display: block; color: #7b818a; font-size: 11px; line-height: 1.45; }
 .vietnamese-datetime-input { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 44px; }
 .vietnamese-datetime-input > input[type="text"] { border-radius: 9px 0 0 9px; }
-.datetime-picker-button { min-height: 46px; padding: 0; display: grid; place-items: center; color: #606873; background: #f7f8fa; border: 1px solid #d3d8df; border-left: 0; border-radius: 0 9px 9px 0; }
-.datetime-picker-button:hover { color: #bd1c23; background: #fff2f2; }
-.datetime-picker-button:focus-visible { z-index: 1; outline: 3px solid #e3242b20; }
-.invoice-meta-grid .datetime-native-picker, .summary-invoice-meta .datetime-native-picker, .installment-fields .datetime-native-picker { position: fixed; left: -10000px; width: 1px; min-height: 1px; padding: 0; opacity: 0; pointer-events: none; }
+.datetime-picker-control { position: relative; min-height: 46px; display: grid; place-items: center; overflow: hidden; color: #606873; background: #f7f8fa; border: 1px solid #d3d8df; border-left: 0; border-radius: 0 9px 9px 0; }
+.datetime-picker-control > svg { pointer-events: none; }
+.datetime-picker-control:hover { color: #bd1c23; background: #fff2f2; }
+.datetime-picker-control:focus-within { z-index: 1; color: #bd1c23; outline: 3px solid #e3242b20; }
+.datetime-picker-control .datetime-native-picker { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; border: 0; }
+.datetime-picker-control .datetime-native-picker::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .installment-date-field { min-width: 0; display: grid; gap: 6px; }
 .installment-date-field > span { color: #555b65; font-size: 11px; font-weight: 750; }
 .installment-date-field > small { color: #7b818a; font-size: 11px; }
@@ -988,7 +990,7 @@ a { color: inherit; text-decoration: none; }
 .summary-invoice-meta input[readonly] { color: #626974; background: #f6f7f9; }
 .summary-invoice-meta input:focus, .summary-invoice-meta select:focus { border-color: #df555b; box-shadow: 0 0 0 3px #e3242b12; }
 .summary-invoice-meta .vietnamese-datetime-input { grid-template-columns: minmax(0, 1fr) 40px; }
-.summary-invoice-meta .datetime-picker-button { min-height: 40px; }
+.summary-invoice-meta .datetime-picker-control { min-height: 40px; }
 .summary-divider { height: 1px; margin: 16px 0; background: #e2e5e9; }
 .sales-summary-card > h3 { margin: 8px 0 20px; font-size: 18px; }
 .sales-summary-card dl { margin: 0; display: grid; gap: 11px; }
@@ -1005,6 +1007,30 @@ a { color: inherit; text-decoration: none; }
 .installment-summary { margin-top: 14px; padding: 11px; color: #8c5c0b; background: #fff7e3; border-radius: 8px; }
 .installment-summary strong, .installment-summary small, .sales-data-note strong, .sales-data-note small { display: block; }
 .installment-summary small, .sales-data-note small { margin-top: 4px; color: #7d838d; font-size: 10px; line-height: 1.45; }
+.summary-payment-card { padding: 16px; }
+.summary-payment-title { margin-bottom: 14px; display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 10px; }
+.summary-payment-title > span { width: 36px; height: 36px; display: grid; place-items: center; color: #186c52; background: #e6f6ef; border-radius: 10px; }
+.summary-payment-title small { display: block; color: #747b85; font-size: 9px; font-weight: 850; letter-spacing: .06em; }
+.summary-payment-title h3 { margin: 3px 0 0; font-size: 14px; }
+.summary-payment-card .sale-mode-options { gap: 7px; }
+.summary-payment-card .payment-mode-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.summary-payment-card .payment-mode-options > button:last-child { grid-column: 1 / -1; }
+.summary-payment-card .payment-mode-options button, .summary-payment-card .sale-mode-options button { min-height: 49px; padding: 8px 9px; gap: 7px; border-radius: 8px; font-size: 11px; }
+.summary-payment-card .payment-mode-options svg, .summary-payment-card .sale-mode-options svg { flex: 0 0 auto; }
+.summary-payment-card .payment-auto-row { min-height: 54px; padding: 10px 11px; gap: 8px; border-radius: 8px; }
+.summary-payment-card .payment-auto-row strong { font-size: 11px; }
+.summary-payment-card .payment-auto-row small { font-size: 14px; white-space: nowrap; }
+.summary-payment-card .payment-simple-grid, .summary-payment-card .payment-simple-grid.is-bank-only, .summary-payment-card .payment-simple-grid.mixed { padding: 10px; grid-template-columns: 1fr; gap: 9px; border-radius: 8px; }
+.summary-payment-card .payment-simple-grid input, .summary-payment-card .payment-simple-grid select { min-height: 40px; font-size: 11px; }
+.summary-payment-card .payment-readonly { min-height: 40px; padding: 7px 10px; }
+.summary-payment-card .payment-readonly span { font-size: 10px; }
+.summary-payment-card .payment-readonly strong { font-size: 14px; }
+.summary-payment-card .installment-flow-card { margin-bottom: 0; padding: 10px; }
+.summary-payment-card .installment-flow-explainer { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+.summary-payment-card .installment-flow-explainer > b { grid-column: 1 / -1; font-size: 16px; text-align: right; }
+.summary-payment-card .installment-fields { grid-template-columns: 1fr; gap: 10px; }
+.summary-payment-card .installment-fields input, .summary-payment-card .installment-fields select { min-height: 40px; font-size: 11px; }
+.summary-payment-card .installment-date-field > small { font-size: 9px; }
 .summary-customer-head { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 10px; }
 .summary-customer-head > span { width: 36px; height: 36px; display: grid; place-items: center; color: #176e53; background: #e6f6ef; border-radius: 10px; }
 .summary-customer-head small, .summary-customer-head strong, .summary-customer-head em { display: block; }

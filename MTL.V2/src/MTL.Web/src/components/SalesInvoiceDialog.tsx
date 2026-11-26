@@ -571,6 +571,38 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
     </div>
   </section>
 
+  const paymentSection = <section className="sales-summary-card summary-payment-card">
+    <div className="summary-payment-title"><span><Banknote size={18} /></span><div><small>THANH TOÁN</small><h3>Nguồn tiền thanh toán</h3></div></div>
+    {invoiceType === 'Sale' && <div className="sale-mode-options sale-mode-first"><button type="button" className={!isInstallment ? 'is-active' : ''} onClick={() => changeSaleMode(false)}><CheckCircle2 size={17} /><span><strong>Bán trực tiếp</strong></span></button><button type="button" className={isInstallment ? 'is-active' : ''} onClick={() => changeSaleMode(true)}><Clock3 size={17} /><span><strong>Bán trả góp</strong></span></button></div>}
+
+    {!isInstallment && <div className="payment-mode-options" role="group" aria-label="Hình thức thanh toán">
+      <button type="button" className={paymentMode === 'Cash' ? 'is-active' : ''} onClick={() => changePaymentMode('Cash')}><Banknote size={17} /><span><strong>Tiền mặt</strong></span></button>
+      <button type="button" className={paymentMode === 'BankTransfer' ? 'is-active' : ''} onClick={() => changePaymentMode('BankTransfer')}><CreditCard size={17} /><span><strong>Chuyển khoản</strong></span></button>
+      <button type="button" className={paymentMode === 'Mixed' ? 'is-active' : ''} onClick={() => changePaymentMode('Mixed')}><Plus size={17} /><span><strong>Tiền mặt + Chuyển khoản</strong></span></button>
+    </div>}
+
+    {isInstallment && <div className="installment-flow-card">
+      <div className="installment-flow-explainer"><Clock3 size={18} /><span><strong>Phần banking tự động</strong></span><b>{currency.format(outstanding)}</b></div>
+      <div className="sales-form-grid installment-fields">
+        <label><span>Tiền mặt trả trước *</span><MoneyInput value={resolvedPayments[0]?.amount ?? 0} onChange={(value) => updatePayment(resolvedPayments[0]!.key, { amount: value })} /></label>
+        <label><span>Đơn vị trả góp *</span><select value={installmentProvider} onChange={(event) => setInstallmentProvider(event.target.value)}><option value="">Chọn đơn vị trả góp…</option>{installmentProvidersQuery.data?.filter((provider) => provider.isActive).map((provider) => <option key={provider.id} value={provider.name}>{provider.name}</option>)}{installmentProvider && !installmentProvidersQuery.data?.some((provider) => provider.name === installmentProvider) && <option value={installmentProvider}>{installmentProvider}</option>}</select></label>
+        <label><span>Tài khoản nhận tiền góp *</span><select value={installmentPaymentAccountId} onChange={(event) => setInstallmentPaymentAccountId(event.target.value)} required={outstanding > 0}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label>
+        <div className="installment-date-field"><span>Ngày dự kiến nhận tiền góp *</span><VietnameseDateTimeInput key={`payment-due-${paymentDueDate}`} ariaLabel="Ngày dự kiến nhận tiền góp" value={paymentDueDate} onChange={(value) => { paymentDueCustomized.current = true; setPaymentDueDate(value) }} required={outstanding > 0} /><small>Mặc định sau 2 ngày kể từ ngày lập hóa đơn.</small></div>
+      </div>
+    </div>}
+
+    {!isInstallment && paymentMode === 'Cash' && <div className="payment-auto-row"><Banknote size={18} /><span><strong>Thanh toán 100% tiền mặt</strong><small>{currency.format(total)}</small></span></div>}
+    {!isInstallment && paymentMode === 'BankTransfer' && (() => {
+      const bank = resolvedPayments.find((payment) => payment.method === 'BankTransfer')!
+      return <div className="payment-simple-grid is-bank-only"><label><span>Tài khoản nhận tiền *</span><select value={bank.paymentAccountId} onChange={(event) => updatePayment(bank.key, { paymentAccountId: event.target.value })}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label></div>
+    })()}
+    {!isInstallment && paymentMode === 'Mixed' && (() => {
+      const cash = resolvedPayments.find((payment) => payment.method === 'Cash')!
+      const bank = resolvedPayments.find((payment) => payment.method === 'BankTransfer')!
+      return <div className="payment-simple-grid mixed"><label><span>Số tiền mặt *</span><MoneyInput value={cash.amount} onChange={(value) => updatePayment(cash.key, { amount: value })} /></label><div className="payment-readonly"><span>Chuyển khoản tự tính</span><strong>{currency.format(bank.amount)}</strong></div><label><span>Tài khoản nhận tiền *</span><select value={bank.paymentAccountId} onChange={(event) => updatePayment(bank.key, { paymentAccountId: event.target.value })}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label></div>
+    })()}
+  </section>
+
   if (invoiceId && invoiceQuery.isLoading) return <div className="sales-editor-backdrop"><div className="sales-editor-loading">Đang tải hóa đơn để chỉnh sửa…</div></div>
   if (invoiceId && invoiceQuery.isError) return <div className="sales-editor-backdrop"><div className="sales-editor-loading"><div className="form-alert">{invoiceQuery.error.message}</div><button className="secondary-button" onClick={onClose}>Đóng</button></div></div>
 
@@ -671,38 +703,6 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
             {voucherMutation.isError && <div className="inline-note danger">{voucherMutation.error.message}</div>}
           </section>
 
-          <section className="sales-section">
-            <div className="sales-section-title"><span><Banknote size={19} /></span><div><h3>Nguồn tiền thanh toán</h3></div></div>
-            {invoiceType === 'Sale' && <div className="sale-mode-options sale-mode-first"><button type="button" className={!isInstallment ? 'is-active' : ''} onClick={() => changeSaleMode(false)}><CheckCircle2 size={18} /><span><strong>Bán trực tiếp</strong></span></button><button type="button" className={isInstallment ? 'is-active' : ''} onClick={() => changeSaleMode(true)}><Clock3 size={18} /><span><strong>Bán trả góp</strong></span></button></div>}
-
-            {!isInstallment && <div className="payment-mode-options" role="group" aria-label="Hình thức thanh toán">
-              <button type="button" className={paymentMode === 'Cash' ? 'is-active' : ''} onClick={() => changePaymentMode('Cash')}><Banknote size={18} /><span><strong>Tiền mặt</strong></span></button>
-              <button type="button" className={paymentMode === 'BankTransfer' ? 'is-active' : ''} onClick={() => changePaymentMode('BankTransfer')}><CreditCard size={18} /><span><strong>Chuyển khoản</strong></span></button>
-              <button type="button" className={paymentMode === 'Mixed' ? 'is-active' : ''} onClick={() => changePaymentMode('Mixed')}><Plus size={18} /><span><strong>Tiền mặt + Chuyển khoản</strong></span></button>
-            </div>}
-
-            {isInstallment && <div className="installment-flow-card">
-              <div className="installment-flow-explainer"><Clock3 size={19} /><span><strong>Phần banking tự động</strong></span><b>{currency.format(outstanding)}</b></div>
-              <div className="sales-form-grid installment-fields">
-                <label><span>Tiền mặt trả trước *</span><MoneyInput value={resolvedPayments[0]?.amount ?? 0} onChange={(value) => updatePayment(resolvedPayments[0]!.key, { amount: value })} /></label>
-                <label><span>Đơn vị trả góp *</span><select value={installmentProvider} onChange={(event) => setInstallmentProvider(event.target.value)}><option value="">Chọn đơn vị trả góp…</option>{installmentProvidersQuery.data?.filter((provider) => provider.isActive).map((provider) => <option key={provider.id} value={provider.name}>{provider.name}</option>)}{installmentProvider && !installmentProvidersQuery.data?.some((provider) => provider.name === installmentProvider) && <option value={installmentProvider}>{installmentProvider}</option>}</select></label>
-                <label><span>Mã hồ sơ</span><input value={installmentReference} onChange={(event) => setInstallmentReference(event.target.value)} /></label>
-                <label><span>Tài khoản nhận tiền góp *</span><select value={installmentPaymentAccountId} onChange={(event) => setInstallmentPaymentAccountId(event.target.value)} required={outstanding > 0}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label>
-                <div className="installment-date-field"><span>Ngày dự kiến nhận tiền góp *</span><VietnameseDateTimeInput key={`payment-due-${paymentDueDate}`} ariaLabel="Ngày dự kiến nhận tiền góp" value={paymentDueDate} onChange={(value) => { paymentDueCustomized.current = true; setPaymentDueDate(value) }} required={outstanding > 0} /><small>Mặc định sau 2 ngày kể từ ngày lập hóa đơn.</small></div>
-              </div>
-            </div>}
-
-            {!isInstallment && paymentMode === 'Cash' && <div className="payment-auto-row"><Banknote size={20} /><span><strong>Thanh toán 100% tiền mặt</strong><small>{currency.format(total)}</small></span></div>}
-            {!isInstallment && paymentMode === 'BankTransfer' && (() => {
-              const bank = resolvedPayments.find((payment) => payment.method === 'BankTransfer')!
-              return <div className="payment-simple-grid is-bank-only"><label><span>Tài khoản nhận tiền *</span><select value={bank.paymentAccountId} onChange={(event) => updatePayment(bank.key, { paymentAccountId: event.target.value })}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label></div>
-            })()}
-            {!isInstallment && paymentMode === 'Mixed' && (() => {
-              const cash = resolvedPayments.find((payment) => payment.method === 'Cash')!
-              const bank = resolvedPayments.find((payment) => payment.method === 'BankTransfer')!
-              return <div className="payment-simple-grid mixed"><label><span>Số tiền mặt *</span><MoneyInput value={cash.amount} onChange={(value) => updatePayment(cash.key, { amount: value })} /></label><div className="payment-readonly"><span>Chuyển khoản tự tính</span><strong>{currency.format(bank.amount)}</strong></div><label><span>Tài khoản nhận tiền *</span><select value={bank.paymentAccountId} onChange={(event) => updatePayment(bank.key, { paymentAccountId: event.target.value })}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label></div>
-            })()}
-          </section>
         </main>
 
         <aside className="sales-editor-summary">
@@ -726,6 +726,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
             {paid > total && <div className="inline-note danger">Số tiền nhận đang vượt tổng hóa đơn.</div>}
             {isInstallment && outstanding > 0 && <div className="installment-summary"><Clock3 size={17} /><span><strong>Khoản banking tự động</strong><small>{paymentDueDate ? `Lên lịch: ${formatVietnameseDateTime(paymentDueDate)}` : 'Chưa chọn ngày dự kiến'}</small></span></div>}
           </div>
+          {paymentSection}
           {selectedCustomerHistory && selectedCustomerHistory.invoices.length > 0 && <div className="sales-summary-card sales-customer-history-card">
             <div className="summary-customer-head"><span><UserRound size={18} /></span><div><small>KHÁCH HÀNG THÂN THUỘC</small><strong>{selectedCustomerHistory.fullName}</strong><em>{selectedCustomerHistory.code}</em></div></div>
             <div className="summary-customer-metrics"><span><small>Tổng tiền đã mua</small><strong>{currency.format(selectedCustomerHistory.totalSpent)}</strong></span><span><small>Hóa đơn gần đây</small><strong>{selectedCustomerHistory.invoices.length}</strong></span></div>
@@ -753,7 +754,6 @@ function MoneyInput({ value, onChange, ariaLabel }: { value: number; onChange: (
 
 function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { value: string; onChange: (value: string) => void; required?: boolean; ariaLabel: string }) {
   const [draft, setDraft] = useState(() => formatVietnameseDateTime(value))
-  const pickerRef = useRef<HTMLInputElement>(null)
 
   function updateDraft(next: string) {
     setDraft(next)
@@ -779,12 +779,6 @@ function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { val
     onChange(next)
   }
 
-  function openCalendar() {
-    const picker = pickerRef.current
-    if (!picker) return
-    picker.showPicker()
-  }
-
   return <div className="vietnamese-datetime-input">
     <input
       type="text"
@@ -797,8 +791,19 @@ function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { val
       onChange={(event) => updateDraft(event.target.value)}
       onBlur={normalizeDraft}
     />
-    <button type="button" className="datetime-picker-button" onClick={openCalendar} aria-label={`Chọn ${ariaLabel.toLowerCase()} từ lịch`} title="Chọn ngày giờ từ lịch"><CalendarDays size={18} /></button>
-    <input ref={pickerRef} className="datetime-native-picker" type="datetime-local" value={value} onChange={(event) => selectFromCalendar(event.target.value)} tabIndex={-1} aria-hidden="true" />
+    <span className="datetime-picker-control" title="Chọn ngày giờ từ lịch">
+      <CalendarDays size={18} />
+      <input
+        className="datetime-native-picker"
+        type="datetime-local"
+        value={value}
+        onChange={(event) => selectFromCalendar(event.target.value)}
+        onClick={(event) => {
+          try { event.currentTarget.showPicker() } catch { /* Browser fallback: native click still opens the control. */ }
+        }}
+        aria-label={`Chọn ${ariaLabel.toLowerCase()} từ lịch`}
+      />
+    </span>
   </div>
 }
 
