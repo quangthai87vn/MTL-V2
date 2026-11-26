@@ -268,9 +268,11 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
       const repairDescriptions = repairDevices.map((device, index) => {
         const model = device.deviceModel.trim() || `Máy ${index + 1}`
         const serviceNames = device.services
-          .map((service) => serviceTypesQuery.data?.find((item) => item.id === service.serviceTypeId)?.name)
-          .filter((name): name is string => Boolean(name))
-          .map(formatServiceName)
+          .map((service) => {
+            const name = serviceTypesQuery.data?.find((item) => item.id === service.serviceTypeId)?.name
+            return name ? formatRepairServiceDescription(name, service.notes) : ''
+          })
+          .filter(Boolean)
         return serviceNames.length > 0 ? `Sửa (Thay) ${serviceNames.join(', ')} cho ${model}` : `Sửa chữa cho ${model}`
       })
       return [...repairDescriptions, ...cart.map((line) => line.name.trim()).filter(Boolean)].join(' + ')
@@ -542,7 +544,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
   }
 
   const productSection = <section className="sales-section">
-    <div className="sales-section-title"><span><PackagePlus size={19} /></span><div><h3>Sản phẩm & dịch vụ</h3><p>Tìm sản phẩm đang còn hàng và điều chỉnh số lượng, đơn giá nếu cần.</p></div></div>
+    <div className="sales-section-title"><span><PackagePlus size={19} /></span><div><h3>SẢN PHẨM & DỊCH VỤ</h3><p>Tìm sản phẩm đang còn hàng và điều chỉnh số lượng, đơn giá nếu cần.</p></div></div>
     <div className="product-entry-toolbar"><label className="sale-product-search"><Search size={18} /><input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Nhập ít nhất 2 ký tự để tìm sản phẩm…" /></label><button type="button" className="secondary-button" onClick={() => setShowManualLine((current) => !current)}><Plus size={16} /> Thêm dịch vụ nhập tay</button></div>
     {showManualLine && <div className="manual-line-entry">
       <label><span>Tên sản phẩm / dịch vụ *</span><input value={manualLineName} onChange={(event) => setManualLineName(event.target.value)} placeholder="Ví dụ: Cài Windows và phần mềm" /></label>
@@ -572,7 +574,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
   </section>
 
   const paymentSection = <section className="sales-summary-card summary-payment-card">
-    <div className="summary-payment-title"><span><Banknote size={18} /></span><div><small>THANH TOÁN</small><h3>Nguồn tiền thanh toán</h3></div></div>
+    <div className="summary-payment-title"><span><Banknote size={18} /></span><div><small>THANH TOÁN</small><h3>NGUỒN TIỀN THANH TOÁN</h3></div></div>
     {invoiceType === 'Sale' && <div className="sale-mode-options sale-mode-first"><button type="button" className={!isInstallment ? 'is-active' : ''} onClick={() => changeSaleMode(false)}><CheckCircle2 size={17} /><span><strong>Bán trực tiếp</strong></span></button><button type="button" className={isInstallment ? 'is-active' : ''} onClick={() => changeSaleMode(true)}><Clock3 size={17} /><span><strong>Bán trả góp</strong></span></button></div>}
 
     {!isInstallment && <div className="payment-mode-options" role="group" aria-label="Hình thức thanh toán">
@@ -587,7 +589,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
         <label><span>Tiền mặt trả trước *</span><MoneyInput value={resolvedPayments[0]?.amount ?? 0} onChange={(value) => updatePayment(resolvedPayments[0]!.key, { amount: value })} /></label>
         <label><span>Đơn vị trả góp *</span><select value={installmentProvider} onChange={(event) => setInstallmentProvider(event.target.value)}><option value="">Chọn đơn vị trả góp…</option>{installmentProvidersQuery.data?.filter((provider) => provider.isActive).map((provider) => <option key={provider.id} value={provider.name}>{provider.name}</option>)}{installmentProvider && !installmentProvidersQuery.data?.some((provider) => provider.name === installmentProvider) && <option value={installmentProvider}>{installmentProvider}</option>}</select></label>
         <label><span>Tài khoản nhận tiền góp *</span><select value={installmentPaymentAccountId} onChange={(event) => setInstallmentPaymentAccountId(event.target.value)} required={outstanding > 0}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label>
-        <div className="installment-date-field"><span>Ngày dự kiến nhận tiền góp *</span><VietnameseDateTimeInput key={`payment-due-${paymentDueDate}`} ariaLabel="Ngày dự kiến nhận tiền góp" value={paymentDueDate} onChange={(value) => { paymentDueCustomized.current = true; setPaymentDueDate(value) }} required={outstanding > 0} /><small>Mặc định sau 2 ngày kể từ ngày lập hóa đơn.</small></div>
+        <div className="installment-date-field"><span>Ngày dự kiến nhận tiền góp *</span><VietnameseDateInput key={`payment-due-${paymentDueDate}`} ariaLabel="Ngày dự kiến nhận tiền góp" value={paymentDueDate} onChange={(value) => { paymentDueCustomized.current = true; setPaymentDueDate(value) }} required={outstanding > 0} /><small>Mặc định sau 2 ngày kể từ ngày lập hóa đơn.</small></div>
       </div>
     </div>}
 
@@ -649,7 +651,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
 
           {invoiceType === 'Repair' && <section className="sales-section repair-intake-card">
             <div className="repair-section-toolbar">
-              <div className="sales-section-title"><span><Wrench size={19} /></span><div><h3>Thông tin máy sửa chữa</h3></div></div>
+              <div className="sales-section-title"><span><Wrench size={19} /></span><div><h3>THÔNG TIN MÁY SỬA CHỮA</h3></div></div>
               <button type="button" className="secondary-button" onClick={() => setRepairDevices((current) => [...current, newRepairDevice()])}><Plus size={17} /> Thêm máy</button>
             </div>
             <div className="repair-device-list">
@@ -681,7 +683,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
           {productSection}
 
           <section className="sales-section">
-            <div className="sales-section-title"><span><Percent size={19} /></span><div><h3>Khuyến mãi & voucher</h3></div></div>
+            <div className="sales-section-title"><span><Percent size={19} /></span><div><h3>KHUYẾN MÃI & VOUCHER</h3></div></div>
             <div className="sales-discount-grid">
               <label><span>Chương trình khuyến mãi</span><div className="discount-add-control"><span className="select-shell"><select value={promotionId} onChange={(event) => setPromotionId(event.target.value)}><option value="">Chọn chương trình…</option>{promotionsQuery.data?.filter((item) => item.isActive).map((item) => <option key={item.id} value={item.id}>{item.name} ({discountText(item.value, item.discountType)})</option>)}</select><ChevronDown size={15} /></span><button type="button" className="secondary-button" disabled={!selectedPromotion || subtotal < selectedPromotion.minimumOrderAmount || discounts.some((item) => item.source === 'Promotion' && item.promotionId === promotionId)} onClick={addPromotionDiscount}><Plus size={16} /> Thêm</button><button type="button" className="secondary-button manual-discount-button" onClick={() => setShowManualDiscount((current) => !current)}><Plus size={16} /> Thêm khuyến mãi nhập tay</button></div></label>
               <label><span>Mã voucher</span><div className="voucher-input"><input value={voucherCode} onChange={(event) => setVoucherCode(event.target.value.toUpperCase())} placeholder="Nhập mã…" /><button type="button" className="secondary-button" disabled={!voucherCode.trim() || subtotal <= 0 || voucherMutation.isPending || discounts.some((item) => item.source === 'Voucher' && item.voucherCode === voucherCode.trim())} onClick={() => voucherMutation.mutate()}>{voucherMutation.isPending ? 'Đang kiểm tra…' : 'Thêm voucher'}</button></div></label>
@@ -711,20 +713,20 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
             <div className="summary-invoice-code"><span>Mã phiếu</span><strong>{invoiceQuery.data?.number ?? 'Tự động khi lưu'}</strong></div>
             <div className="summary-invoice-meta">
               <label><span>Người lập phiếu</span><input value={invoiceQuery.data?.issuer.name ?? user?.fullName ?? 'Nhân viên'} readOnly /></label>
-              <div className="invoice-meta-field"><span>Ngày lập phiếu</span><VietnameseDateTimeInput key={`invoice-date-${invoiceDate}`} ariaLabel="Ngày lập phiếu" value={invoiceDate} onChange={changeInvoiceDate} required /></div>
+              <div className="invoice-meta-field"><span>Ngày lập phiếu</span><VietnameseDateInput key={`invoice-date-${invoiceDate}`} ariaLabel="Ngày lập phiếu" value={invoiceDate} onChange={changeInvoiceDate} required /></div>
               <label><span>Trạng thái xử lý phiếu</span><select value={repairStatus} onChange={(event) => setRepairStatus(event.target.value as RepairStatus)}>
                 <option value="InProgress">Đang xử lý</option>
                 <option value="Returned">Đã xử lý</option>
                 <option value="Cancelled">Đã hủy</option>
               </select></label>
-              {invoiceType === 'Repair' && <div className="invoice-meta-field"><span>Ngày dự kiến trả máy</span><VietnameseDateTimeInput key={`expected-return-${expectedReturnAt}`} ariaLabel="Ngày dự kiến trả máy" value={expectedReturnAt} onChange={setExpectedReturnAt} required /></div>}
+              {invoiceType === 'Repair' && <div className="invoice-meta-field"><span>Ngày dự kiến trả máy</span><VietnameseDateInput key={`expected-return-${expectedReturnAt}`} ariaLabel="Ngày dự kiến trả máy" value={expectedReturnAt} onChange={setExpectedReturnAt} required /></div>}
             </div>
             <div className="summary-divider" />
             <h3>{invoiceType === 'Sale' ? `${cart.length} sản phẩm` : `${repairDevices.length} máy sửa chữa`}</h3>
             {invoicePurpose && <div className="summary-purpose"><ClipboardPenLine size={15} /><span>{invoicePurpose}</span></div>}
             <dl><div><dt>Tạm tính</dt><dd>{currency.format(subtotal)}</dd></div>{promotionDiscount > 0 && <div className="discount"><dt>Khuyến mãi</dt><dd>− {currency.format(promotionDiscount)}</dd></div>}{voucherDiscount > 0 && <div className="discount"><dt>Voucher</dt><dd>− {currency.format(voucherDiscount)}</dd></div>}<div className="grand-total"><dt>Khách cần trả</dt><dd>{currency.format(total)}</dd></div><div><dt>{repairStatus === 'Returned' ? 'Đã ghi nhận' : 'Phân bổ dự kiến'}</dt><dd className="paid">{currency.format(paid)}</dd></div><div className="remaining"><dt>{isInstallment ? 'Banking dự kiến' : 'Còn phải thu'}</dt><dd>{currency.format(outstanding)}</dd></div></dl>
             {paid > total && <div className="inline-note danger">Số tiền nhận đang vượt tổng hóa đơn.</div>}
-            {isInstallment && outstanding > 0 && <div className="installment-summary"><Clock3 size={17} /><span><strong>Khoản banking tự động</strong><small>{paymentDueDate ? `Lên lịch: ${formatVietnameseDateTime(paymentDueDate)}` : 'Chưa chọn ngày dự kiến'}</small></span></div>}
+            {isInstallment && outstanding > 0 && <div className="installment-summary"><Clock3 size={17} /><span><strong>Khoản banking tự động</strong><small>{paymentDueDate ? `Lên lịch: ${formatVietnameseDate(paymentDueDate)}` : 'Chưa chọn ngày dự kiến'}</small></span></div>}
           </div>
           {paymentSection}
           {selectedCustomerHistory && selectedCustomerHistory.invoices.length > 0 && <div className="sales-summary-card sales-customer-history-card">
@@ -752,8 +754,8 @@ function MoneyInput({ value, onChange, ariaLabel }: { value: number; onChange: (
   />
 }
 
-function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { value: string; onChange: (value: string) => void; required?: boolean; ariaLabel: string }) {
-  const [draft, setDraft] = useState(() => formatVietnameseDateTime(value))
+function VietnameseDateInput({ value, onChange, required, ariaLabel }: { value: string; onChange: (value: string) => void; required?: boolean; ariaLabel: string }) {
+  const [draft, setDraft] = useState(() => formatVietnameseDate(value))
 
   function updateDraft(next: string) {
     setDraft(next)
@@ -761,7 +763,7 @@ function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { val
       onChange('')
       return
     }
-    const parsed = parseVietnameseDateTime(next)
+    const parsed = parseVietnameseDate(next, value)
     if (parsed) onChange(parsed)
   }
 
@@ -770,13 +772,14 @@ function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { val
       onChange('')
       return
     }
-    const parsed = parseVietnameseDateTime(draft)
-    setDraft(parsed ? formatVietnameseDateTime(parsed) : formatVietnameseDateTime(value))
+    const parsed = parseVietnameseDate(draft, value)
+    setDraft(parsed ? formatVietnameseDate(parsed) : formatVietnameseDate(value))
   }
 
   function selectFromCalendar(next: string) {
-    setDraft(formatVietnameseDateTime(next))
-    onChange(next)
+    const merged = mergeDateWithExistingTime(next, value)
+    setDraft(formatVietnameseDate(merged))
+    onChange(merged)
   }
 
   return <div className="vietnamese-datetime-input">
@@ -784,19 +787,19 @@ function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { val
       type="text"
       inputMode="numeric"
       aria-label={ariaLabel}
-      title="Định dạng: ngày/tháng/năm giờ:phút"
-      placeholder="dd/MM/yyyy HH:mm"
+      title="Định dạng: ngày/tháng/năm"
+      placeholder="dd/MM/yyyy"
       value={draft}
       required={required}
       onChange={(event) => updateDraft(event.target.value)}
       onBlur={normalizeDraft}
     />
-    <span className="datetime-picker-control" title="Chọn ngày giờ từ lịch">
+    <span className="datetime-picker-control" title="Chọn ngày từ lịch">
       <CalendarDays size={18} />
       <input
         className="datetime-native-picker"
-        type="datetime-local"
-        value={value}
+        type="date"
+        value={datePartFromLocalDateTime(value)}
         onChange={(event) => selectFromCalendar(event.target.value)}
         onClick={(event) => {
           try { event.currentTarget.showPicker() } catch { /* Browser fallback: native click still opens the control. */ }
@@ -828,6 +831,12 @@ function formatServiceName(name: string) {
   }).join(' ')
 }
 
+function formatRepairServiceDescription(name: string, notes?: string) {
+  const formattedName = formatServiceName(name)
+  const normalizedNotes = notes?.trim()
+  return normalizedNotes ? `${formattedName} (${normalizedNotes})` : formattedName
+}
+
 function isAutomaticRepairNote(value: string | undefined, repairs: RepairOrder[], lines: SalesInvoiceDetails['lines']) {
   if (!value?.trim()) return true
   const normalizedValue = value.trim()
@@ -836,9 +845,9 @@ function isAutomaticRepairNote(value: string | undefined, repairs: RepairOrder[]
   const repairSummary = repairs.map((repair, index) => {
     const model = repair.deviceModel.trim() || `Máy ${index + 1}`
     const services = repair.services?.length
-      ? repair.services.map((service) => service.name).filter(Boolean)
-      : repair.serviceTypes?.map((service) => service.name).filter(Boolean) ?? []
-    return services.length > 0 ? `Sửa (Thay) ${services.map(formatServiceName).join(', ')} cho ${model}` : `Sửa chữa cho ${model}`
+      ? repair.services.map((service) => formatRepairServiceDescription(service.name, service.notes)).filter(Boolean)
+      : repair.serviceTypes?.map((service) => formatRepairServiceDescription(service.name)).filter(Boolean) ?? []
+    return services.length > 0 ? `Sửa (Thay) ${services.join(', ')} cho ${model}` : `Sửa chữa cho ${model}`
   })
   const unformattedRepairSummary = repairs.map((repair, index) => {
     const model = repair.deviceModel.trim() || `Máy ${index + 1}`
@@ -894,25 +903,33 @@ function toDateTimeLocal(date: Date) {
   return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16)
 }
 
-function formatVietnameseDateTime(value: string) {
+function formatVietnameseDate(value: string) {
   if (!value) return ''
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (!match) return ''
-  return `${match[3]}/${match[2]}/${match[1]} ${match[4]}:${match[5]}`
+  return `${match[3]}/${match[2]}/${match[1]}`
 }
 
-function parseVietnameseDateTime(value: string) {
-  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/)
+function parseVietnameseDate(value: string, existingValue: string) {
+  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (!match) return null
-  const [, dayText, monthText, yearText, hourText, minuteText] = match
+  const [, dayText, monthText, yearText] = match
   const day = Number(dayText)
   const month = Number(monthText)
   const year = Number(yearText)
-  const hour = Number(hourText)
-  const minute = Number(minuteText)
-  const date = new Date(year, month - 1, day, hour, minute)
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day || date.getHours() !== hour || date.getMinutes() !== minute) return null
-  return toDateTimeLocal(date)
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null
+  return mergeDateWithExistingTime(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`, existingValue)
+}
+
+function datePartFromLocalDateTime(value: string) {
+  return value.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? ''
+}
+
+function mergeDateWithExistingTime(date: string, existingValue: string) {
+  if (!date) return ''
+  const time = existingValue.match(/T(\d{2}:\d{2})/)?.[1] ?? '00:00'
+  return `${date}T${time}`
 }
 
 function addDaysToLocalDateTime(value: string, days: number) {

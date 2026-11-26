@@ -169,7 +169,7 @@ export function SalesPage() {
             {invoicesQuery.isLoading && <tr><td colSpan={15} className="empty-cell">Đang tải hóa đơn…</td></tr>}
             {invoicesQuery.data?.items.map((invoice) => {
               const banking = bankingSummaries(invoice.paymentSources)
-              return <tr key={invoice.id} className={`sales-invoice-row ${invoice.repairStatus === 'Returned' ? 'repair-is-returned' : invoice.repairStatus === 'ReadyForReturn' ? 'repair-is-ready' : 'repair-is-pending'}`} onClick={() => setSelectedInvoiceId(invoice.id)}>
+              return <tr key={invoice.id} className={`sales-invoice-row ${invoiceRowStatusClass(invoice)}`} onClick={() => setSelectedInvoiceId(invoice.id)}>
               <td className="sales-actions-column"><div className="invoice-row-actions">{hasPermission('sales.manage') && <button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setEditInvoiceId(invoice.id) }} aria-label={`Sửa ${invoice.number}`} title="Sửa hóa đơn"><Pencil size={16} /></button>}<button type="button" className="icon-button" onClick={(event) => { event.stopPropagation(); setPrintInvoiceId(invoice.id) }} aria-label={`In ${invoice.number}`} title="In hóa đơn"><Printer size={16} /></button>{hasPermission('sales.manage') && <button type="button" className="icon-button danger" onClick={(event) => { event.stopPropagation(); deleteInvoice(invoice) }} aria-label={`Xóa ${invoice.number}`} title="Xóa hóa đơn" disabled={deleteMutation.isPending}><Trash2 size={16} /></button>}</div></td>
               <td><span className="date-cell created-date">{formatDateTime(invoice.invoiceDateUtc)}</span></td>
               <td><button type="button" className="invoice-number" onClick={() => setSelectedInvoiceId(invoice.id)}><FileText size={16} /><span><strong>{invoice.number}</strong><small>{invoice.type === 'Repair' && invoice.repairDeviceModel ? `${invoice.repairDeviceModel}${invoice.repairDeviceCount > 1 ? ` + ${invoice.repairDeviceCount - 1} máy` : ''}` : invoice.isInstallment && invoice.installmentProvider ? invoice.installmentProvider : 'Bán sản phẩm'}</small>{invoice.isInstallment && <span className="invoice-sale-mode installment">Trả góp</span>}</span></button></td>
@@ -212,6 +212,14 @@ export function SalesPage() {
     }} />}
     {printInvoiceId && <SalesInvoiceDetailsDialog invoiceId={printInvoiceId} autoPrintMode="a4" onClose={() => setPrintInvoiceId(null)} onChanged={() => { void queryClient.invalidateQueries({ queryKey: ['sales-invoices'] }) }} />}
   </>
+}
+
+function invoiceRowStatusClass(invoice: SalesInvoice) {
+  if (invoice.type !== 'Repair') return ''
+  if (invoice.repairStatus === 'Returned') return 'repair-is-returned'
+  if (invoice.repairStatus === 'ReadyForReturn') return 'repair-is-ready'
+  if (invoice.repairStatus === 'Cancelled') return 'repair-is-cancelled'
+  return 'repair-is-pending'
 }
 
 function processingLabel(status: RepairStatus | undefined) {

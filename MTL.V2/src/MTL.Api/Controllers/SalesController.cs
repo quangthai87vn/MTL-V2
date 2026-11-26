@@ -968,6 +968,7 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
             customer.TotalSpent += newContribution;
         }
         if (IsProcessed(invoice)) customer.LastPurchaseAtUtc = invoice.InvoiceDateUtc;
+        invoice.UpdatedAtUtc = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
