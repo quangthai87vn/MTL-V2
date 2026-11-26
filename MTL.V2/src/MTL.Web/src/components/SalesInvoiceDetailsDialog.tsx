@@ -11,6 +11,7 @@ const dateTime = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyl
 
 export function SalesInvoiceDetailsDialog({ invoiceId, autoPrintMode, onClose }: { invoiceId: string; autoPrintMode?: 'a4' | 'bill'; onClose: () => void; onChanged: () => void }) {
   const [printMode, setPrintMode] = useState<'a4' | 'bill'>('a4')
+  const [referenceNow] = useState(() => Date.now())
   const autoPrinted = useRef(false)
 
   const invoiceQuery = useQuery({ queryKey: ['sales-invoice', invoiceId], queryFn: () => api.get<SalesInvoiceDetails>(`/api/sales/${invoiceId}`) })
@@ -25,7 +26,7 @@ export function SalesInvoiceDetailsDialog({ invoiceId, autoPrintMode, onClose }:
   const outstanding = invoice?.outstandingAmount ?? 0
   const scheduledPayments = invoice?.payments.filter((payment) => payment.isScheduled) ?? []
   const scheduledAmount = scheduledPayments.reduce((sum, payment) => sum + payment.amount, 0)
-  const nextScheduledPayment = scheduledPayments.find((payment) => new Date(payment.paidAtUtc).getTime() > Date.now()) ?? scheduledPayments[0]
+  const nextScheduledPayment = scheduledPayments.find((payment) => new Date(payment.paidAtUtc).getTime() > referenceNow) ?? scheduledPayments[0]
   useEffect(() => {
     if (!invoice || !autoPrintMode || autoPrinted.current) return
     autoPrinted.current = true
@@ -46,7 +47,7 @@ export function SalesInvoiceDetailsDialog({ invoiceId, autoPrintMode, onClose }:
       {invoice && <>
         <div className="sales-details-overview">
           <article><small>Khách hàng</small><strong>{invoice.customerName}</strong><span><Phone size={14} /> {invoice.customerPhone || 'Chưa có số điện thoại'}</span>{invoice.customerAddress && <span>{invoice.customerAddress}</span>}</article>
-          <article><small>Nghiệp vụ</small><strong>{invoice.type === 'Sale' ? 'Bán sản phẩm' : 'Tiếp nhận sửa chữa'}</strong><StatusBadge tone={repairStatusTone(invoiceRepairStatus)}>{repairStatusLabel(invoiceRepairStatus, invoice.type)}</StatusBadge></article>
+          <article><small>Nghiệp vụ</small><strong>{invoice.type === 'Sale' ? 'Bán sản phẩm' : 'Tiếp nhận sửa chữa'}</strong><StatusBadge tone={repairStatusTone(invoiceRepairStatus)}>{repairStatusLabel(invoiceRepairStatus)}</StatusBadge></article>
           <article><small>Tổng hóa đơn</small><strong className="details-total">{currency.format(invoice.totalAmount)}</strong><span>{invoiceRepairStatus === 'Returned' ? 'Đã ghi nhận' : 'Phân bổ dự kiến'}: {currency.format(invoice.paidAmount)}</span></article>
           <article className={outstanding > 0 || scheduledAmount > 0 ? 'has-debt' : ''}><small>{invoice.isInstallment ? 'Banking đã lên lịch' : 'Còn phải thu'}</small><strong>{currency.format(invoice.isInstallment ? scheduledAmount : outstanding)}</strong>{nextScheduledPayment && <span><CalendarClock size={14} /> Dự kiến {dateTime.format(new Date(nextScheduledPayment.paidAtUtc))}</span>}</article>
         </div>
@@ -56,7 +57,7 @@ export function SalesInvoiceDetailsDialog({ invoiceId, autoPrintMode, onClose }:
 
         {(invoice.repairs?.length || invoice.repair) && <section className="sales-details-section repair-details">
           <h3><Wrench size={18} /> Thông tin máy sửa chữa ({invoice.repairs?.length || 1})</h3>
-          <div className="repair-overall-status"><span>Trạng thái xử lý toàn phiếu</span><StatusBadge tone={repairStatusTone(invoiceRepairStatus)}>{repairStatusLabel(invoiceRepairStatus, invoice.type)}</StatusBadge>{invoice.expectedReturnAtUtc && <strong><CalendarClock size={15} /> Dự kiến trả {dateTime.format(new Date(invoice.expectedReturnAtUtc))}</strong>}</div>
+          <div className="repair-overall-status"><span>Trạng thái xử lý toàn phiếu</span><StatusBadge tone={repairStatusTone(invoiceRepairStatus)}>{repairStatusLabel(invoiceRepairStatus)}</StatusBadge>{invoice.expectedReturnAtUtc && <strong><CalendarClock size={15} /> Dự kiến trả {dateTime.format(new Date(invoice.expectedReturnAtUtc))}</strong>}</div>
           <div className="repair-detail-list">{(invoice.repairs?.length ? invoice.repairs : invoice.repair ? [invoice.repair] : []).map((repair, index) => <article key={repair.id || `${repair.deviceModel}-${index}`}><header><strong>Máy {index + 1}: {repair.deviceModel}</strong><span>{repair.services?.map((item) => item.name).join(' · ') || repair.serviceTypes?.map((item) => item.name).join(' · ') || 'Chưa gắn loại dịch vụ'}</span></header><dl><div><dt>Serial / Service Tag</dt><dd>{repair.serialNumber || '—'}</dd></div><div><dt>Phụ kiện nhận kèm</dt><dd>{repair.accessories || 'Không ghi nhận'}</dd></div><div><dt>Tổng dịch vụ</dt><dd>{currency.format(repair.estimatedCost)}</dd></div><div className="full"><dt>Dịch vụ & chi phí</dt><dd>{repair.services?.length ? repair.services.map((service) => `${service.name}${service.notes ? ` — ${service.notes}` : ''}: ${currency.format(service.amount)}`).join(' · ') : 'Chưa tách chi phí dịch vụ'}</dd></div><div className="full"><dt>Tình trạng</dt><dd>{repair.deviceCondition || 'Không ghi nhận'}</dd></div></dl></article>)}</div>
         </section>}
 
@@ -81,10 +82,9 @@ export function SalesInvoiceDetailsDialog({ invoiceId, autoPrintMode, onClose }:
 }
 
 function InvoicePrintTemplate({ invoice, mode }: { invoice: SalesInvoiceDetails; mode: 'a4' | 'bill' }) {
-  const printedAt = new Date().toLocaleString('vi-VN')
-  const invoiceDate = new Date(invoice.invoiceDateUtc).toLocaleDateString('vi-VN')
+  const printedAt = formatPrintDateTime(new Date())
+  const invoiceDate = formatPrintDate(new Date(invoice.invoiceDateUtc))
   const companyPhone = invoice.company.phone?.replace(/^hotline:\s*/i, '')
-  const invoiceRepairStatus = invoice.repairStatus ?? invoice.repairs?.[0]?.status ?? invoice.repair?.status ?? 'InProgress'
 
   return <article className={`invoice-print-template print-${mode}`} aria-hidden="true">
     <header className="print-invoice-header">
@@ -97,16 +97,16 @@ function InvoicePrintTemplate({ invoice, mode }: { invoice: SalesInvoiceDetails;
 
     <section className="print-customer-order">
       <div><h3>THÔNG TIN KHÁCH HÀNG</h3><p className="print-customer-line"><span><b>Khách hàng:</b> {invoice.customerName}</span><span><b>Điện thoại:</b> {invoice.customerPhone || '—'}</span></p>{invoice.customerAddress && <p className="print-customer-address"><b>Địa chỉ:</b> {invoice.customerAddress}</p>}</div>
-      <div className="print-order-line"><h3>THÔNG TIN ĐƠN HÀNG</h3><p><b>Người lập:</b> {invoice.issuer.name}</p><p><b>Trạng thái:</b> {repairStatusLabel(invoiceRepairStatus, invoice.type)}</p>{invoice.type === 'Repair' && invoice.expectedReturnAtUtc && <p><b>Dự kiến trả:</b> {new Date(invoice.expectedReturnAtUtc).toLocaleDateString('vi-VN')}</p>}</div>
+      <div className="print-order-line"><h3>THÔNG TIN ĐƠN HÀNG</h3><p><b>Người lập:</b> {invoice.issuer.name}</p>{invoice.type === 'Repair' && invoice.expectedReturnAtUtc && <p><b>Dự kiến trả:</b> {formatPrintDate(new Date(invoice.expectedReturnAtUtc))}</p>}</div>
     </section>
 
     {(invoice.repairs?.length || invoice.repair) && <section className="print-repair-info">{(invoice.repairs?.length ? invoice.repairs : invoice.repair ? [invoice.repair] : []).map((repair, index) => <div key={repair.id || `${repair.deviceModel}-${index}`}><p><b>Máy {index + 1}:</b> {repair.deviceModel}{repair.deviceCondition ? <> · <b>Tình trạng:</b> {repair.deviceCondition}</> : null}</p><p><b>Dịch vụ:</b> {repair.services?.length ? repair.services.map((service) => `${service.name}${service.notes ? ` — ${service.notes}` : ''} (${formatPrintMoney(service.amount)} đ)`).join(', ') : repair.serviceTypes?.map((item) => item.name).join(', ') || '—'}</p></div>)}</section>}
 
     <table className="print-lines-table">
-      <thead><tr><th>STT</th><th>HÀNG HÓA / DỊCH VỤ</th><th>BH</th><th>SL</th><th>ĐƠN GIÁ</th><th>THÀNH TIỀN</th></tr></thead>
+      <thead><tr><th>STT</th><th>HÀNG HÓA / DỊCH VỤ</th><th>SL</th><th>ĐƠN GIÁ</th><th>THÀNH TIỀN</th></tr></thead>
       <tbody>
-        {invoice.lines.map((line, index) => <tr key={line.id}><td>{index + 1}</td><td>{line.productName}<small>{line.unitName} · BH {line.warrantyPeriod || '—'}</small></td><td>{line.warrantyPeriod || '—'}</td><td>{line.quantity.toLocaleString('vi-VN')}</td><td>{formatPrintMoney(line.unitPrice)}</td><td>{formatPrintMoney(line.lineTotal)}</td></tr>)}
-        {invoice.discounts.map((discount, index) => <tr className="print-discount-row" key={discount.id || `${discount.source}-${index}`}><td>{invoice.lines.length + index + 1}</td><td>{discount.source === 'Voucher' ? `Voucher ${discount.code || ''} — ${discount.name}` : discount.name}</td><td>—</td><td>1</td><td>−{formatPrintMoney(discount.amount)}</td><td>−{formatPrintMoney(discount.amount)}</td></tr>)}
+        {invoice.lines.map((line, index) => <tr key={line.id}><td>{index + 1}</td><td>{line.productName}<small>{line.unitName}{line.warrantyPeriod ? ` · Bảo hành ${line.warrantyPeriod}` : ''}</small></td><td>{line.quantity.toLocaleString('vi-VN')}</td><td>{formatPrintMoney(line.unitPrice)}</td><td>{formatPrintMoney(line.lineTotal)}</td></tr>)}
+        {invoice.discounts.map((discount, index) => <tr className="print-discount-row" key={discount.id || `${discount.source}-${index}`}><td>{invoice.lines.length + index + 1}</td><td>{discount.source === 'Voucher' ? `Voucher ${discount.code || ''} — ${discount.name}` : discount.name}</td><td>1</td><td>−{formatPrintMoney(discount.amount)}</td><td>−{formatPrintMoney(discount.amount)}</td></tr>)}
       </tbody>
     </table>
 
@@ -123,6 +123,16 @@ function InvoicePrintTemplate({ invoice, mode }: { invoice: SalesInvoiceDetails;
 
 function formatPrintMoney(value: number) {
   return Math.round(value).toLocaleString('vi-VN')
+}
+
+function formatPrintDateTime(value: Date) {
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${value.getFullYear()} ${pad(value.getHours())}:${pad(value.getMinutes())}`
+}
+
+function formatPrintDate(value: Date) {
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${pad(value.getDate())}/${pad(value.getMonth() + 1)}/${value.getFullYear()}`
 }
 
 function numberToVietnamese(value: number) {
@@ -170,7 +180,7 @@ function readThreeDigits(value: number, full: boolean) {
   return words.join(' ')
 }
 
-function repairStatusLabel(status?: RepairStatus, _invoiceType: SalesInvoiceDetails['type'] = 'Repair') {
+function repairStatusLabel(status?: RepairStatus) {
   if (status === 'Returned') return 'Đã xử lý'
   if (status === 'Cancelled') return 'Đã hủy'
   return 'Đang xử lý'

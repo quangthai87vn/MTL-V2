@@ -1767,7 +1767,13 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
                 .Select(x => new InvoiceIssuerItem(x.Id, x.FullName, x.Email))
                 .SingleOrDefaultAsync(cancellationToken)
             : null;
-        issuer ??= new InvoiceIssuerItem(currentUser.UserId, currentUser.Email ?? "Nhân viên", currentUser.Email);
+        if (issuer is null && currentUser.UserId.HasValue)
+        {
+            issuer = await db.Users.AsNoTracking().Where(x => x.Id == currentUser.UserId.Value)
+                .Select(x => new InvoiceIssuerItem(x.Id, x.FullName, x.Email))
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+        issuer ??= new InvoiceIssuerItem(null, "Nhân viên", null);
 
         var discounts = invoice.Discounts
             .OrderBy(x => x.CreatedAtUtc)
