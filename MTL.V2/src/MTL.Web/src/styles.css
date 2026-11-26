@@ -784,7 +784,7 @@ a { color: inherit; text-decoration: none; }
 .sales-editor-alert { margin: 14px 24px 0; }
 .sales-editor-layout { width: 100%; margin: 0 auto; padding: 18px 24px 48px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
 .sales-editor-main { display: grid; gap: 15px; }
-.sales-editor-summary { position: sticky; top: 110px; display: grid; gap: 12px; }
+.sales-editor-summary { position: sticky; top: 110px; max-height: calc(100vh - 128px); padding-right: 2px; display: grid; gap: 12px; overflow-y: auto; }
 .sales-section, .sales-summary-card, .sales-data-note { padding: 20px; background: white; border: 1px solid #dfe2e6; border-radius: 14px; box-shadow: 0 7px 22px #1519220b; }
 .sales-section-title { margin-bottom: 17px; display: flex; gap: 11px; align-items: flex-start; }
 .sales-section-title > span { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; color: var(--red); background: #fff0f0; border-radius: 10px; }
@@ -807,6 +807,8 @@ a { color: inherit; text-decoration: none; }
 .sales-editor .money-input { text-align: right; font-variant-numeric: tabular-nums; }
 .invoice-note-card { position: relative; display: grid; gap: 16px; border-color: #efc2c4; box-shadow: inset 4px 0 #e3242b, 0 7px 22px #1519220b; }
 .invoice-note-card .sales-section-title { margin-bottom: 0; }
+.invoice-customer-block { position: relative; z-index: 4; }
+.invoice-customer-block .customer-found { margin-bottom: 0; }
 .invoice-notes-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .invoice-notes-field { min-width: 0; display: grid; gap: 7px; }
 .invoice-notes-field > span { color: #4e5560; font-size: 12px; font-weight: 800; }
@@ -819,7 +821,7 @@ a { color: inherit; text-decoration: none; }
 .datetime-picker-button { min-height: 46px; padding: 0; display: grid; place-items: center; color: #606873; background: #f7f8fa; border: 1px solid #d3d8df; border-left: 0; border-radius: 0 9px 9px 0; }
 .datetime-picker-button:hover { color: #bd1c23; background: #fff2f2; }
 .datetime-picker-button:focus-visible { z-index: 1; outline: 3px solid #e3242b20; }
-.invoice-meta-grid .datetime-native-picker, .installment-fields .datetime-native-picker { position: fixed; left: -10000px; width: 1px; min-height: 1px; padding: 0; opacity: 0; pointer-events: none; }
+.invoice-meta-grid .datetime-native-picker, .summary-invoice-meta .datetime-native-picker, .installment-fields .datetime-native-picker { position: fixed; left: -10000px; width: 1px; min-height: 1px; padding: 0; opacity: 0; pointer-events: none; }
 .installment-date-field { min-width: 0; display: grid; gap: 6px; }
 .installment-date-field > span { color: #555b65; font-size: 11px; font-weight: 750; }
 .installment-date-field > small { color: #7b818a; font-size: 11px; }
@@ -977,6 +979,17 @@ a { color: inherit; text-decoration: none; }
 .installment-flow-explainer small { margin-top: 3px; color: #8c754c; line-height: 1.4; }
 .installment-flow-explainer > b { color: #b61920; font-size: 18px; }
 .compact-section { padding-bottom: 18px; }
+.summary-invoice-code { margin-top: 12px; padding: 10px 11px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #606671; background: #f6f7f9; border-radius: 8px; font-size: 11px; }
+.summary-invoice-code strong { overflow: hidden; color: #272c34; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.summary-invoice-meta { margin-top: 13px; display: grid; gap: 10px; }
+.summary-invoice-meta label, .summary-invoice-meta .invoice-meta-field { min-width: 0; display: grid; gap: 5px; }
+.summary-invoice-meta label > span, .summary-invoice-meta .invoice-meta-field > span { color: #6a707a; font-size: 10px; font-weight: 800; }
+.summary-invoice-meta input, .summary-invoice-meta select { width: 100%; min-height: 40px; padding: 0 10px; color: #2d333b; background: white; border: 1px solid #d8dce2; border-radius: 8px; outline: 0; font-size: 12px; }
+.summary-invoice-meta input[readonly] { color: #626974; background: #f6f7f9; }
+.summary-invoice-meta input:focus, .summary-invoice-meta select:focus { border-color: #df555b; box-shadow: 0 0 0 3px #e3242b12; }
+.summary-invoice-meta .vietnamese-datetime-input { grid-template-columns: minmax(0, 1fr) 40px; }
+.summary-invoice-meta .datetime-picker-button { min-height: 40px; }
+.summary-divider { height: 1px; margin: 16px 0; background: #e2e5e9; }
 .sales-summary-card > h3 { margin: 8px 0 20px; font-size: 18px; }
 .sales-summary-card dl { margin: 0; display: grid; gap: 11px; }
 .sales-summary-card dl > div { display: flex; justify-content: space-between; gap: 15px; color: #606671; font-size: 12px; }
@@ -992,7 +1005,25 @@ a { color: inherit; text-decoration: none; }
 .installment-summary { margin-top: 14px; padding: 11px; color: #8c5c0b; background: #fff7e3; border-radius: 8px; }
 .installment-summary strong, .installment-summary small, .sales-data-note strong, .sales-data-note small { display: block; }
 .installment-summary small, .sales-data-note small { margin-top: 4px; color: #7d838d; font-size: 10px; line-height: 1.45; }
-.summary-save { width: 100%; margin-top: 16px; }
+.summary-customer-head { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 10px; }
+.summary-customer-head > span { width: 36px; height: 36px; display: grid; place-items: center; color: #176e53; background: #e6f6ef; border-radius: 10px; }
+.summary-customer-head small, .summary-customer-head strong, .summary-customer-head em { display: block; }
+.summary-customer-head small { color: #6b727c; font-size: 9px; font-style: normal; font-weight: 850; letter-spacing: .06em; }
+.summary-customer-head strong { margin-top: 3px; overflow: hidden; color: #252b33; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.summary-customer-head em { margin-top: 2px; color: #858b95; font-size: 9px; font-style: normal; }
+.summary-customer-metrics { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 8px; }
+.summary-customer-metrics > span { min-width: 0; padding: 10px; display: grid; gap: 4px; background: #f6f8f7; border: 1px solid #e2e8e5; border-radius: 8px; }
+.summary-customer-metrics small { color: #747b84; font-size: 9px; }
+.summary-customer-metrics strong { overflow: hidden; color: #176e53; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.summary-customer-invoices { margin-top: 14px; }
+.summary-customer-invoices > div { padding-bottom: 8px; display: flex; align-items: center; gap: 6px; color: #5e6570; border-bottom: 1px solid #e6e8eb; font-size: 10px; font-weight: 800; }
+.summary-customer-invoices > article { padding: 9px 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid #eef0f2; }
+.summary-customer-invoices > article:last-child { padding-bottom: 0; border-bottom: 0; }
+.summary-customer-invoices article span { min-width: 0; }
+.summary-customer-invoices article strong, .summary-customer-invoices article small { display: block; }
+.summary-customer-invoices article strong { overflow: hidden; color: #343a43; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.summary-customer-invoices article small { margin-top: 3px; color: #898f98; font-size: 9px; }
+.summary-customer-invoices article b { flex: 0 0 auto; color: #b31a21; font-size: 10px; }
 .sales-data-note { color: #515762; box-shadow: none; }
 .invoice-service-cell { display: grid; gap: 7px; justify-items: start; }
 .invoice-service-tags { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -1586,7 +1617,7 @@ a { color: inherit; text-decoration: none; }
   .login-story { display: none; }
   .login-panel { min-height: 100vh; padding: 24px; }
   .sales-editor-layout { grid-template-columns: 1fr; }
-  .sales-editor-summary { position: static; grid-template-columns: 1fr 1fr; }
+  .sales-editor-summary { position: static; max-height: none; padding-right: 0; grid-template-columns: 1fr 1fr; overflow: visible; }
   .payment-mode-options { grid-template-columns: 1fr; }
   .payment-simple-grid, .payment-simple-grid.mixed { grid-template-columns: 1fr; }
   .sales-management-content { grid-template-columns: 1fr; }
@@ -1682,7 +1713,7 @@ a { color: inherit; text-decoration: none; }
   .sales-editor-head > div:last-child button { flex: 1; }
   .sales-editor-layout { padding: 12px 10px 35px; }
   .sales-editor-summary { grid-template-columns: 1fr; }
-  .transaction-kind-card, .sales-form-grid, .sales-discount-grid, .invoice-meta-grid, .invoice-notes-grid { grid-template-columns: 1fr; }
+  .transaction-kind-card, .sales-form-grid, .sales-discount-grid, .invoice-meta-grid, .invoice-notes-grid, .customer-lookup-row { grid-template-columns: 1fr; }
   .discount-add-control { grid-template-columns: 1fr 1fr; }
   .discount-add-control .select-shell { grid-column: 1 / -1; }
   .repair-invoice-status { grid-template-columns: 1fr; }

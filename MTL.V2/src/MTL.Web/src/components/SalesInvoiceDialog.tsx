@@ -135,6 +135,13 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
     queryFn: () => api.get<PagedResult<Customer>>(`/api/customers?search=${encodeURIComponent(deferredCustomerPhone)}&page=1&pageSize=8`),
     enabled: customerSuggestionOpen && deferredCustomerPhone.length >= 3 && !customerHistory,
   })
+  const savedCustomerHistoryQuery = useQuery({
+    queryKey: ['sales-customer-history', customerId, deferredCustomerPhone],
+    queryFn: () => api.get<CustomerLookup>(`/api/customers/lookup?phone=${encodeURIComponent(deferredCustomerPhone)}`),
+    enabled: Boolean(invoiceId && customerId && deferredCustomerPhone.length >= 8 && !customerHistory),
+    retry: false,
+  })
+  const selectedCustomerHistory = customerHistory ?? savedCustomerHistoryQuery.data ?? null
 
   const lookupMutation = useMutation({
     mutationFn: (phone: string) => api.get<CustomerLookup>(`/api/customers/lookup?phone=${encodeURIComponent(phone)}`),
@@ -586,40 +593,26 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
 
           <section className="sales-section invoice-note-card">
             <div className="sales-section-title"><span><ClipboardPenLine size={19} /></span><div><h3>THÔNG TIN HOÁ ĐƠN</h3></div></div>
-            <div className={`invoice-meta-grid ${invoiceType === 'Sale' ? 'is-sale' : ''}`}>
-              <label><span>Người lập phiếu</span><input value={invoiceQuery.data?.issuer.name ?? user?.fullName ?? 'Nhân viên'} readOnly /></label>
-              <div className="invoice-meta-field"><span>Ngày lập phiếu</span><VietnameseDateTimeInput key={`invoice-date-${invoiceDate}`} ariaLabel="Ngày lập phiếu" value={invoiceDate} onChange={changeInvoiceDate} required /></div>
-              <label><span>Trạng thái xử lý phiếu</span><select value={repairStatus} onChange={(event) => setRepairStatus(event.target.value as RepairStatus)}>
-                <option value="InProgress">Đang xử lý</option>
-                <option value="Returned">Đã xử lý</option>
-                <option value="Cancelled">Đã hủy</option>
-              </select></label>
-              {invoiceType === 'Repair' && <div className="invoice-meta-field"><span>Ngày dự kiến trả máy</span><VietnameseDateTimeInput key={`expected-return-${expectedReturnAt}`} ariaLabel="Ngày dự kiến trả máy" value={expectedReturnAt} onChange={setExpectedReturnAt} required /></div>}
+            <div className="invoice-customer-block">
+              <div className="customer-lookup-row">
+                <label><span>Số điện thoại khách hàng *</span><div className="customer-phone-field"><Phone size={17} /><input value={customerPhone} onFocus={() => setCustomerSuggestionOpen(true)} onBlur={() => window.setTimeout(() => setCustomerSuggestionOpen(false), 150)} onChange={(event) => { setCustomerPhone(event.target.value); setCustomerId(undefined); setCustomerHistory(null); setCustomerEmail(''); setCustomerAddress(''); setCustomerNotes(''); setCustomerSuggestionOpen(true); lookupMutation.reset() }} placeholder="Gõ từ 3 số để tìm khách hàng…" autoComplete="off" required />
+                  {customerSuggestionOpen && deferredCustomerPhone.length >= 3 && <div className="customer-phone-suggestions">
+                    {customerSuggestionsQuery.isFetching && <p>Đang lọc khách hàng…</p>}
+                    {customerSuggestions.map((customer) => <button type="button" key={customer.id} className={customer.id === exactCustomer?.id ? 'is-exact' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => selectCustomer(customer)}><span className="suggestion-avatar">{customer.fullName.slice(0, 1).toUpperCase()}</span><span><strong>{customer.fullName}</strong><small>{customer.phone} · {customer.code}</small></span><b>{currency.format(customer.totalSpent)}</b></button>)}
+                    {!customerSuggestionsQuery.isFetching && customerSuggestions.length === 0 && <p>Chưa có khách hàng khớp số điện thoại này.</p>}
+                  </div>}
+                </div></label>
+                <button type="button" className="secondary-button" disabled={customerPhone.replace(/\D/g, '').length < 8 || lookupMutation.isPending} onClick={() => lookupMutation.mutate(customerPhone)}><Search size={16} /> {lookupMutation.isPending ? 'Đang tìm…' : 'Tra cứu'}</button>
+              </div>
+              {exactCustomer && !customerId && <div className="customer-choice-callout existing"><CheckCircle2 size={17} /><span><strong>Số điện thoại đã tồn tại</strong><small>Chọn hồ sơ {exactCustomer.fullName} để dùng lịch sử mua hàng.</small></span><button type="button" className="secondary-button" onClick={() => selectCustomer(exactCustomer)}>Chọn khách hàng</button></div>}
+              {canCreateCustomer && <div className="customer-choice-callout new"><UserRoundCog size={17} /><span><strong>Đây là số điện thoại mới</strong><small>Tạo hồ sơ khách hàng trước khi lưu hóa đơn để quản lý thông tin đầy đủ.</small></span><button type="button" className="secondary-button" onClick={() => setShowCustomerEditor(true)}>Tạo khách hàng mới</button></div>}
+              {lookupMutation.isError && !canCreateCustomer && <div className="inline-note neutral">Không tìm thấy khách hàng — hãy tạo hồ sơ mới để tiếp tục.</div>}
+              {customerId && <div className="customer-found"><CheckCircle2 size={17} /><div><strong>{customerName}{selectedCustomerHistory?.code ? ` · ${selectedCustomerHistory.code}` : ''}</strong><small>{selectedCustomerHistory ? `${selectedCustomerHistory.invoices.length} hóa đơn gần đây · Tổng mua ${currency.format(selectedCustomerHistory.totalSpent)}` : 'Đã chọn hồ sơ khách hàng'}</small></div><button type="button" className="secondary-button customer-detail-button" onClick={() => setShowCustomerEditor(true)}><UserRoundCog size={17} /> Sửa thông tin</button></div>}
             </div>
             <div className="invoice-notes-grid">
               <label className="invoice-notes-field"><span>Nội dung hiển thị nội bộ</span><textarea value={notes || suggestedNotes} onChange={(event) => setNotes(event.target.value === suggestedNotes ? '' : event.target.value)} placeholder="Nội dung dành cho nhân viên" rows={2} /><small>Tự động cập nhật theo model, thẻ dịch vụ và sản phẩm đã chọn. Nội dung này không in trên bill.</small></label>
               <label className="invoice-notes-field print-notes-field"><span>Ghi chú</span><textarea value={printNotes} onChange={(event) => setPrintNotes(event.target.value)} placeholder="Thông tin cần hiển thị khi in bill" rows={2} maxLength={2000} /><small>Chỉ nội dung tại ô này được hiển thị trên bản in.</small></label>
             </div>
-          </section>
-
-          <section className="sales-section">
-            <div className="sales-section-title"><span><UserRound size={19} /></span><div><h3>Thông tin khách hàng</h3></div></div>
-            <div className="customer-lookup-row">
-              <label><span>Số điện thoại *</span><div className="customer-phone-field"><Phone size={17} /><input value={customerPhone} onFocus={() => setCustomerSuggestionOpen(true)} onBlur={() => window.setTimeout(() => setCustomerSuggestionOpen(false), 150)} onChange={(event) => { setCustomerPhone(event.target.value); setCustomerId(undefined); setCustomerHistory(null); setCustomerEmail(''); setCustomerAddress(''); setCustomerNotes(''); setCustomerSuggestionOpen(true); lookupMutation.reset() }} placeholder="Gõ từ 3 số để tìm khách hàng…" autoComplete="off" required />
-                {customerSuggestionOpen && deferredCustomerPhone.length >= 3 && <div className="customer-phone-suggestions">
-                  {customerSuggestionsQuery.isFetching && <p>Đang lọc khách hàng…</p>}
-                  {customerSuggestions.map((customer) => <button type="button" key={customer.id} className={customer.id === exactCustomer?.id ? 'is-exact' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => selectCustomer(customer)}><span className="suggestion-avatar">{customer.fullName.slice(0, 1).toUpperCase()}</span><span><strong>{customer.fullName}</strong><small>{customer.phone} · {customer.code}</small></span><b>{currency.format(customer.totalSpent)}</b></button>)}
-                  {!customerSuggestionsQuery.isFetching && customerSuggestions.length === 0 && <p>Chưa có khách hàng khớp số điện thoại này.</p>}
-                </div>}
-              </div></label>
-              <button type="button" className="secondary-button" disabled={customerPhone.replace(/\D/g, '').length < 8 || lookupMutation.isPending} onClick={() => lookupMutation.mutate(customerPhone)}><Search size={16} /> {lookupMutation.isPending ? 'Đang tìm…' : 'Tra cứu'}</button>
-            </div>
-            {exactCustomer && !customerId && <div className="customer-choice-callout existing"><CheckCircle2 size={17} /><span><strong>Số điện thoại đã tồn tại</strong><small>Chọn hồ sơ {exactCustomer.fullName} để dùng lịch sử mua hàng.</small></span><button type="button" className="secondary-button" onClick={() => selectCustomer(exactCustomer)}>Chọn khách hàng</button></div>}
-            {canCreateCustomer && <div className="customer-choice-callout new"><UserRoundCog size={17} /><span><strong>Đây là số điện thoại mới</strong><small>Tạo hồ sơ khách hàng trước khi lưu hóa đơn để quản lý thông tin đầy đủ.</small></span><button type="button" className="secondary-button" onClick={() => setShowCustomerEditor(true)}>Tạo khách hàng mới</button></div>}
-            {lookupMutation.isError && !canCreateCustomer && <div className="inline-note neutral">Không tìm thấy khách hàng — hãy tạo hồ sơ mới để tiếp tục.</div>}
-            {customerId && <div className="customer-found"><CheckCircle2 size={17} /><div><strong>{customerName}{customerHistory?.code ? ` · ${customerHistory.code}` : ''}</strong><small>{customerHistory ? `${customerHistory.invoices.length} hóa đơn gần đây · Tổng mua ${currency.format(customerHistory.totalSpent)}` : 'Đã chọn hồ sơ khách hàng'}</small></div><button type="button" className="secondary-button customer-detail-button" onClick={() => setShowCustomerEditor(true)}><UserRoundCog size={17} /> Sửa thông tin chi tiết</button></div>}
-            {(customerEmail || customerAddress) && <div className="customer-detail-summary"><span>{customerEmail || 'Chưa có email'}</span><span>{customerAddress || 'Chưa có địa chỉ'}</span></div>}
-            {customerHistory && customerHistory.invoices.length > 0 && <details className="customer-history"><summary><History size={15} /> Xem lịch sử hóa đơn</summary><div>{customerHistory.invoices.slice(0, 5).map((invoice) => <span key={invoice.id}><strong>{invoice.number}</strong><small>{new Date(invoice.invoiceDateUtc).toLocaleDateString('vi-VN')} · {currency.format(invoice.totalAmount)}</small></span>)}</div></details>}
           </section>
 
           {invoiceType === 'Repair' && <section className="sales-section repair-intake-card">
@@ -715,13 +708,29 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
         <aside className="sales-editor-summary">
           <div className="sales-summary-card">
             <span className="eyebrow">TỔNG KẾT HÓA ĐƠN</span>
+            <div className="summary-invoice-code"><span>Mã phiếu</span><strong>{invoiceQuery.data?.number ?? 'Tự động khi lưu'}</strong></div>
+            <div className="summary-invoice-meta">
+              <label><span>Người lập phiếu</span><input value={invoiceQuery.data?.issuer.name ?? user?.fullName ?? 'Nhân viên'} readOnly /></label>
+              <div className="invoice-meta-field"><span>Ngày lập phiếu</span><VietnameseDateTimeInput key={`invoice-date-${invoiceDate}`} ariaLabel="Ngày lập phiếu" value={invoiceDate} onChange={changeInvoiceDate} required /></div>
+              <label><span>Trạng thái xử lý phiếu</span><select value={repairStatus} onChange={(event) => setRepairStatus(event.target.value as RepairStatus)}>
+                <option value="InProgress">Đang xử lý</option>
+                <option value="Returned">Đã xử lý</option>
+                <option value="Cancelled">Đã hủy</option>
+              </select></label>
+              {invoiceType === 'Repair' && <div className="invoice-meta-field"><span>Ngày dự kiến trả máy</span><VietnameseDateTimeInput key={`expected-return-${expectedReturnAt}`} ariaLabel="Ngày dự kiến trả máy" value={expectedReturnAt} onChange={setExpectedReturnAt} required /></div>}
+            </div>
+            <div className="summary-divider" />
             <h3>{invoiceType === 'Sale' ? `${cart.length} sản phẩm` : `${repairDevices.length} máy sửa chữa`}</h3>
             {invoicePurpose && <div className="summary-purpose"><ClipboardPenLine size={15} /><span>{invoicePurpose}</span></div>}
             <dl><div><dt>Tạm tính</dt><dd>{currency.format(subtotal)}</dd></div>{promotionDiscount > 0 && <div className="discount"><dt>Khuyến mãi</dt><dd>− {currency.format(promotionDiscount)}</dd></div>}{voucherDiscount > 0 && <div className="discount"><dt>Voucher</dt><dd>− {currency.format(voucherDiscount)}</dd></div>}<div className="grand-total"><dt>Khách cần trả</dt><dd>{currency.format(total)}</dd></div><div><dt>{repairStatus === 'Returned' ? 'Đã ghi nhận' : 'Phân bổ dự kiến'}</dt><dd className="paid">{currency.format(paid)}</dd></div><div className="remaining"><dt>{isInstallment ? 'Banking dự kiến' : 'Còn phải thu'}</dt><dd>{currency.format(outstanding)}</dd></div></dl>
             {paid > total && <div className="inline-note danger">Số tiền nhận đang vượt tổng hóa đơn.</div>}
             {isInstallment && outstanding > 0 && <div className="installment-summary"><Clock3 size={17} /><span><strong>Khoản banking tự động</strong><small>{paymentDueDate ? `Lên lịch: ${formatVietnameseDateTime(paymentDueDate)}` : 'Chưa chọn ngày dự kiến'}</small></span></div>}
-            <button className="primary-button summary-save" disabled={createMutation.isPending}><Save size={18} /> {createMutation.isPending ? 'Đang lưu…' : invoiceId ? 'Cập nhật hóa đơn' : invoiceType === 'Repair' ? 'Lưu phiếu tiếp nhận' : 'Lưu hóa đơn'}</button>
           </div>
+          {selectedCustomerHistory && selectedCustomerHistory.invoices.length > 0 && <div className="sales-summary-card sales-customer-history-card">
+            <div className="summary-customer-head"><span><UserRound size={18} /></span><div><small>KHÁCH HÀNG THÂN THUỘC</small><strong>{selectedCustomerHistory.fullName}</strong><em>{selectedCustomerHistory.code}</em></div></div>
+            <div className="summary-customer-metrics"><span><small>Tổng tiền đã mua</small><strong>{currency.format(selectedCustomerHistory.totalSpent)}</strong></span><span><small>Hóa đơn gần đây</small><strong>{selectedCustomerHistory.invoices.length}</strong></span></div>
+            <div className="summary-customer-invoices"><div><History size={15} /><span>Hóa đơn gần đây</span></div>{selectedCustomerHistory.invoices.slice(0, 5).map((invoice) => <article key={invoice.id}><span><strong>{invoice.number}</strong><small>{new Date(invoice.invoiceDateUtc).toLocaleDateString('vi-VN')}</small></span><b>{currency.format(invoice.totalAmount)}</b></article>)}</div>
+          </div>}
         </aside>
       </div>
     </form>
