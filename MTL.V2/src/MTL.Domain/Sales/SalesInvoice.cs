@@ -79,6 +79,7 @@ public sealed class SalesInvoice : CompanyOwnedEntity
     public PaymentAccount? InstallmentPaymentAccount { get; set; }
     public DateTimeOffset? PaymentDueDateUtc { get; set; }
     public string? Notes { get; set; }
+    public string? PrintNotes { get; set; }
     public string? LegacySource { get; set; }
     public string? LegacyId { get; set; }
     public ICollection<SalesInvoiceLine> Lines { get; set; } = [];

@@ -164,7 +164,7 @@ export function SalesPage() {
 
       <div className="data-table-wrap sales-table-wrap">
         <table className="data-table sales-table">
-          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Ngày lập phiếu</th><th>Hóa đơn</th><th className="sales-customer-column">Khách hàng</th><th className="sales-purpose-column">Nội dung / ghi chú & thẻ</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th className="sales-money-column">Tổng tiền</th><th className="sales-money-column">Đã ghi nhận</th><th className="sales-money-column">Còn lại</th><th>Phương thức tiền</th><th>Tài khoản banking</th><th>Người lập phiếu</th><th>Ngày trả máy</th><th>Ngày cập nhật lần cuối</th></tr></thead>
+          <thead><tr><th className="sales-actions-column">Thao tác</th><th>Ngày lập phiếu</th><th>Hóa đơn</th><th className="sales-customer-column">Khách hàng</th><th className="sales-purpose-column">Nội dung nội bộ & thẻ</th><th>Nghiệp vụ</th><th>Trạng thái xử lý</th><th className="sales-money-column">Tổng tiền</th><th className="sales-money-column">Đã ghi nhận</th><th className="sales-money-column">Còn lại</th><th>Phương thức tiền</th><th>Tài khoản banking</th><th>Người lập phiếu</th><th>Ngày trả máy</th><th>Ngày cập nhật lần cuối</th></tr></thead>
           <tbody>
             {invoicesQuery.isLoading && <tr><td colSpan={15} className="empty-cell">Đang tải hóa đơn…</td></tr>}
             {invoicesQuery.data?.items.map((invoice) => {

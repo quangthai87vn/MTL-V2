@@ -1722,6 +1722,10 @@ namespace MTL.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("PaymentDueDateUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("PrintNotes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<decimal>("PromotionDiscountAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");

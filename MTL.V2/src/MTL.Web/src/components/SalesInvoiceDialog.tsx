@@ -1,5 +1,6 @@
 import {
   Banknote,
+  CalendarDays,
   CheckCircle2,
   ChevronDown,
   ClipboardPenLine,
@@ -111,6 +112,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
   const [installmentPaymentAccountId, setInstallmentPaymentAccountId] = useState('')
   const [paymentDueDate, setPaymentDueDate] = useState('')
   const [notes, setNotes] = useState('')
+  const [printNotes, setPrintNotes] = useState('')
   const [validationError, setValidationError] = useState('')
 
   const [repairDevices, setRepairDevices] = useState<RepairDeviceDraft[]>([newRepairDevice()])
@@ -197,7 +199,11 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
     setPaymentDueDate(invoice.paymentDueDateUtc ? toDateTimeLocal(new Date(invoice.paymentDueDateUtc)) : '')
     paymentDueCustomized.current = Boolean(invoice.paymentDueDateUtc)
     const hydratedRepairs = invoice.repairs?.length ? invoice.repairs : invoice.repair ? [invoice.repair] : []
-    setNotes(invoice.type === 'Repair' && isAutomaticRepairNote(invoice.notes, hydratedRepairs) ? '' : invoice.notes ?? '')
+    const hasAutomaticInternalContent = invoice.type === 'Repair'
+      ? isAutomaticRepairNote(invoice.notes, hydratedRepairs, invoice.lines)
+      : isAutomaticSaleNote(invoice.notes, invoice.lines)
+    setNotes(hasAutomaticInternalContent ? '' : invoice.notes ?? '')
+    setPrintNotes(invoice.printNotes ?? '')
     setRepairStatus(normalizeProcessingStatus(invoice.repairStatus ?? hydratedRepairs[0]?.status))
     setExpectedReturnAt(invoice.expectedReturnAtUtc
       ? toDateTimeLocal(new Date(invoice.expectedReturnAtUtc))
@@ -252,12 +258,18 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
   const outstanding = Math.max(0, total - paid)
   const suggestedNotes = useMemo(() => {
     if (invoiceType === 'Repair') {
-      return repairDevices.map((device, index) => device.deviceModel.trim() || `Máy ${index + 1}`).join(' + ')
+      const repairDescriptions = repairDevices.map((device, index) => {
+        const model = device.deviceModel.trim() || `Máy ${index + 1}`
+        const serviceNames = device.services
+          .map((service) => serviceTypesQuery.data?.find((item) => item.id === service.serviceTypeId)?.name)
+          .filter((name): name is string => Boolean(name))
+          .map(formatServiceName)
+        return serviceNames.length > 0 ? `Sửa (Thay) ${serviceNames.join(', ')} cho ${model}` : `Sửa chữa cho ${model}`
+      })
+      return [...repairDescriptions, ...cart.map((line) => line.name.trim()).filter(Boolean)].join(' + ')
     }
-    if (cart.length === 0) return ''
-    const productNames = cart.slice(0, 2).map((line) => line.name)
-    return `${productNames.join(' + ')}${cart.length > 2 ? ` + ${cart.length - 2} sản phẩm khác` : ''}`
-  }, [cart, invoiceType, repairDevices])
+    return cart.map((line) => line.name.trim()).filter(Boolean).join(' + ')
+  }, [cart, invoiceType, repairDevices, serviceTypesQuery.data])
   const invoicePurpose = notes.trim() || suggestedNotes
   const customerSuggestions = customerSuggestionsQuery.data?.items ?? []
   const exactCustomer = customerSuggestions.find((customer) => normalizePhone(customer.phone ?? '') === deferredCustomerPhone)
@@ -489,6 +501,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
         notes: null,
       })) : [],
       notes: invoicePurpose || null,
+      printNotes: printNotes.trim() || null,
     })
   }
 
@@ -575,15 +588,18 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
             <div className="sales-section-title"><span><ClipboardPenLine size={19} /></span><div><h3>THÔNG TIN HOÁ ĐƠN</h3></div></div>
             <div className={`invoice-meta-grid ${invoiceType === 'Sale' ? 'is-sale' : ''}`}>
               <label><span>Người lập phiếu</span><input value={invoiceQuery.data?.issuer.name ?? user?.fullName ?? 'Nhân viên'} readOnly /></label>
-              <label><span>Ngày lập phiếu</span><VietnameseDateTimeInput key={`invoice-date-${invoiceDate}`} ariaLabel="Ngày lập phiếu" value={invoiceDate} onChange={changeInvoiceDate} required /></label>
+              <div className="invoice-meta-field"><span>Ngày lập phiếu</span><VietnameseDateTimeInput key={`invoice-date-${invoiceDate}`} ariaLabel="Ngày lập phiếu" value={invoiceDate} onChange={changeInvoiceDate} required /></div>
               <label><span>Trạng thái xử lý phiếu</span><select value={repairStatus} onChange={(event) => setRepairStatus(event.target.value as RepairStatus)}>
                 <option value="InProgress">Đang xử lý</option>
                 <option value="Returned">Đã xử lý</option>
                 <option value="Cancelled">Đã hủy</option>
               </select></label>
-              {invoiceType === 'Repair' && <label><span>Ngày dự kiến trả máy</span><VietnameseDateTimeInput key={`expected-return-${expectedReturnAt}`} ariaLabel="Ngày dự kiến trả máy" value={expectedReturnAt} onChange={setExpectedReturnAt} required /></label>}
+              {invoiceType === 'Repair' && <div className="invoice-meta-field"><span>Ngày dự kiến trả máy</span><VietnameseDateTimeInput key={`expected-return-${expectedReturnAt}`} ariaLabel="Ngày dự kiến trả máy" value={expectedReturnAt} onChange={setExpectedReturnAt} required /></div>}
             </div>
-            <label className="invoice-notes-field"><span>Nội dung / ghi chú</span><textarea value={notes || suggestedNotes} onChange={(event) => setNotes(event.target.value === suggestedNotes ? '' : event.target.value)} placeholder="Nội dung hóa đơn" rows={2} /></label>
+            <div className="invoice-notes-grid">
+              <label className="invoice-notes-field"><span>Nội dung hiển thị nội bộ</span><textarea value={notes || suggestedNotes} onChange={(event) => setNotes(event.target.value === suggestedNotes ? '' : event.target.value)} placeholder="Nội dung dành cho nhân viên" rows={2} /><small>Tự động cập nhật theo model, thẻ dịch vụ và sản phẩm đã chọn. Nội dung này không in trên bill.</small></label>
+              <label className="invoice-notes-field print-notes-field"><span>Ghi chú</span><textarea value={printNotes} onChange={(event) => setPrintNotes(event.target.value)} placeholder="Thông tin cần hiển thị khi in bill" rows={2} maxLength={2000} /><small>Chỉ nội dung tại ô này được hiển thị trên bản in.</small></label>
+            </div>
           </section>
 
           <section className="sales-section">
@@ -679,7 +695,7 @@ export function SalesInvoiceDialog({ invoiceId, onClose, onCreated }: { invoiceI
                 <label><span>Đơn vị trả góp *</span><select value={installmentProvider} onChange={(event) => setInstallmentProvider(event.target.value)}><option value="">Chọn đơn vị trả góp…</option>{installmentProvidersQuery.data?.filter((provider) => provider.isActive).map((provider) => <option key={provider.id} value={provider.name}>{provider.name}</option>)}{installmentProvider && !installmentProvidersQuery.data?.some((provider) => provider.name === installmentProvider) && <option value={installmentProvider}>{installmentProvider}</option>}</select></label>
                 <label><span>Mã hồ sơ</span><input value={installmentReference} onChange={(event) => setInstallmentReference(event.target.value)} /></label>
                 <label><span>Tài khoản nhận tiền góp *</span><select value={installmentPaymentAccountId} onChange={(event) => setInstallmentPaymentAccountId(event.target.value)} required={outstanding > 0}><option value="">Chọn tài khoản ngân hàng…</option>{accountsQuery.data?.filter((account) => account.isActive).map((account) => <option key={account.id} value={account.id}>{account.name} · {account.bankName} · {account.accountNumber}</option>)}</select></label>
-                <label><span>Ngày dự kiến nhận tiền góp *</span><VietnameseDateTimeInput key={`payment-due-${paymentDueDate}`} ariaLabel="Ngày dự kiến nhận tiền góp" value={paymentDueDate} onChange={(value) => { paymentDueCustomized.current = true; setPaymentDueDate(value) }} required={outstanding > 0} /><small>Mặc định sau 2 ngày kể từ ngày lập hóa đơn.</small></label>
+                <div className="installment-date-field"><span>Ngày dự kiến nhận tiền góp *</span><VietnameseDateTimeInput key={`payment-due-${paymentDueDate}`} ariaLabel="Ngày dự kiến nhận tiền góp" value={paymentDueDate} onChange={(value) => { paymentDueCustomized.current = true; setPaymentDueDate(value) }} required={outstanding > 0} /><small>Mặc định sau 2 ngày kể từ ngày lập hóa đơn.</small></div>
               </div>
             </div>}
 
@@ -728,6 +744,7 @@ function MoneyInput({ value, onChange, ariaLabel }: { value: number; onChange: (
 
 function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { value: string; onChange: (value: string) => void; required?: boolean; ariaLabel: string }) {
   const [draft, setDraft] = useState(() => formatVietnameseDateTime(value))
+  const pickerRef = useRef<HTMLInputElement>(null)
 
   function updateDraft(next: string) {
     setDraft(next)
@@ -748,17 +765,32 @@ function VietnameseDateTimeInput({ value, onChange, required, ariaLabel }: { val
     setDraft(parsed ? formatVietnameseDateTime(parsed) : formatVietnameseDateTime(value))
   }
 
-  return <input
-    type="text"
-    inputMode="numeric"
-    aria-label={ariaLabel}
-    title="Định dạng: ngày/tháng/năm giờ:phút"
-    placeholder="dd/MM/yyyy HH:mm"
-    value={draft}
-    required={required}
-    onChange={(event) => updateDraft(event.target.value)}
-    onBlur={normalizeDraft}
-  />
+  function selectFromCalendar(next: string) {
+    setDraft(formatVietnameseDateTime(next))
+    onChange(next)
+  }
+
+  function openCalendar() {
+    const picker = pickerRef.current
+    if (!picker) return
+    picker.showPicker()
+  }
+
+  return <div className="vietnamese-datetime-input">
+    <input
+      type="text"
+      inputMode="numeric"
+      aria-label={ariaLabel}
+      title="Định dạng: ngày/tháng/năm giờ:phút"
+      placeholder="dd/MM/yyyy HH:mm"
+      value={draft}
+      required={required}
+      onChange={(event) => updateDraft(event.target.value)}
+      onBlur={normalizeDraft}
+    />
+    <button type="button" className="datetime-picker-button" onClick={openCalendar} aria-label={`Chọn ${ariaLabel.toLowerCase()} từ lịch`} title="Chọn ngày giờ từ lịch"><CalendarDays size={18} /></button>
+    <input ref={pickerRef} className="datetime-native-picker" type="datetime-local" value={value} onChange={(event) => selectFromCalendar(event.target.value)} tabIndex={-1} aria-hidden="true" />
+  </div>
 }
 
 function parseMoney(value: string) {
@@ -773,16 +805,52 @@ function detectProductServiceTypeCode(name: string, categoryName?: string) {
   return ''
 }
 
-function isAutomaticRepairNote(value: string | undefined, repairs: RepairOrder[]) {
+function formatServiceName(name: string) {
+  const acronyms = new Set(['BIOS', 'CPU', 'GPU', 'HDD', 'LCD', 'PC', 'RAM', 'SSD', 'USB', 'WIFI'])
+  return name.trim().toLocaleLowerCase('vi-VN').split(/\s+/).map((word, index) => {
+    const upper = word.toLocaleUpperCase('vi-VN')
+    if (acronyms.has(upper)) return upper
+    return index === 0 ? `${word.charAt(0).toLocaleUpperCase('vi-VN')}${word.slice(1)}` : word
+  }).join(' ')
+}
+
+function isAutomaticRepairNote(value: string | undefined, repairs: RepairOrder[], lines: SalesInvoiceDetails['lines']) {
   if (!value?.trim()) return true
   const normalizedValue = value.trim()
   const models = repairs.map((repair, index) => repair.deviceModel.trim() || `Máy ${index + 1}`)
   if (models.length === 0) return false
+  const repairSummary = repairs.map((repair, index) => {
+    const model = repair.deviceModel.trim() || `Máy ${index + 1}`
+    const services = repair.services?.length
+      ? repair.services.map((service) => service.name).filter(Boolean)
+      : repair.serviceTypes?.map((service) => service.name).filter(Boolean) ?? []
+    return services.length > 0 ? `Sửa (Thay) ${services.map(formatServiceName).join(', ')} cho ${model}` : `Sửa chữa cho ${model}`
+  })
+  const unformattedRepairSummary = repairs.map((repair, index) => {
+    const model = repair.deviceModel.trim() || `Máy ${index + 1}`
+    const services = repair.services?.length
+      ? repair.services.map((service) => service.name).filter(Boolean)
+      : repair.serviceTypes?.map((service) => service.name).filter(Boolean) ?? []
+    return services.length > 0 ? `Sửa (Thay) ${services.join(', ')} cho ${model}` : `Sửa chữa cho ${model}`
+  })
+  const extraProducts = lines.filter((line) => line.sku !== 'DICH-VU-SUA-CHUA').map((line) => line.productName.trim()).filter(Boolean)
+  const generatedSummary = [...repairSummary, ...extraProducts].join(' + ')
+  const unformattedGeneratedSummary = [...unformattedRepairSummary, ...extraProducts].join(' + ')
   const modelSummary = models.join(' + ')
   const legacySummary = repairs.slice(0, 2)
     .map((repair) => [repair.deviceModel.trim(), repair.deviceCondition.trim()].filter(Boolean).join(' — '))
     .join(' + ') + (repairs.length > 2 ? ` + ${repairs.length - 2} máy khác` : '')
-  return normalizedValue === modelSummary || normalizedValue === legacySummary || normalizedValue === models[0]
+  return normalizedValue === generatedSummary || normalizedValue === unformattedGeneratedSummary || normalizedValue === modelSummary || normalizedValue === legacySummary || normalizedValue === models[0]
+}
+
+function isAutomaticSaleNote(value: string | undefined, lines: SalesInvoiceDetails['lines']) {
+  if (!value?.trim()) return true
+  const productNames = lines.map((line) => line.productName.trim()).filter(Boolean)
+  if (productNames.length === 0) return false
+  const generatedSummary = productNames.join(' + ')
+  const legacyNames = productNames.slice(0, 2)
+  const legacySummary = `${legacyNames.join(' + ')}${productNames.length > 2 ? ` + ${productNames.length - 2} sản phẩm khác` : ''}`
+  return value.trim() === generatedSummary || value.trim() === legacySummary || value.trim() === productNames[0]
 }
 
 function normalizePhone(value: string) {

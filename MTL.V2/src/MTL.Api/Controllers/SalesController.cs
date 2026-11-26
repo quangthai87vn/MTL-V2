@@ -390,7 +390,8 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
             InstallmentReference = Clean(request.InstallmentReference),
             InstallmentPaymentAccountId = request.IsInstallment ? request.InstallmentPaymentAccountId : null,
             PaymentDueDateUtc = request.PaymentDueDateUtc?.ToUniversalTime(),
-            Notes = Clean(request.Notes)
+            Notes = Clean(request.Notes),
+            PrintNotes = Clean(request.PrintNotes)
         };
 
         if (!TryAddServiceTypeIds(request.ServiceTypeIds, activeServiceTypes, selectedInvoiceServiceTypeIds, out var serviceTypeError))
@@ -737,6 +738,7 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
         invoice.InstallmentPaymentAccount = null;
         invoice.PaymentDueDateUtc = request.PaymentDueDateUtc?.ToUniversalTime();
         invoice.Notes = Clean(request.Notes);
+        invoice.PrintNotes = Clean(request.PrintNotes);
         invoice.PromotionId = null;
         invoice.PromotionName = null;
         invoice.PromotionDiscountAmount = 0;
@@ -1853,6 +1855,7 @@ public sealed class SalesController(AppDbContext db, ICurrentUser currentUser) :
             InstallmentPaymentAccountName = invoice.InstallmentPaymentAccount?.Name,
             RepairStatus = invoice.RepairStatus,
             ExpectedReturnAtUtc = invoice.ExpectedReturnAtUtc,
+            PrintNotes = invoice.PrintNotes,
             Repairs = repairItems,
             ServiceTypes = serviceTypes
         };
@@ -1886,6 +1889,7 @@ public sealed record SalesInvoiceDetails(Guid Id, string Number, SalesInvoiceTyp
     public string? InstallmentPaymentAccountName { get; init; }
     public RepairStatus? RepairStatus { get; init; }
     public DateTimeOffset? ExpectedReturnAtUtc { get; init; }
+    public string? PrintNotes { get; init; }
     public IReadOnlyList<RepairOrderItem> Repairs { get; init; } = [];
     public IReadOnlyList<ServiceTypeItem> ServiceTypes { get; init; } = [];
 }
@@ -1912,6 +1916,7 @@ public sealed record CreateSalesInvoiceRequest(SalesInvoiceType Type, string Cus
     public IReadOnlyList<Guid>? ServiceTypeIds { get; init; }
     public RepairStatus? RepairStatus { get; init; }
     public DateTimeOffset? ExpectedReturnAtUtc { get; init; }
+    public string? PrintNotes { get; init; }
 }
 public sealed record CreateSalesInvoiceLineRequest(Guid? ProductId, string? ProductName, decimal Quantity, string? UnitName, decimal UnitPrice, decimal DiscountAmount, string? Notes)
 {

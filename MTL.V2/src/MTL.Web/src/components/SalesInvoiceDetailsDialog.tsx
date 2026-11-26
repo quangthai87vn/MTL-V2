@@ -53,7 +53,8 @@ export function SalesInvoiceDetailsDialog({ invoiceId, autoPrintMode, onClose }:
         </div>
         <div className="invoice-issued-by"><span>Người xuất hóa đơn</span><strong>{invoice.issuer.name}</strong>{invoice.issuer.email && <small>{invoice.issuer.email}</small>}</div>
 
-        {invoice.notes && <section className="invoice-purpose-detail"><FileText size={18} /><div><small>NỘI DUNG / GHI CHÚ HÓA ĐƠN</small><strong>{invoice.notes}</strong></div></section>}
+        {invoice.notes && <section className="invoice-purpose-detail"><FileText size={18} /><div><small>NỘI DUNG HIỂN THỊ NỘI BỘ</small><strong>{invoice.notes}</strong></div></section>}
+        {invoice.printNotes && <section className="invoice-purpose-detail print-note-preview"><ReceiptText size={18} /><div><small>GHI CHÚ TRÊN BILL</small><strong>{invoice.printNotes}</strong></div></section>}
 
         {(invoice.repairs?.length || invoice.repair) && <section className="sales-details-section repair-details">
           <h3><Wrench size={18} /> Thông tin máy sửa chữa ({invoice.repairs?.length || 1})</h3>
@@ -101,6 +102,8 @@ function InvoicePrintTemplate({ invoice, mode }: { invoice: SalesInvoiceDetails;
     </section>
 
     {(invoice.repairs?.length || invoice.repair) && <section className="print-repair-info">{(invoice.repairs?.length ? invoice.repairs : invoice.repair ? [invoice.repair] : []).map((repair, index) => <div key={repair.id || `${repair.deviceModel}-${index}`}><p><b>Máy {index + 1}:</b> {repair.deviceModel}{repair.deviceCondition ? <> · <b>Tình trạng:</b> {repair.deviceCondition}</> : null}</p><p><b>Dịch vụ:</b> {repair.services?.length ? repair.services.map((service) => `${service.name}${service.notes ? ` — ${service.notes}` : ''} (${formatPrintMoney(service.amount)} đ)`).join(', ') : repair.serviceTypes?.map((item) => item.name).join(', ') || '—'}</p></div>)}</section>}
+
+    {invoice.printNotes && <section className="print-invoice-note"><b>Ghi chú:</b> <span>{invoice.printNotes}</span></section>}
 
     <table className="print-lines-table">
       <thead><tr><th>STT</th><th>HÀNG HÓA / DỊCH VỤ</th><th>SL</th><th>ĐƠN GIÁ</th><th>THÀNH TIỀN</th></tr></thead>

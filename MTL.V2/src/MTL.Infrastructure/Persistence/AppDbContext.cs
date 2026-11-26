@@ -147,6 +147,7 @@ public sealed class AppDbContext(
             entity.Property(x => x.RepairStatus).HasConversion<string>().HasMaxLength(30);
             entity.Property(x => x.PromotionDiscountAmount).HasPrecision(18, 2);
             entity.Property(x => x.VoucherDiscountAmount).HasPrecision(18, 2);
+            entity.Property(x => x.PrintNotes).HasMaxLength(2000);
             entity.HasOne(x => x.InstallmentPaymentAccount).WithMany().HasForeignKey(x => x.InstallmentPaymentAccountId).OnDelete(DeleteBehavior.SetNull);
             ConfigureMoney(entity);
             entity.Property(x => x.LegacySource).HasMaxLength(50);

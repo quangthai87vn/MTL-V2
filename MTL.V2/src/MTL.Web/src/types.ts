@@ -265,6 +265,7 @@ export type RevenueReport = {
 export type SalesInvoiceDetails = SalesInvoice & {
   customerEmail?: string
   customerAddress?: string
+  printNotes?: string
   subtotal: number
   discountAmount: number
   promotionId?: string
