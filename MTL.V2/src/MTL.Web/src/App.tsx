@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage'
 import { ModulePlaceholderPage } from './pages/ModulePlaceholderPage'
 import { ProductsPage } from './pages/ProductsPage'
 import { PurchasesPage } from './pages/PurchasesPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { SalesPage } from './pages/SalesPage'
 import { SettingsPage } from './pages/SettingsPage'
 
@@ -43,7 +44,7 @@ export function App() {
         <Route path="sales" element={<SalesPage />} />
         <Route path="purchases" element={<PurchasesPage />} />
         <Route path="inventory" element={<ModulePlaceholderPage module="inventory" />} />
-        <Route path="reports" element={<ModulePlaceholderPage module="reports" />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to={user ? '/' : '/login'} replace />} />

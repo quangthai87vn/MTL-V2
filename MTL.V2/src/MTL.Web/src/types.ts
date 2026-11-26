@@ -188,6 +188,80 @@ export type SalesFilterOptions = {
   paymentAccounts: PaymentAccount[]
 }
 
+export type RevenueReportGrouping = 'Day' | 'Month' | 'Year'
+
+export type RevenueReportFilterOptions = {
+  creators: Array<{ id: string; name: string }>
+  paymentAccounts: Array<{
+    id: string
+    name: string
+    bankName: string
+    accountNumber: string
+    accountHolder: string
+    isActive: boolean
+  }>
+}
+
+export type RevenueReport = {
+  from: string
+  to: string
+  groupBy: RevenueReportGrouping
+  generatedAtUtc: string
+  summary: {
+    invoiceRevenue: number
+    collectedAmount: number
+    scheduledAmount: number
+    outstandingAmount: number
+    invoiceCount: number
+    averageInvoiceValue: number
+    previousInvoiceRevenue: number
+    previousCollectedAmount: number
+    revenueChangePercent?: number
+    collectedChangePercent?: number
+  }
+  timeline: Array<{
+    label: string
+    from: string
+    to: string
+    invoiceRevenue: number
+    collectedAmount: number
+    cashAmount: number
+    bankAmount: number
+    scheduledAmount: number
+    invoiceCount: number
+  }>
+  paymentSources: Array<{
+    key: 'cash' | 'bank'
+    label: string
+    amount: number
+    transactionCount: number
+    share: number
+  }>
+  banking: Array<{
+    paymentAccountId?: string
+    name: string
+    bankName: string
+    accountNumber?: string
+    accountHolder?: string
+    actualAmount: number
+    scheduledAmount: number
+    transactionCount: number
+    share: number
+  }>
+  invoices: Array<{
+    id: string
+    number: string
+    type: SalesInvoiceType
+    customerName: string
+    invoiceDateUtc: string
+    totalAmount: number
+    collectedAmount: number
+    outstandingAmount: number
+    paymentSource: string
+    createdByName: string
+  }>
+}
+
 export type SalesInvoiceDetails = SalesInvoice & {
   customerEmail?: string
   customerAddress?: string
